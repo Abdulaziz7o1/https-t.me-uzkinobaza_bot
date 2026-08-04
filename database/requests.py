@@ -174,13 +174,13 @@ async def movie_exists_db(movie_id: int) -> bool:
             return row is not None
 
 async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
-    """Belgilangan ID (kino kodi) bilan yangi kino qo'shish"""
+    """Belgilangan ID (kino kodi) bilan yangi kinoni yangilab yoki yangi qo'shish"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
     async with get_db() as db:
         await db.execute(
-            "INSERT INTO movies (id, file_id, caption) VALUES (?, ?, ?)",
+            "INSERT OR REPLACE INTO movies (id, file_id, caption) VALUES (?, ?, ?)",
             (movie_id, file_id, caption)
         )
         await db.commit()
@@ -188,13 +188,10 @@ async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
         return True
 
 async def get_movie(movie_id: int):
-    """Kino ma'lumotlarini olish va ko'rishlar sonini oshirish"""
+    """Kino ma'lumotlarini to'g'ridan-to'g'ri bazadan real-vaqt rejimida olish"""
     from database.connection import cache
-    cache_key = f"movie_{movie_id}"
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
-    
+    cache.delete(f"movie_{movie_id}")
+
     async with get_db() as db:
         async with db.execute("SELECT file_id, caption FROM movies WHERE id = ?", (movie_id,)) as cursor:
             movie = await cursor.fetchone()
@@ -202,7 +199,6 @@ async def get_movie(movie_id: int):
             # Ko'rishlar sonini bittaga oshirish
             await db.execute("UPDATE movies SET views_count = views_count + 1 WHERE id = ?", (movie_id,))
             await db.commit()
-            cache.set(cache_key, movie, ttl_seconds=120)
         return movie
 
 async def delete_movie(movie_id: int) -> bool:
