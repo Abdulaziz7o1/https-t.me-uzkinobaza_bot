@@ -78,7 +78,7 @@ async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: 
             await bot.send_video(
                 chat_id=target_channel,
                 video=file_id,
-                caption=f"🎬 <b>Yangi kino qo'shildi!</b>\n\n🎬 {caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n\n🤖 {config.BOT_USERNAME}",
+                caption=f"🎬 <b>Yangi kino qo'shildi!</b>\n\n🎬 {caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n\n🤖 {config.BOT_USERNAME}",
                 parse_mode="HTML"
             )
         except Exception as e:
