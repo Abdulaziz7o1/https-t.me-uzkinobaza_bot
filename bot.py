@@ -409,9 +409,33 @@ async def on_startup(bot: Bot):
     asyncio.create_task(auto_expire_movies_scheduler(bot))
     logging.info("Barcha schedulerlar (Backup, Broadcast, Daily Movie, Bi-weekly Premium, Birthday, Admin PIN 2FA, Inactive Cleanup, 2-Yearly Global Unban, Kassa Report, Auto Expire) muvaffaqiyatli ishga tushdi.")
 
-
+async def start_health_web_server():
+    """Render.com Free Web Service uchun port va ping tinglovchi ($0/month BEPUL tarif uchun)"""
+    try:
+        from aiohttp import web
+        import os
+        port = os.getenv("PORT")
+        if port:
+            app = web.Application()
+            async def health_check(request):
+                return web.Response(text="Kino Bot is running!")
+            app.router.add_get("/", health_check)
+            app.router.add_get("/health", health_check)
+            runner = web.AppRunner(app)
+            await runner.setup()
+            site = web.TCPSite(runner, "0.0.0.0", int(port))
+            await site.start()
+            logging.info(f"Render Free Web Server {port}-portda ishga tushdi! 🚀")
+    except Exception as e:
+        logging.warning(f"Web serverni ishga tushirishda ogohlantirish: {e}")
 
 async def main():
+    # Database yaratish va sozlash
+    await init_db()
+    
+    # Web serverni Render Free uchun ishga tushirish
+    await start_health_web_server()
+    
     # Bot obyektini yaratish with proxy support
     from aiogram.client.session.aiohttp import AiohttpSession
     from aiohttp_socks import ProxyConnector
