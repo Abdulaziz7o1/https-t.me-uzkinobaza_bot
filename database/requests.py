@@ -202,22 +202,27 @@ async def get_movie(movie_id: int):
         return movie
 
 async def delete_movie(movie_id: int) -> bool:
-    """Kinoni o'chirish va keshni zudlik bilan tozalash"""
+    """Kinoni bazadan, keshdan va barcha xotira bo'limlaridan butunlay yo'q qilish"""
     from database.connection import cache
-    cache_key = f"movie_{movie_id}"
-    cache.delete(cache_key)
+    cache.delete(f"movie_{movie_id}")
 
     async with get_db() as db:
         async with db.execute("SELECT id FROM movies WHERE id = ?", (movie_id,)) as cursor:
-            if not await cursor.fetchone():
-                cache.delete(cache_key)
+            row = await cursor.fetchone()
+            if not row:
+                cache.delete(f"movie_{movie_id}")
                 return False
+
         await db.execute("DELETE FROM movies WHERE id = ?", (movie_id,))
         await db.execute("DELETE FROM favorites WHERE movie_id = ?", (movie_id,))
         await db.execute("DELETE FROM ratings WHERE movie_id = ?", (movie_id,))
         await db.execute("DELETE FROM comments WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM watch_history WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM movie_reports WHERE movie_id = ?", (movie_id,))
         await db.commit()
-        cache.delete(cache_key)
+
+        cache.delete(f"movie_{movie_id}")
+        cache.clear()
         return True
 
 async def search_movies_by_name(query: str):
