@@ -140,6 +140,7 @@ async def cmd_start(message: Message, state: FSMContext):
                     video=file_id,
                     caption=cap,
                     parse_mode="HTML",
+                    protect_content=True,
                     reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating)
                 )
             else:
@@ -295,6 +296,7 @@ async def search_movie_by_code(message: Message):
             video=file_id,
             caption=cap,
             parse_mode="HTML",
+            protect_content=True,
             reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires)
         )
     else:
@@ -905,6 +907,7 @@ async def random_movie(message: Message, state: FSMContext):
             video=file_id,
             caption=cap,
             parse_mode="HTML",
+            protect_content=True,
             reply_markup=get_movie_action_keyboard(random_id, is_fav, avg_rating)
         )
     else:
