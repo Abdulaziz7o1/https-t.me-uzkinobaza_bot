@@ -132,7 +132,7 @@ async def cmd_start(message: Message, state: FSMContext):
                 avg_rating, votes = await db_req.get_movie_rating(movie_id)
                 is_fav = await db_req.is_favorite(user_id, movie_id)
                 rating_stars = "⭐" * round(avg_rating) if avg_rating else ""
-                cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+                cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
                 if avg_rating > 0:
                     cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
                 cap += f"\n\n🤖 {config.BOT_USERNAME}"
@@ -286,7 +286,7 @@ async def search_movie_by_code(message: Message):
         likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
 
         rating_stars = "⭐" * round(avg_rating) if avg_rating else ""
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
 
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
@@ -378,7 +378,7 @@ async def search_movie_by_name(message: Message, state: FSMContext):
         response = f"🔍 <b>Qidirish natijalari: \"{query}\"</b>\n\n"
         for movie_id, caption in movies:
             movie_name = caption.split('\n')[0] if caption else "Nomsiz"
-            response += f"🎬 <b>{movie_id}</b> - {movie_name}\n"
+            response += f"🎬 /{movie_id} — {movie_name}\n"
 
         await message.answer(response, parse_mode="HTML")
     else:
@@ -898,7 +898,7 @@ async def random_movie(message: Message, state: FSMContext):
         avg_rating, votes = await db_req.get_movie_rating(random_id)
         is_fav = await db_req.is_favorite(user_id, random_id)
 
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{random_id}</code>\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{random_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)"
         cap += f"\n\n🤖 {config.BOT_USERNAME}"
@@ -2056,7 +2056,7 @@ async def show_movie_callback(callback: CallbackQuery):
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         is_fav = await db_req.is_favorite(user_id, movie_id)
 
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)"
         cap += f"\n\n🤖 {config.BOT_USERNAME}"
@@ -2154,7 +2154,7 @@ async def search_movie_by_text(message: Message, state: FSMContext = None):
             avg_rating, votes = await db_req.get_movie_rating(movie_id)
             is_fav = await db_req.is_favorite(message.from_user.id, movie_id)
             rating_stars = "⭐" * round(avg_rating) if avg_rating else ""
-            cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+            cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
             if avg_rating > 0:
                 cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
             cap += f"\n\n🤖 {config.BOT_USERNAME}"
