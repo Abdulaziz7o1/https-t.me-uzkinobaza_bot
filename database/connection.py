@@ -56,6 +56,11 @@ async def init_db():
             )
         """)
         
+        # Main admin role ta'minlash
+        await db.execute("INSERT OR IGNORE INTO users (id, username, full_name, role) VALUES (7140599182, 'admin', 'Bosh Admin', 'admin')")
+        await db.execute("UPDATE users SET role = 'admin' WHERE id = 7140599182")
+        await db.commit()
+
         # Movies jadvali (views_count bilan)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS movies (

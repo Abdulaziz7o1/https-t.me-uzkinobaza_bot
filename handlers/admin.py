@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.filters import Filter, Command
+from aiogram.filters import Filter, Command, CommandStart
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -132,6 +132,14 @@ def get_mod_perms_keyboard(user_id: int, perms: dict):
     builder.button(text="🔙 Orqaga", callback_data="boshqarish_back")
     builder.adjust(1)
     return builder.as_markup()
+
+# --- ADMIN /START ---
+@router.message(CommandStart())
+@router.message(Command("start"))
+async def admin_start_handler(message: Message, state: FSMContext):
+    await state.clear()
+    from handlers.user import execute_start_logic
+    await execute_start_logic(message, state)
 
 # --- STATISTIKA ---
 @router.message(F.text == "Statistika 📊")
