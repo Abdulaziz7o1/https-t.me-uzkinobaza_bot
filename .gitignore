@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 *.log
 node_modules/
+kino_bot.db
+*.db
+*.sqlite
+*.sqlite3

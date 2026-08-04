@@ -77,6 +77,9 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Eski test videosini bazadan to'liq tozalash
+        await db.execute("DELETE FROM movies WHERE caption NOT LIKE '%Qimorda%' AND (caption IS NULL OR caption = '' OR file_id LIKE '%BAACAgI%')")
+        await db.commit()
         
         # Favorites jadvali (tanlangan kinolar)
         await db.execute("""
