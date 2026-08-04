@@ -115,6 +115,7 @@ class StateCancelMiddleware(BaseMiddleware):
         if isinstance(event, Message) and event.text:
             text_clean = event.text.lower().replace("\ufe0f", "").strip()
             menu_keywords = [
+                "/start", "start", "/cancel", "cancel", "/help",
                 "qidirish", "saqlanganlar", "tanlanganlar", "tasodifiy", "so'rash",
                 "ballarim", "bonus", "reytinglar", "referal", "so'rovlari",
                 "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
@@ -122,7 +123,7 @@ class StateCancelMiddleware(BaseMiddleware):
                 "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",
                 "moderatorlar", "trendlari", "kun kinosi", "shubhali", "keshni", "ommaviy"
             ]
-            if any(kw in text_clean for kw in menu_keywords):
+            if text_clean.startswith("/") or any(kw in text_clean for kw in menu_keywords):
                 state = data.get("state")
                 if state:
                     current_state = await state.get_state()
@@ -130,7 +131,7 @@ class StateCancelMiddleware(BaseMiddleware):
                         await state.clear()
                         data["raw_state"] = None
                         import logging
-                        logging.info(f"FSM state '{current_state}' cleared automatically for menu button.")
+                        logging.info(f"FSM state '{current_state}' cleared automatically for command/menu button '{text_clean}'.")
         return await handler(event, data)
 
 

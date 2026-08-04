@@ -92,7 +92,8 @@ async def execute_start_logic(message: Message, state: FSMContext):
             reply_markup=get_user_menu()
         )
 
-@router.message(CommandStart())
+@router.message(CommandStart(), StateFilter("*"))
+@router.message(Command("start"), StateFilter("*"))
 async def cmd_start(message: Message, state: FSMContext):
     """Start komandasi - umumiy start logikasini chaqirish"""
     await execute_start_logic(message, state)

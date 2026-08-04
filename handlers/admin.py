@@ -134,8 +134,8 @@ def get_mod_perms_keyboard(user_id: int, perms: dict):
     return builder.as_markup()
 
 # --- ADMIN /START ---
-@router.message(CommandStart())
-@router.message(Command("start"))
+@router.message(CommandStart(), StateFilter("*"))
+@router.message(Command("start"), StateFilter("*"))
 async def admin_start_handler(message: Message, state: FSMContext):
     await state.clear()
     from handlers.user import execute_start_logic
