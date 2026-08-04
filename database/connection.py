@@ -23,7 +23,13 @@ class SimpleCache:
     def set(self, key, value, ttl_seconds=300):
         self.cache[key] = value
         self.ttls[key] = datetime.now() + timedelta(seconds=ttl_seconds)
-    
+
+    def delete(self, key):
+        if key in self.cache:
+            del self.cache[key]
+        if key in self.ttls:
+            del self.ttls[key]
+
     def clear(self):
         self.cache.clear()
         self.ttls.clear()

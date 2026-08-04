@@ -210,8 +210,8 @@ async def add_movie_id(message: Message, state: FSMContext):
 
     movie_id = int(text)
     
-    # Kod band emasligini tekshirish
-    exists = await db_req.get_movie(movie_id)
+    # Kod band emasligini haqiqiy SQL bazadan tekshirish
+    exists = await db_req.movie_exists_db(movie_id)
     if exists:
         await message.answer(f"❌ <b>{movie_id}</b> kodli kino allaqachon mavjud!\nIltimos, boshqa kod kiriting:")
         return

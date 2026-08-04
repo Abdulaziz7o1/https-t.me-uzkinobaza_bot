@@ -166,14 +166,25 @@ async def add_movie(file_id: str, caption: str) -> int:
         await db.commit()
         return cursor.lastrowid
 
+async def movie_exists_db(movie_id: int) -> bool:
+    """Kesh-ga qaramay haqiqiy SQL bazada kino borligini tekshirish"""
+    async with get_db() as db:
+        async with db.execute("SELECT 1 FROM movies WHERE id = ?", (movie_id,)) as cursor:
+            row = await cursor.fetchone()
+            return row is not None
+
 async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
     """Belgilangan ID (kino kodi) bilan yangi kino qo'shish"""
+    from database.connection import cache
+    cache.delete(f"movie_{movie_id}")
+
     async with get_db() as db:
         await db.execute(
             "INSERT INTO movies (id, file_id, caption) VALUES (?, ?, ?)",
             (movie_id, file_id, caption)
         )
         await db.commit()
+        cache.delete(f"movie_{movie_id}")
         return True
 
 async def get_movie(movie_id: int):
@@ -195,13 +206,22 @@ async def get_movie(movie_id: int):
         return movie
 
 async def delete_movie(movie_id: int) -> bool:
-    """Kinoni o'chirish"""
+    """Kinoni o'chirish va keshni zudlik bilan tozalash"""
+    from database.connection import cache
+    cache_key = f"movie_{movie_id}"
+    cache.delete(cache_key)
+
     async with get_db() as db:
         async with db.execute("SELECT id FROM movies WHERE id = ?", (movie_id,)) as cursor:
             if not await cursor.fetchone():
+                cache.delete(cache_key)
                 return False
         await db.execute("DELETE FROM movies WHERE id = ?", (movie_id,))
+        await db.execute("DELETE FROM favorites WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM ratings WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM comments WHERE movie_id = ?", (movie_id,))
         await db.commit()
+        cache.delete(cache_key)
         return True
 
 async def search_movies_by_name(query: str):
