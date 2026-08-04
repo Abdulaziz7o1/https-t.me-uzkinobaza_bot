@@ -245,9 +245,12 @@ async def search_movie_by_code(message: Message):
     movie_id = int(message.text.lstrip('/'))
     movie = await db_req.get_movie(movie_id)
 
-    # Kunlik limit tekshirish (premium bo'lmaganlar uchun)
+    # Admin, Moderator va Premium foydalanuvchilar uchun kutish va limiti yo'q (0 second)
     is_premium = await db_req.is_premium_user(user_id)
-    if not is_premium:
+    is_admin_or_mod = (user_id in config.ADMINS or user_id in await db_req.get_all_admins())
+    skip_wait = is_premium or is_admin_or_mod
+
+    if not skip_wait:
         daily_count = await db_req.get_daily_movie_count(user_id)
         bonus_limit = await db_req.get_daily_bonus_limit(user_id)
         max_allowed = 3 + bonus_limit
@@ -261,28 +264,16 @@ async def search_movie_by_code(message: Message):
             return
 
     if movie:
-        # Kunlik limitni oshirish (premium bo'lmaganlar uchun)
-        if not is_premium:
+        # Kunlik limitni oshirish va 5 soniyalik timer (faqat bepul foydalanuvchilar uchun)
+        if not skip_wait:
             await db_req.increment_daily_movie_count(user_id)
-            
-            # 7 soniyalik kutish taymeri va jonli hisoblagich
             cd_msg = await message.answer(
-                "⏳ <b>Kino yuklanmoqda... 7...</b>\n\n"
+                "⏳ <b>Kino yuklanmoqda... 5...</b>\n\n"
                 "💎 <i>Premium olsangiz har bir kino uchun kutish vaqti 0 second bo'ladi!</i>",
                 parse_mode="HTML"
             )
             import asyncio
-            for sec in range(6, 0, -1):
-                await asyncio.sleep(1)
-                try:
-                    await cd_msg.edit_text(
-                        f"⏳ <b>Kino yuklanmoqda... {sec}...</b>\n\n"
-                        f"💎 <i>Premium olsangiz har bir kino uchun kutish vaqti 0 second bo'ladi!</i>",
-                        parse_mode="HTML"
-                    )
-                except Exception:
-                    pass
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
             try:
                 await cd_msg.delete()
             except Exception:
