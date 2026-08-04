@@ -26,6 +26,7 @@ class AdminStates(StatesGroup):
     waiting_for_movie_id = State()
     waiting_for_movie_video = State()
     waiting_for_movie_caption = State()
+    waiting_for_movie_id_for_video = State()
     waiting_for_movie_delete = State()
     waiting_for_broadcast_msg = State()
     waiting_for_channel_id = State()
@@ -262,6 +263,57 @@ async def add_movie_video(message: Message, state: FSMContext):
         "<i>Eslatma: Agar tavsif kerak bo'lmasa, nuqta (.) yuboring.</i>",
         parse_mode="HTML"
     )
+
+# --- DIRECT VIDEO SENDING BY ADMIN (VIDEO FIRST -> CODE SECOND) ---
+@router.message(StateFilter(None), F.video | F.document)
+async def admin_direct_video_handler(message: Message, state: FSMContext):
+    if not await db_req.has_permission(message.from_user.id, "add_movie"):
+        return
+    file_id = message.video.file_id if message.video else message.document.file_id
+    caption = message.caption or ""
+    await state.update_data(direct_file_id=file_id, direct_caption=caption)
+    await state.set_state(AdminStates.waiting_for_movie_id_for_video)
+    await message.answer(
+        "🎬 <b>Kino video fayli qabul qilindi!</b>\n\n"
+        "🔢 <b>Ushbu kino uchun kod (raqam) kiriting:</b>\n"
+        "<i>Eslatma: Kod faqat sonlardan iborat bo'lishi va bazada takrorlanmasligi kerak.</i>",
+        parse_mode="HTML"
+    )
+
+@router.message(AdminStates.waiting_for_movie_id_for_video, F.text)
+async def admin_save_direct_video_code(message: Message, state: FSMContext):
+    text = message.text.strip()
+    if text in MENU_BUTTONS:
+        await state.clear()
+        return
+
+    if not text.isdigit():
+        await message.answer("⚠️ Iltimos, faqat musbat sonlardan iborat kino kodini kiriting!")
+        return
+
+    movie_id = int(text)
+    exists = await db_req.movie_exists_db(movie_id)
+    if exists:
+        await message.answer(f"❌ <b>{movie_id}</b> kodli kino allaqachon mavjud!\nIltimos, boshqa kod kiriting:")
+        return
+
+    data = await state.get_data()
+    file_id = data.get("direct_file_id")
+    caption = data.get("direct_caption", "")
+
+    if not file_id:
+        await message.answer("⚠️ Video fayli topilmadi. Qaytadan video yuboring.")
+        await state.clear()
+        return
+
+    await db_req.add_movie_with_id(movie_id, file_id, caption)
+    await state.clear()
+    await message.answer(
+        f"✅ <b>Kino muvaffaqiyatli qo'shildi!</b>\n\n"
+        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>",
+        parse_mode="HTML"
+    )
+    await auto_post_movie_to_channel(message.bot, movie_id, file_id, caption)
 
 MENU_BUTTONS = [
     "Kino qo'shish ➕", "Kino o'chirish ❌", "Statistika 📊",
