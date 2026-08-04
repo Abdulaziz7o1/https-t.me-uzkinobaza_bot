@@ -271,9 +271,21 @@ MENU_BUTTONS = [
     "Referal sozlash 👥", "Shubhali harakatlar 🚨", "Keshni tozalash 🧹"
 ]
 
-@router.message(AdminStates.waiting_for_movie_video, ~F.text.in_(MENU_BUTTONS))
+@router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
-    await message.answer("⚠️ Iltimos, faqat video fayl yuboring! Yoki bekor qilish uchun /cancel yozing.")
+    if message.text in MENU_BUTTONS:
+        await state.clear()
+        return
+
+    data = await state.get_data()
+    m_id = data.get("movie_id", "?")
+    await message.answer(
+        f"⚠️ Siz <b>{m_id}</b> kodi uchun video yuklash bosqichidasiz.\n\n"
+        f"🎬 <b>Iltimos, kino video faylini yuboring!</b>\n\n"
+        f"📌 <i>Eslatma: Video fayli yuklanib jarayon to'liq yakunlanmaguncha <b>{m_id}</b> kodi bazaga saqlanmaydi va bo'sh qoladi.\n"
+        f"Jarayonni bekor qilish uchun /cancel yoki /start yuboring.</i>",
+        parse_mode="HTML"
+    )
 
 @router.message(AdminStates.waiting_for_movie_caption, F.text, ~F.text.in_(MENU_BUTTONS))
 async def add_movie_caption(message: Message, state: FSMContext):
