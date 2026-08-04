@@ -8,16 +8,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN or BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
     raise ValueError("BOT_TOKEN .env faylida ko'rsatilmagan!")
 
-# Adminlar ro'yxatini olish
-admins_raw = os.getenv("ADMINS", "7140599182")
+# Yagona Bosh Admin
 ADMINS = [7140599182]
-if admins_raw:
-    for admin in admins_raw.split(","):
-        admin = admin.strip()
-        if admin.isdigit():
-            val = int(admin)
-            if val not in ADMINS:
-                ADMINS.append(val)
 
 # Kanallar ro'yxatini olish
 channels_raw = os.getenv("CHANNELS", "")
