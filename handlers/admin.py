@@ -2661,13 +2661,13 @@ async def admin_approve_prem_callback(callback: CallbackQuery):
     parts = callback.data.split("_")
     u_id = int(parts[3])
     days = int(parts[4]) if len(parts) > 4 else 30
+    amount = int(parts[5]) if len(parts) > 5 and parts[5].isdigit() else (55000 if days == 90 else 20000)
     
     await db_req.set_user_premium(u_id, days=days)
     
     period_text = f"{days // 30} oylik" if days % 30 == 0 else f"{days} kunlik"
     
-    # Kassaga to'lov summasini yozish
-    amount = 25000 if days == 90 else 10000
+    # Kassaga to'lov summasini yozish (O'zgartirilgan haqiqiy narx)
     plan_str = f"{period_text} Premium"
     await db_req.add_payment_record(u_id, amount, plan_str, confirmed_by=callback.from_user.id)
     
@@ -3069,10 +3069,11 @@ async def show_kassa_panel(message: Message, state: FSMContext):
     txt += f"💵 <b>Hozirgi Kassa Balansi:</b> <code>{kassa_total:,} UZS</code>\n\n"
     
     if payments:
-        txt += "📋 <b>So'nggi 10 ta to'lovlar tarixi:</b>\n\n"
+        txt += "📋 <b>So'nggi 10 ta to'lovlar tarixi (Namangan / Uzb vaqti):</b>\n\n"
         for p_id, u_id, amount, plan, created_at, username, full_name in payments:
             name = f"@{username}" if username else full_name or str(u_id)
-            txt += f"• 👤 {name} — <b>{amount:,} UZS</b> ({plan})\n  <i>{created_at}</i>\n"
+            time_str = str(created_at)[:19] if created_at else "—"
+            txt += f"• 👤 {name} — <b>{amount:,} UZS</b> ({plan})\n  🕒 <i>{time_str}</i>\n"
     else:
         txt += "📋 <i>Hali to'lovlar tarixi mavjud emas.</i>"
         

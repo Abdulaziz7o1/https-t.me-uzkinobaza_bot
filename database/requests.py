@@ -2219,17 +2219,30 @@ async def global_unban_all_users() -> int:
 
 
 # ─── KASSA VA TO'LOVLAR TARIXI FUNKSIYALARI ──────────────────────────────────
+async def has_user_bought_premium_before(user_id: int) -> bool:
+    """Foydalanuvchi ilgarigi vaqtda kamida 1 marta Premium olganligini tekshirish"""
+    async with get_db() as db:
+        async with db.execute("SELECT COUNT(*) FROM payment_records WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row and row[0] > 0:
+                return True
+    return False
+
 async def add_payment_record(user_id: int, amount: int, plan: str, confirmed_by: int) -> int:
-    """To'lov yozuvini saqlash va Kassa balansini oshirish"""
+    """To'lov yozuvini Uzbekistan (UTC+5 Namangan) vaqti bilan saqlash va Kassa balansini oshirish"""
+    from datetime import datetime, timedelta, timezone
+    uzb_tz = timezone(timedelta(hours=5))
+    now_uzb_str = datetime.now(uzb_tz).strftime("%Y-%m-%d %H:%M:%S")
+
     async with get_db() as db:
         await db.execute(
-            "INSERT INTO payment_records (user_id, amount, plan, confirmed_by) VALUES (?, ?, ?, ?)",
-            (user_id, amount, plan, confirmed_by)
+            "INSERT INTO payment_records (user_id, amount, plan, confirmed_by, created_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, amount, plan, confirmed_by, now_uzb_str)
         )
         # Kassa balansini yangilash
         async with db.execute("SELECT value FROM bot_settings WHERE key = 'kassa_total'") as cursor:
             row = await cursor.fetchone()
-            current_total = int(row[0]) if row and row[0].isdigit() else 0
+            current_total = int(row[0]) if row and str(row[0]).isdigit() else 0
             
         new_total = current_total + amount
         await db.execute(

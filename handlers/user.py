@@ -727,14 +727,27 @@ async def process_premium_payment_cb(callback: CallbackQuery, state: FSMContext)
         days = 30
         plan_label = "1 oylik"
 
+    is_repeat = await db_req.has_user_bought_premium_before(user_id)
+
     if discount_pct > 0 and action in ["premium_monthly", "premium_quarterly"]:
-        final_price = int(base_price * (100 - discount_pct) / 100)
-        amount = f"{final_price:,} UZS ({discount_pct}% SKIDKA QO'LLANDI!)"
+        final_price = (int(base_price * (100 - discount_pct) / 100) // 1000) * 1000
+        amount = f"{final_price:,} UZS ({discount_pct}% PROMO SKIDKA QO'LLANDI!)"
+    elif is_repeat and action in ["premium_monthly", "premium_quarterly"]:
+        # 2-marta olishiga 15% chegirma va 1000 ga pastga yaxlitlash (masalan 46,750 -> 46,000 UZS)
+        final_price = (int(base_price * 0.85) // 1000) * 1000
+        amount = f"{final_price:,} UZS (🎉 15% TAKRORIY CHEGIRMA QO'LLANDI!)"
     else:
-        amount = f"{base_price:,} UZS" if action != "premium_manual" else "Kelishilgan summa"
+        final_price = base_price
+        amount = f"{final_price:,} UZS" if action != "premium_manual" else "Kelishilgan summa"
 
     await state.set_state(UserStates.waiting_for_payment_receipt)
-    await state.update_data(payment_plan=plan_name, payment_amount=amount, payment_days=days, payment_label=plan_label)
+    await state.update_data(
+        payment_plan=plan_name,
+        payment_amount=amount,
+        payment_raw_amount=final_price,
+        payment_days=days,
+        payment_label=plan_label
+    )
 
     msg = (
         f"💳 <b>TO'LOV MA'LUMOTLARI ({plan_name}):</b>\n\n"
@@ -821,8 +834,10 @@ async def user_payment_receipt_handler(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
     
+    raw_amount = data.get("payment_raw_amount", 55000 if days == 90 else 20000)
+    
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"✅ {plan_label} Premium tasdiqlash", callback_data=f"admin_approve_prem_{user.id}_{days}")],
+        [InlineKeyboardButton(text=f"✅ {plan_label} Premium tasdiqlash", callback_data=f"admin_approve_prem_{user.id}_{days}_{raw_amount}")],
         [
             InlineKeyboardButton(text="❌ Xato chek", callback_data=f"admin_reject_receipt_{user.id}"),
             InlineKeyboardButton(text="⚠️ Ogohlantirish", callback_data=f"admin_warn_receipt_{user.id}")
