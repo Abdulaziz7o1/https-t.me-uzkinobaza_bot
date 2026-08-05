@@ -46,6 +46,7 @@ class AdminStates(StatesGroup):
     waiting_for_bc_caption = State()
     waiting_for_bc_button = State()
     waiting_for_bc_button_url = State()
+    waiting_for_bc_button_title_after_url = State()
     waiting_for_bc_confirm = State()
     waiting_for_bc_target = State()
     waiting_for_ticket_reply = State()
@@ -947,14 +948,26 @@ async def bc_button_handler(message: Message, state: FSMContext):
         await show_bc_preview(message, state)
         return
 
-    # 2. Format: Faqat Link (masalan: https://t.me/...)
+    # 2. Format: Faqat Link (masalan: https://t.me/...) -> Endi tugma nomini so'raymiz
     if "http://" in text or "https://" in text or "t.me/" in text or "://" in text:
-        btn_text = "📍 Havolaga o'tish"
         btn_url = text
         if not btn_url.startswith("http"):
             btn_url = "https://" + btn_url
-        await state.update_data(bc_btn_text=btn_text, bc_btn_url=btn_url)
-        await show_bc_preview(message, state)
+        await state.update_data(bc_btn_url=btn_url)
+        await state.set_state(AdminStates.waiting_for_bc_button_title_after_url)
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="O'tkazib yuborish ⏭ (Standart \"📍 Havolaga o'tish\")", callback_data="bc_skip_button_title")],
+            [InlineKeyboardButton(text="Bekor qilish ❌", callback_data="bc_cancel")]
+        ])
+        await message.answer(
+            "✅ <b>Havola qabul qilindi!</b>\n\n"
+            "📝 <b>Endi ushbu tugma uchun maxsus nom yuboring:</b>\n"
+            "<i>Masalan: Botga kirish 🚀 yoki Premyerani ko'rish 🎬</i>\n\n"
+            "<i>(Nom bermasangiz «O'tkazib yuborish ⏭» tugmasini bosing — bot avtomatik «📍 Havolaga o'tish» nomini qo'yadi)</i>",
+            parse_mode="HTML",
+            reply_markup=kb
+        )
         return
 
     # 3. Format: Faqat Nomi (masalan: Botga kirish) -> Endi havolasini so'raymiz
@@ -973,6 +986,18 @@ async def bc_button_handler(message: Message, state: FSMContext):
         parse_mode="HTML",
         reply_markup=kb
     )
+
+@router.message(AdminStates.waiting_for_bc_button_title_after_url, F.text, ~F.text.in_(MENU_BUTTONS))
+async def bc_button_title_after_url_handler(message: Message, state: FSMContext):
+    btn_text = message.text.strip()
+    await state.update_data(bc_btn_text=btn_text)
+    await show_bc_preview(message, state)
+
+@router.callback_query(F.data == "bc_skip_button_title")
+async def bc_skip_button_title_callback(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(bc_btn_text="📍 Havolaga o'tish")
+    await show_bc_preview(callback.message, state, is_callback=True)
+    await callback.answer()
 
 @router.message(AdminStates.waiting_for_bc_button_url, F.text, ~F.text.in_(MENU_BUTTONS))
 async def bc_button_url_handler(message: Message, state: FSMContext):
