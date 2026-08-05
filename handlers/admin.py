@@ -862,12 +862,17 @@ async def bc_skip_media_callback(callback: CallbackQuery, state: FSMContext):
     )
     await callback.answer()
 
-@router.message(AdminStates.waiting_for_bc_caption, F.text, ~F.text.in_(MENU_BUTTONS))
+@router.message(AdminStates.waiting_for_bc_caption)
 async def bc_caption_handler(message: Message, state: FSMContext):
-    caption = message.text.strip()
+    caption = ""
+    if message.text:
+        caption = message.text.strip()
+    elif message.caption:
+        caption = message.caption.strip()
+        
     await state.update_data(bc_caption=caption)
-    
     await state.set_state(AdminStates.waiting_for_bc_button)
+    
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="O'tkazib yuborish ⏭ (Standart bot tugmasi)", callback_data="bc_skip_button")],
         [InlineKeyboardButton(text="Bekor qilish ❌", callback_data="bc_cancel")]
