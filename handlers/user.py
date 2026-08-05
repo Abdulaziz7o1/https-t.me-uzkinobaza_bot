@@ -394,9 +394,14 @@ async def search_movie_by_name(message: Message, state: FSMContext):
 
 
 # ─── PREMIUM OBUNA ─────────────────────────────────────────────────────────────
+@router.callback_query(F.data == "sub_buy_premium")
+async def sub_buy_premium_cb(callback: CallbackQuery):
+    await callback.answer()
+    await premium_info(callback.message)
+
 @router.message(Command("premium"))
 @router.message(F.text == "/premium")
-@router.message(F.text == "💎 Premium")
+@router.message(F.text.in_(["💎 Premium", "💎 VIP Premium", "VIP Premium 💎", "VIP Premium"]))
 async def premium_info(message: Message):
     user_id = message.from_user.id
     is_premium = await db_req.is_premium_user(user_id)

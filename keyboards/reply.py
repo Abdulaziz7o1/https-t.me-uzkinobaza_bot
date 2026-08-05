@@ -139,31 +139,34 @@ def get_user_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="🔍 Kino qidirish"),
-                KeyboardButton(text="⭐️ Saqlanganlar")
+                KeyboardButton(text="💎 VIP Premium"),
+                KeyboardButton(text="🔍 Kino qidirish")
             ],
             [
-                KeyboardButton(text="Tasodifiy Kino 🎲"),
-                KeyboardButton(text="Kino so'rash 🎬")
+                KeyboardButton(text="⭐️ Saqlanganlar"),
+                KeyboardButton(text="Tasodifiy Kino 🎲")
             ],
             [
-                KeyboardButton(text="💎 Mening Ballarim"),
-                KeyboardButton(text="🎁 Kunlik Bonus")
+                KeyboardButton(text="Kino so'rash 🎬"),
+                KeyboardButton(text="💎 Mening Ballarim")
             ],
             [
-                KeyboardButton(text="🏆 Reytinglar"),
-                KeyboardButton(text="👥 Referal")
+                KeyboardButton(text="🎁 Kunlik Bonus"),
+                KeyboardButton(text="🏆 Reytinglar")
             ],
             [
-                KeyboardButton(text="🗳️ Kino so'rovlari"),
-                KeyboardButton(text="⚙️ Sozlamalar")
+                KeyboardButton(text="👥 Referal"),
+                KeyboardButton(text="🗳️ Kino so'rovlari")
             ],
             [
                 KeyboardButton(text="👑 Profilim"),
                 KeyboardButton(text="🔝 TOP Kinolar")
             ],
             [
-                KeyboardButton(text="🎂 Tug'ilgan Kun"),
+                KeyboardButton(text="⚙️ Sozlamalar"),
+                KeyboardButton(text="🎂 Tug'ilgan Kun")
+            ],
+            [
                 KeyboardButton(text="🆘 Yordam / Murojaat")
             ]
         ],

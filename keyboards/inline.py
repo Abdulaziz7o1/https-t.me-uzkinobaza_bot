@@ -30,6 +30,7 @@ def get_subscription_keyboard(channels: list) -> InlineKeyboardMarkup:
         builder.button(text=display_name, url=link)
             
     builder.button(text="A'zo bo'ldim ✅", callback_data="check_sub")
+    builder.button(text="💎 VIP Premium olish (Kutish va Obunalarsiz!) 🚀", callback_data="sub_buy_premium")
     builder.adjust(1)
     return builder.as_markup()
 
