@@ -71,6 +71,10 @@ class CheckSubMiddleware(BaseMiddleware):
                 )
                 return
 
+        # Premium to'lov cheki yuborayotgan foydalanuvchilar obuna tekshiruvidan ozod qilinadi
+        if curr_state and ("waiting_for_payment" in str(curr_state) or "payment" in str(curr_state).lower()):
+            return await handler(event, data)
+
         # Premium/VIP foydalanuvchilar obuna tekshiruvidan ozod qilinadi (Whitelist)
         try:
             if await is_user_premium(user_id):
