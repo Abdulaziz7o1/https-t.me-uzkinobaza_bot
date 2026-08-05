@@ -114,24 +114,26 @@ class StateCancelMiddleware(BaseMiddleware):
     ) -> Any:
         if isinstance(event, Message) and event.text:
             text_clean = event.text.lower().replace("\ufe0f", "").strip()
-            menu_keywords = [
-                "/start", "start", "/cancel", "cancel", "/help",
-                "qidirish", "saqlanganlar", "tanlanganlar", "tasodifiy", "so'rash",
-                "ballarim", "bonus", "reytinglar", "referal", "so'rovlari",
-                "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
-                "kino qo'shish", "kino o'chirish", "kino tahrirlash", "statistika", "reklama",
-                "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",
-                "moderatorlar", "trendlari", "kun kinosi", "shubhali", "keshni", "ommaviy"
-            ]
-            if text_clean.startswith("/") or any(kw in text_clean for kw in menu_keywords):
-                state = data.get("state")
-                if state:
-                    current_state = await state.get_state()
-                    if current_state is not None:
-                        await state.clear()
-                        data["raw_state"] = None
-                        import logging
-                        logging.info(f"FSM state '{current_state}' cleared automatically for command/menu button '{text_clean}'.")
+            is_url = text_clean.startswith(("http://", "https://", "t.me/")) or "://" in text_clean
+            if not is_url:
+                menu_keywords = [
+                    "qidirish", "saqlanganlar", "tanlanganlar", "tasodifiy", "so'rash",
+                    "ballarim", "bonus", "reytinglar", "referal", "so'rovlari",
+                    "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
+                    "kino qo'shish", "kino o'chirish", "kino tahrirlash", "statistika", "reklama",
+                    "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",
+                    "moderatorlar", "trendlari", "kun kinosi", "shubhali", "keshni", "ommaviy"
+                ]
+                exact_cancel_cmds = ["/start", "/cancel", "/help", "/stop", "start", "cancel"]
+                if text_clean in exact_cancel_cmds or any(kw == text_clean for kw in menu_keywords):
+                    state = data.get("state")
+                    if state:
+                        current_state = await state.get_state()
+                        if current_state is not None:
+                            await state.clear()
+                            data["raw_state"] = None
+                            import logging
+                            logging.info(f"FSM state '{current_state}' cleared automatically for command/menu button '{text_clean}'.")
         return await handler(event, data)
 
 

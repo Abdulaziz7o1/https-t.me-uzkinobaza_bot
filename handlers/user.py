@@ -2091,8 +2091,8 @@ async def user_daily_bonus(message: Message, state: FSMContext):
 @router.message(F.text, ~F.text.startswith("/"))
 async def search_movie_by_text(message: Message, state: FSMContext = None):
     query = message.text.strip()
-    # Raqamlar faqat search_movie_by_code orqali qidiriladi
-    if query.isdigit() or query.lstrip('/').isdigit():
+    # Raqamlar va URL havolalar kino nomi emas
+    if query.isdigit() or query.lstrip('/').isdigit() or query.startswith(("http://", "https://", "t.me/")) or "://" in query:
         return
     if not query or len(query) < 2:
         await message.answer("🔍 Kamida 2 ta belgi kiriting.")

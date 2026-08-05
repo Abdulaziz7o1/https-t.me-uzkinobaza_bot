@@ -900,19 +900,26 @@ async def bc_skip_caption_callback(callback: CallbackQuery, state: FSMContext):
 async def bc_button_handler(message: Message, state: FSMContext):
     text = message.text.strip()
     
-    if "-" not in text or "http" not in text:
+    # Agar admin faqat link (havola) yuborgan bo'lsa (chiziqchasiz)
+    if ("http://" in text or "https://" in text or "t.me/" in text) and "-" not in text:
+        btn_text = "📍 Havolaga o'tish"
+        btn_url = text.strip()
+        if not btn_url.startswith("http"):
+            btn_url = "https://" + btn_url
+    elif "-" in text:
+        parts = text.split("-", 1)
+        btn_text = parts[0].strip()
+        btn_url = parts[1].strip()
+        if not btn_url.startswith("http"):
+            btn_url = "https://" + btn_url
+    else:
         await message.answer(
             "⚠️ <b>Noto'g'ri format!</b>\n\n"
-            "Iltimos, <code>Tugma nomi - https://havola.com</code> shaklida yuboring yoki "
-            "«O'tkazib yuborish ⏭» tugmasini bosing:",
+            "Iltimos, <code>Tugma nomi - https://havola.com</code> shaklida yuboring yoki shunchaki havolaning o'zini yuboring:",
             parse_mode="HTML"
         )
         return
         
-    parts = text.split("-", 1)
-    btn_text = parts[0].strip()
-    btn_url = parts[1].strip()
-    
     await state.update_data(bc_btn_text=btn_text, bc_btn_url=btn_url)
     await show_bc_preview(message, state)
 
