@@ -44,6 +44,8 @@ def get_db():
 async def init_db():
     """Barcha jadvallarni yaratish va bazani faollashtirish"""
     async with get_db() as db:
+        await db.execute("PRAGMA journal_mode=WAL;")
+        await db.execute("PRAGMA synchronous=NORMAL;")
         # Users jadvali (role va status bilan)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
