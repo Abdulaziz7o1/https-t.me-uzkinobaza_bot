@@ -269,8 +269,8 @@ async def search_movie_by_code(message: Message):
         if not skip_wait:
             await db_req.increment_daily_movie_count(user_id)
             cd_msg = await message.answer(
-                "⏳ <b>Kino yuklanmoqda... 3...</b>\n\n"
-                "💎 <i>Premium olsangiz har bir kino uchun kutish vaqti 0 second bo'ladi!</i>",
+                "🎬 <b>Kino yuklanmoqda... (3 soniya)</b> ⏳\n\n"
+                "💎 <i>Kutishni istamaysizmi? /premium olib, kutish vaqtini <b>0 soniya</b> qiling!</i> 🚀",
                 parse_mode="HTML"
             )
             import asyncio
