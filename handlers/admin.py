@@ -478,7 +478,7 @@ async def add_channel_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_channel_id)
     await callback.message.answer(
         "Kanalning username yoki ID raqamini yuboring:\n"
-        "Masalan: <code>@MadridPrimee</code> yoki <code>-1001234567</code>"
+        "Masalan: <code>@Kanal_Username</code> yoki <code>-1001234567</code>"
     )
     await callback.answer()
 
