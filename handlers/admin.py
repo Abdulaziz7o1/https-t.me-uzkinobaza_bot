@@ -1004,13 +1004,29 @@ async def show_bc_preview(event: Message, state: FSMContext, is_callback: bool =
         await event.answer("👁 <b>Reklama Tayyor! Oldindan ko'rish (Preview):</b>", parse_mode="HTML")
         
     if media_id and media_type == "photo":
-        await event.bot.send_photo(chat_id=event.chat.id, photo=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        try:
+            await event.bot.send_photo(chat_id=event.chat.id, photo=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        except Exception:
+            await event.bot.send_photo(chat_id=event.chat.id, photo=media_id, caption=final_caption, reply_markup=ad_kb)
     elif media_id and media_type == "video":
-        await event.bot.send_video(chat_id=event.chat.id, video=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        try:
+            await event.bot.send_video(chat_id=event.chat.id, video=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        except Exception:
+            await event.bot.send_video(chat_id=event.chat.id, video=media_id, caption=final_caption, reply_markup=ad_kb)
     elif media_id and media_type == "animation":
-        await event.bot.send_animation(chat_id=event.chat.id, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        try:
+            await event.bot.send_animation(chat_id=event.chat.id, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        except Exception:
+            await event.bot.send_animation(chat_id=event.chat.id, animation=media_id, caption=final_caption, reply_markup=ad_kb)
+    elif media_id and media_type == "sticker":
+        await event.bot.send_sticker(chat_id=event.chat.id, sticker=media_id, reply_markup=ad_kb)
+        if final_caption:
+            await event.bot.send_message(chat_id=event.chat.id, text=final_caption, parse_mode="HTML")
     else:
-        await event.bot.send_message(chat_id=event.chat.id, text=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        try:
+            await event.bot.send_message(chat_id=event.chat.id, text=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+        except Exception:
+            await event.bot.send_message(chat_id=event.chat.id, text=final_caption, reply_markup=ad_kb)
         
     await event.bot.send_message(
         chat_id=event.chat.id,
@@ -1059,13 +1075,29 @@ async def bc_send_confirm_callback(callback: CallbackQuery, state: FSMContext):
     for user_id in users:
         try:
             if media_id and media_type == "photo":
-                await bot.send_photo(chat_id=user_id, photo=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                try:
+                    await bot.send_photo(chat_id=user_id, photo=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                except Exception:
+                    await bot.send_photo(chat_id=user_id, photo=media_id, caption=final_caption, reply_markup=ad_kb)
             elif media_id and media_type == "video":
-                await bot.send_video(chat_id=user_id, video=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                try:
+                    await bot.send_video(chat_id=user_id, video=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                except Exception:
+                    await bot.send_video(chat_id=user_id, video=media_id, caption=final_caption, reply_markup=ad_kb)
             elif media_id and media_type == "animation":
-                await bot.send_animation(chat_id=user_id, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                try:
+                    await bot.send_animation(chat_id=user_id, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                except Exception:
+                    await bot.send_animation(chat_id=user_id, animation=media_id, caption=final_caption, reply_markup=ad_kb)
+            elif media_id and media_type == "sticker":
+                await bot.send_sticker(chat_id=user_id, sticker=media_id, reply_markup=ad_kb)
+                if final_caption:
+                    await bot.send_message(chat_id=user_id, text=final_caption)
             else:
-                await bot.send_message(chat_id=user_id, text=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                try:
+                    await bot.send_message(chat_id=user_id, text=final_caption, reply_markup=ad_kb, parse_mode="HTML")
+                except Exception:
+                    await bot.send_message(chat_id=user_id, text=final_caption, reply_markup=ad_kb)
                 
             sent_count += 1
             await asyncio.sleep(0.05)
