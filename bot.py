@@ -407,7 +407,8 @@ async def on_startup(bot: Bot):
     asyncio.create_task(biyearly_global_unban_scheduler(bot))
     asyncio.create_task(daily_kassa_report_scheduler(bot))
     asyncio.create_task(auto_expire_movies_scheduler(bot))
-    logging.info("Barcha schedulerlar (Backup, Broadcast, Daily Movie, Bi-weekly Premium, Birthday, Admin PIN 2FA, Inactive Cleanup, 2-Yearly Global Unban, Kassa Report, Auto Expire) muvaffaqiyatli ishga tushdi.")
+    asyncio.create_task(keep_alive_self_ping())
+    logging.info("Barcha schedulerlar va 24/7 Render Keep-Alive Auto-Ping muvaffaqiyatli ishga tushdi.")
 
 async def start_health_web_server():
     """Render.com Free Web Service uchun port va ping tinglovchi ($0/month BEPUL tarif uchun)"""
@@ -428,6 +429,28 @@ async def start_health_web_server():
             logging.info(f"Render Free Web Server {port}-portda ishga tushdi! 🚀")
     except Exception as e:
         logging.warning(f"Web serverni ishga tushirishda ogohlantirish: {e}")
+
+async def keep_alive_self_ping():
+    """Render Free Web Service 15 daqiqada uyquga (spin down) ketmasligi uchun avtomatik 3 daqiqada o'ziga ping yuboradi (24/7 $0/oy)"""
+    await asyncio.sleep(15)
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "https://uzkinobaza-bot.onrender.com/health")
+    local_port = os.getenv("PORT")
+    
+    import aiohttp
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(render_url, timeout=ClientTimeout(total=10)) as resp:
+                    logging.info(f"Keep-Alive ping: {resp.status}")
+        except Exception:
+            if local_port:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"http://127.0.0.1:{local_port}/health", timeout=ClientTimeout(total=5)) as resp:
+                            logging.info(f"Local Keep-Alive ping: {resp.status}")
+                except Exception:
+                    pass
+        await asyncio.sleep(180)
 
 async def main():
     # Database yaratish va sozlash
