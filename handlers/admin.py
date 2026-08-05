@@ -45,6 +45,7 @@ class AdminStates(StatesGroup):
     waiting_for_bc_media = State()
     waiting_for_bc_caption = State()
     waiting_for_bc_button = State()
+    waiting_for_bc_button_url = State()
     waiting_for_bc_confirm = State()
     waiting_for_bc_target = State()
     waiting_for_ticket_reply = State()
@@ -900,28 +901,59 @@ async def bc_skip_caption_callback(callback: CallbackQuery, state: FSMContext):
 async def bc_button_handler(message: Message, state: FSMContext):
     text = message.text.strip()
     
-    # Agar admin faqat link (havola) yuborgan bo'lsa (chiziqchasiz)
-    if ("http://" in text or "https://" in text or "t.me/" in text) and "-" not in text:
-        btn_text = "📍 Havolaga o'tish"
-        btn_url = text.strip()
-        if not btn_url.startswith("http"):
-            btn_url = "https://" + btn_url
-    elif "-" in text:
+    # 1. Format: Nom - Link (masalan: Botga kirish - https://t.me/...)
+    if "-" in text and ("http://" in text or "https://" in text or "t.me/" in text or "://" in text):
         parts = text.split("-", 1)
         btn_text = parts[0].strip()
         btn_url = parts[1].strip()
         if not btn_url.startswith("http"):
             btn_url = "https://" + btn_url
-    else:
-        await message.answer(
-            "⚠️ <b>Noto'g'ri format!</b>\n\n"
-            "Iltimos, <code>Tugma nomi - https://havola.com</code> shaklida yuboring yoki shunchaki havolaning o'zini yuboring:",
-            parse_mode="HTML"
-        )
+        await state.update_data(bc_btn_text=btn_text, bc_btn_url=btn_url)
+        await show_bc_preview(message, state)
         return
-        
-    await state.update_data(bc_btn_text=btn_text, bc_btn_url=btn_url)
+
+    # 2. Format: Faqat Link (masalan: https://t.me/...)
+    if "http://" in text or "https://" in text or "t.me/" in text or "://" in text:
+        btn_text = "📍 Havolaga o'tish"
+        btn_url = text
+        if not btn_url.startswith("http"):
+            btn_url = "https://" + btn_url
+        await state.update_data(bc_btn_text=btn_text, bc_btn_url=btn_url)
+        await show_bc_preview(message, state)
+        return
+
+    # 3. Format: Faqat Nomi (masalan: Botga kirish) -> Endi havolasini so'raymiz
+    btn_text = text
+    await state.update_data(bc_btn_text=btn_text)
+    await state.set_state(AdminStates.waiting_for_bc_button_url)
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="O'tkazib yuborish ⏭ (Standart bot havolasi)", callback_data="bc_skip_button_url")],
+        [InlineKeyboardButton(text="Bekor qilish ❌", callback_data="bc_cancel")]
+    ])
+    await message.answer(
+        f"✅ Tugma nomi qabul qilindi: <b>«{btn_text}»</b>\n\n"
+        "🔗 <b>Endi ushbu tugma uchun havolani (link) yuboring:</b>\n"
+        f"<i>Masalan: https://t.me/{config.BOT_USERNAME.lstrip('@')}?start=start</i>",
+        parse_mode="HTML",
+        reply_markup=kb
+    )
+
+@router.message(AdminStates.waiting_for_bc_button_url, F.text, ~F.text.in_(MENU_BUTTONS))
+async def bc_button_url_handler(message: Message, state: FSMContext):
+    btn_url = message.text.strip()
+    if not btn_url.startswith("http"):
+        btn_url = "https://" + btn_url
+    await state.update_data(bc_btn_url=btn_url)
     await show_bc_preview(message, state)
+
+@router.callback_query(F.data == "bc_skip_button_url")
+async def bc_skip_button_url_callback(callback: CallbackQuery, state: FSMContext):
+    bot_username = config.BOT_USERNAME.lstrip('@')
+    default_btn_url = f"https://t.me/{bot_username}?start=start"
+    await state.update_data(bc_btn_url=default_btn_url)
+    await show_bc_preview(callback.message, state, is_callback=True)
+    await callback.answer()
 
 @router.callback_query(F.data == "bc_skip_button")
 async def bc_skip_button_callback(callback: CallbackQuery, state: FSMContext):
