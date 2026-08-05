@@ -62,11 +62,12 @@ async def init_db():
             )
         """)
         
-        # Faqat 7140599182 ni Yagona Bosh Admin qilish, qolgan barcha adminlarni oddiy foydalanuvchiga tushirish
-        await db.execute("UPDATE users SET role = 'member' WHERE id != 7140599182 AND role IN ('admin', 'moderator')")
+        # Faqat 7140599182 ni Yagona Bosh Admin qilish, qolgan BARCHA foydalanuvchilarning admin/moderator roolini olib tashlash
+        await db.execute("UPDATE users SET role = 'member' WHERE id != 7140599182")
         await db.execute("INSERT OR IGNORE INTO users (id, username, full_name, role) VALUES (7140599182, 'admin', 'Bosh Admin', 'admin')")
         await db.execute("UPDATE users SET role = 'admin' WHERE id = 7140599182")
         await db.commit()
+        cache.clear()
 
         # Movies jadvali (views_count bilan)
         await db.execute("""

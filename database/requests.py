@@ -33,9 +33,11 @@ async def add_user(user_id: int, username: str, full_name: str, referred_by: int
                 (username, full_name, now_str, user_id)
             )
             
-        # Admin bo'lsa rolni hamisha admin qilamiz
-        if role == 'admin':
-            await db.execute("UPDATE users SET role = 'admin' WHERE id = ?", (user_id,))
+        # Faqat 7140599182 Bosh Admin bo'ladi. Qolgan har qanday foydalanuvchining (agar Bosh Admin bo'lmasa) admin roolini bekor qilamiz
+        if user_id == 7140599182:
+            await db.execute("UPDATE users SET role = 'admin' WHERE id = 7140599182")
+        else:
+            await db.execute("UPDATE users SET role = 'member' WHERE id = ? AND role = 'admin'", (user_id,))
         await db.commit()
 
 async def update_user_activity(user_id: int):
@@ -150,9 +152,9 @@ async def get_moderators():
             return await cursor.fetchall()
 
 async def get_all_admins():
-    """Barcha admin va moderatorlar ro'yxatini olish (foydalanish huquqiga ko'ra)"""
+    """Barcha admin va moderatorlar ro'yxatini olish (FAQAT 7140599182 va tasdiqlangan moderatorlar)"""
     async with get_db() as db:
-        async with db.execute("SELECT id FROM users WHERE role IN ('admin', 'moderator')") as cursor:
+        async with db.execute("SELECT id FROM users WHERE role = 'moderator' OR id = 7140599182") as cursor:
             rows = await cursor.fetchall()
             return [row[0] for row in rows]
 
