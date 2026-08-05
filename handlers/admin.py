@@ -164,6 +164,43 @@ async def admin_start_handler(message: Message, state: FSMContext):
     from handlers.user import execute_start_logic
     await execute_start_logic(message, state)
 
+# --- ZAXIRA FAYLIDAN TIKLASH (JSON UPLOAD) ---
+@router.message(F.document, F.document.file_name.endswith(".json"))
+async def admin_restore_json_backup(message: Message):
+    if message.from_user.id not in config.ADMINS:
+        return
+    try:
+        file_id = message.document.file_id
+        file = await message.bot.get_file(file_id)
+        file_path = file.file_path
+        downloaded_file = await message.bot.download_file(file_path)
+        content = downloaded_file.read().decode('utf-8')
+        
+        restored = await db_req.import_movies_from_json(content)
+        if restored > 0:
+            with open("movies_backup.json", "w", encoding="utf-8") as f:
+                f.write(content)
+            await message.answer(f"✅ <b>Zaxira faylidan {restored} ta kino 100% muvaffaqiyatli tiklandi va bazaga saqlandi!</b>", parse_mode="HTML")
+        else:
+            await message.answer("⚠️ Fayl ichida kinolar topilmadi yoki fayl formati noto'g'ri.")
+    except Exception as e:
+        await message.answer(f"❌ Zaxirani tiklashda xato yuz berdi: {e}")
+
+# --- KINOLAR ZAXIRASINI OLISH (/backup) ---
+@router.message(Command("backup"))
+@router.message(F.text == "💾 Baza zaxirasi")
+async def send_movies_backup_to_admin(message: Message):
+    if message.from_user.id not in config.ADMINS:
+        return
+    json_data = await db_req.export_movies_backup_json()
+    with open("movies_backup.json", "w", encoding="utf-8") as f:
+        f.write(json_data)
+    file = FSInputFile("movies_backup.json")
+    await message.answer_document(
+        document=file,
+        caption="💾 <b>Kinolarning joriy zaxira fayli (Backup).</b>\n\nUshbu faylni saqlab qo'ying, istalgan vaqtda botga yuborsangiz barcha kinolaringiz 100% qayta tiklanadi!"
+    )
+
 # --- STATISTIKA ---
 @router.message(F.text == "Statistika 📊")
 async def get_bot_statistics(message: Message, state: FSMContext):
