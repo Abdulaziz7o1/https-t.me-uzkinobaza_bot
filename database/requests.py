@@ -227,6 +227,48 @@ async def delete_movie(movie_id: int) -> bool:
         cache.clear()
         return True
 
+async def export_movies_backup_json() -> str:
+    """Barcha kinolarni JSON matn shaklida zaxiralash uchun chiqarish"""
+    import json
+    async with get_db() as db:
+        async with db.execute("SELECT id, file_id, caption, views_count FROM movies ORDER BY id ASC") as cursor:
+            rows = await cursor.fetchall()
+            movies = []
+            for r in rows:
+                movies.append({
+                    "id": r[0],
+                    "file_id": r[1],
+                    "caption": r[2],
+                    "views_count": r[3]
+                })
+            return json.dumps(movies, ensure_ascii=False, indent=2)
+
+async def import_movies_from_json(json_str: str) -> int:
+    """JSON matnidan barcha kinolarni bazaga qayta tiklash"""
+    import json
+    try:
+        movies = json.loads(json_str)
+        if not isinstance(movies, list):
+            return 0
+        restored = 0
+        async with get_db() as db:
+            for m in movies:
+                m_id = m.get("id")
+                file_id = m.get("file_id")
+                caption = m.get("caption", "")
+                views = m.get("views_count", 0)
+                if m_id and file_id:
+                    await db.execute(
+                        "INSERT OR REPLACE INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, ?)",
+                        (m_id, file_id, caption, views)
+                    )
+                    restored += 1
+            await db.commit()
+        return restored
+    except Exception as e:
+        print(f"Movies JSON import error: {e}")
+        return 0
+
 async def search_movies_by_name(query: str):
     """Kinolarni nomi (tavsifi) bo'yicha qidirish"""
     async with get_db() as db:

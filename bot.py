@@ -408,7 +408,26 @@ async def on_startup(bot: Bot):
     asyncio.create_task(daily_kassa_report_scheduler(bot))
     asyncio.create_task(auto_expire_movies_scheduler(bot))
     asyncio.create_task(keep_alive_self_ping())
+    await restore_movies_backup_on_startup(bot)
     logging.info("Barcha schedulerlar va 24/7 Render Keep-Alive Auto-Ping muvaffaqiyatli ishga tushdi.")
+
+async def restore_movies_backup_on_startup(bot: Bot):
+    """Server qayta ishga tushganida bazada kinolar 0 ta bo'lsa, zaxiradan avtomatik 100% tiklaydi"""
+    try:
+        import database.requests as db_req
+        count = await db_req.get_total_movies_count()
+        if count > 0:
+            return
+            
+        logging.info("Bazada kinolar 0 ta. Avtomatik zaxiradan tiklash boshlandi...")
+        if os.path.exists("movies_backup.json"):
+            with open("movies_backup.json", "r", encoding="utf-8") as f:
+                content = f.read()
+                restored = await db_req.import_movies_from_json(content)
+                if restored > 0:
+                    logging.info(f"Zaxiradan {restored} ta kino avtomatik tiklandi! 🚀")
+    except Exception as e:
+        logging.warning(f"Zaxiradan tiklashda ogohlantirish: {e}")
 
 async def start_health_web_server():
     """Render.com Free Web Service uchun port va ping tinglovchi ($0/month BEPUL tarif uchun)"""

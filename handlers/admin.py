@@ -83,6 +83,28 @@ async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: 
             )
         except Exception as e:
             print(f"Kanalga auto-postda xato: {e}")
+    await sync_movies_backup_storage(bot)
+
+async def sync_movies_backup_storage(bot):
+    """Har safar kino qo'shilganda yoki o'chirilganda Bosh Admin chatiga #MOVIES_BACKUP zaxira faylini yuboradi (100% tiklash uchun)"""
+    try:
+        json_data = await db_req.export_movies_backup_json()
+        backup_file_path = "movies_backup.json"
+        with open(backup_file_path, "w", encoding="utf-8") as f:
+            f.write(json_data)
+        
+        file = FSInputFile(backup_file_path)
+        for admin_id in config.ADMINS:
+            try:
+                await bot.send_document(
+                    chat_id=admin_id,
+                    document=file,
+                    caption="💾 #MOVIES_BACKUP — Barcha kinolarning avtomatik bulutli zaxira fayli."
+                )
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Backup sync error: {e}")
 
 def get_resolve_request_keyboard(request_id: int):
     builder = InlineKeyboardBuilder()
@@ -377,6 +399,7 @@ async def delete_movie_exec(message: Message, state: FSMContext):
     await state.clear()
     if deleted:
         await message.answer(f"✅ Kodli kino bazadan o'chirildi: {movie_id}")
+        await sync_movies_backup_storage(message.bot)
     else:
         await message.answer(f"❌ Bunday kodli kino topilmadi: {movie_id}")
 
