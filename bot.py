@@ -408,8 +408,11 @@ async def on_startup(bot: Bot):
     asyncio.create_task(biyearly_global_unban_scheduler(bot))
     asyncio.create_task(daily_kassa_report_scheduler(bot))
     asyncio.create_task(auto_expire_movies_scheduler(bot))
-    asyncio.create_task(keep_alive_self_ping())
     await restore_movies_backup_on_startup(bot)
+    try:
+        await db_req.restore_sponsor_channels_backup_on_startup()
+    except Exception as e:
+        logging.warning(f"Homiy kanallarni tiklashda xato: {e}")
     logging.info("Barcha schedulerlar va 24/7 Render Keep-Alive Auto-Ping muvaffaqiyatli ishga tushdi.")
 
 async def restore_movies_backup_on_startup(bot: Bot):

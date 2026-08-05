@@ -408,6 +408,43 @@ async def resolve_request(request_id: int):
 
 
 # --- SPONSOR CHANNELS (HOMIY KANALLAR) ---
+SPONSOR_CHANNELS_BACKUP_FILE = "sponsor_channels_backup.json"
+
+async def save_sponsor_channels_backup():
+    """Barcha homiy kanallarni sponsor_channels_backup.json zaxira fayliga saqlash"""
+    import json
+    channels = await get_sponsor_channels()
+    data = [{"id": c[0], "channel_id": c[1], "channel_name": c[2]} for c in channels]
+    try:
+        with open(SPONSOR_CHANNELS_BACKUP_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Sponsor channels backup saqlashda xato: {e}")
+
+async def restore_sponsor_channels_backup_on_startup():
+    """Bot ishga tushganda (Render restart bo'lganda) sponsor_channels_backup.json faylidan kanallarni qayta tiklash"""
+    import json, os
+    if not os.path.exists(SPONSOR_CHANNELS_BACKUP_FILE):
+        return
+    try:
+        with open(SPONSOR_CHANNELS_BACKUP_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return
+        async with get_db() as db:
+            for ch in data:
+                ch_id = ch.get("channel_id")
+                ch_name = ch.get("channel_name") or ch_id
+                if ch_id:
+                    await db.execute(
+                        "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
+                        (ch_id, ch_name)
+                    )
+            await db.commit()
+        print(f"Sponsor channels backup qayta tiklandi: {len(data)} ta kanal.")
+    except Exception as e:
+        print(f"Sponsor channels backup tiklashda xato: {e}")
+
 async def get_sponsor_channels() -> list:
     """Hamkor kanallar ID ro'yxatini olish"""
     async with get_db() as db:
@@ -415,7 +452,7 @@ async def get_sponsor_channels() -> list:
             return await cursor.fetchall()
 
 async def add_sponsor_channel(channel_id: str, channel_name: str = None) -> bool:
-    """Yangi hamkor kanal qo'shish"""
+    """Yangi hamkor kanal qo'shish va zaxiraga saqlash"""
     async with get_db() as db:
         try:
             await db.execute(
@@ -423,15 +460,17 @@ async def add_sponsor_channel(channel_id: str, channel_name: str = None) -> bool
                 (channel_id, channel_name or channel_id)
             )
             await db.commit()
+            await save_sponsor_channels_backup()
             return True
         except Exception:
             return False
 
 async def remove_sponsor_channel(channel_db_id: int) -> bool:
-    """Hamkor kanalni ID bo'yicha o'chirish"""
+    """Hamkor kanalni ID bo'yicha o'chirish va zaxirani yangilash"""
     async with get_db() as db:
         await db.execute("DELETE FROM sponsor_channels WHERE id = ?", (channel_db_id,))
         await db.commit()
+        await save_sponsor_channels_backup()
         return True
 
 # --- O'CHIRISH (REKLAMADA BLOKLANGANLAR UCHUN) ---
