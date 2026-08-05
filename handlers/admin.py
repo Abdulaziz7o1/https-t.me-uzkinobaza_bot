@@ -489,16 +489,21 @@ async def add_channel_id(message: Message, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_channel_name)
     await message.answer("Kanal nomini (tugmada ko'rinadigan matn) yuboring:")
 
-@router.message(AdminStates.waiting_for_channel_name, F.text)
+@router.message(AdminStates.waiting_for_channel_name)
 async def add_channel_name(message: Message, state: FSMContext):
-    channel_name = message.text.strip()
+    channel_name = message.text.strip() if message.text else "Kanal"
     data = await state.get_data()
-    channel_id = data["channel_id"]
+    channel_id = data.get("channel_id")
     
+    if not channel_id:
+        await message.answer("⚠️ Qayta urinib ko'ring. Iltimos, «Yangi kanal qo'shish ➕» tugmasini qayta bosing.")
+        await state.clear()
+        return
+
     success = await db_req.add_sponsor_channel(channel_id, channel_name)
     await state.clear()
     if success:
-        await message.answer(f"✅ Hamkor kanal muvaffaqiyatli qo'shildi: <b>{channel_name}</b>")
+        await message.answer(f"✅ Hamkor kanal muvaffaqiyatli qo'shildi: <b>{channel_name}</b>", parse_mode="HTML")
     else:
         await message.answer("❌ Kanal qo'shishda xatolik yuz berdi. Ehtimol, bu kanal allaqachon mavjud.")
 
