@@ -1668,23 +1668,33 @@ async def get_banned_users_list() -> list:
             return await cursor.fetchall()
 
 # --- WATERMARK / CAPTION CLEANER UTILITY ---
+async def clean_and_format_caption_async(raw_caption: str) -> str:
+    """Begona reklama va havolalarni tozala va sozlangan brend watermarkini qo'sh"""
+    import re, config
+    bot_tag = config.BOT_USERNAME if config.BOT_USERNAME.startswith("@") else f"@{config.BOT_USERNAME}"
+    
+    custom_wm = await get_setting("custom_watermark_text")
+    wm_text = custom_wm if custom_wm else f"🎬 <b>{bot_tag} — Eng sara kinolar bazasi 🍿</b>"
+
+    if not raw_caption:
+        return wm_text
+
+    cleaned = re.sub(r'@(?!uzkinobaza_bot\b)[a-zA-Z0-9_]{5,}', '', raw_caption)
+    cleaned = re.sub(r'https?://t\.me/\S+', '', cleaned).strip()
+    
+    if cleaned:
+        return f"{wm_text}\n\n{cleaned}"
+    return wm_text
+
 def clean_and_format_caption(raw_caption: str) -> str:
     """Begona reklama va havolalarni tozala va @uzkinobaza_bot brendini qo'sh"""
-    import re
-    import config
-    
-    bot_tag = config.BOT_USERNAME
-    if not bot_tag.startswith("@"):
-        bot_tag = f"@{bot_tag}"
-        
+    import re, config
+    bot_tag = config.BOT_USERNAME if config.BOT_USERNAME.startswith("@") else f"@{config.BOT_USERNAME}"
     if not raw_caption:
         return f"🎬 <b>Kino Bot:</b> {bot_tag}"
-        
     cleaned = re.sub(r'@(?!uzkinobaza_bot\b)[a-zA-Z0-9_]{5,}', '', raw_caption)
-    cleaned = re.sub(r'https?://t\.me/\S+', '', cleaned)
-    cleaned = cleaned.strip()
-    
-    header = f"🎬 <b>{bot_tag}</b>"
+    cleaned = re.sub(r'https?://t\.me/\S+', '', cleaned).strip()
+    header = f"🎬 <b>{bot_tag} — Eng sara kinolar 🍿</b>"
     if cleaned:
         return f"{header}\n\n{cleaned}"
     return header

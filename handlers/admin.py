@@ -3721,7 +3721,7 @@ async def toggle_maint_off_cb(callback: CallbackQuery):
     await callback.message.edit_text("✅ <b>Bot oddiy ishchi rejimga qaytarildi. Barcha foydalanuvchilar botdan to'liq foydalanishi mumkin!</b>", parse_mode="HTML")
 
 
-# ─── NOFAOLLARGA ESLATMA YUBORISH (NOFAOLLARGA ESLATMA 💤) ─────────────────────
+# ─── NOFAOLLARGA ESLATMA YUBORISH (NOFAOLLARGA ESLATMA 💤 - FEATURE #14) ────────
 @router.message(F.text == "Nofaollarga Eslatma 💤")
 async def show_inactive_reminder_panel(message: Message, state: FSMContext):
     await state.clear()
@@ -3733,13 +3733,13 @@ async def show_inactive_reminder_panel(message: Message, state: FSMContext):
     cnt = len(inactives) if inactives else 0
     
     txt = (
-        f"💤 <b>NOFAOL FOYDALANUVCHILARGA ESLATMA:</b>\n\n"
+        f"💤 <b>NOFAOL FOYDALANUVCHILARGA ESLATMA (FEATURE #14):</b>\n\n"
         f"Oxirgi 15 kun ichida botga kirmagan <b>{cnt} ta</b> foydalanuvchi aniqlandi.\n\n"
-        f"<i>Ularga 'Sizni sog'indik, botimizga yangi premera kinolar qo'shildi!' eslatma xabarini yuborishni tasdiqlaysizmi?</i>"
+        f"<i>Ularga 'Sizni sog'indik + 🎁 +5 💎 bonus ball' eslatma xabarini yuborishni tasdiqlaysizmi?</i>"
     )
     
     kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text=f"📢 {cnt} ta Nofaolga Xabar Yuborish", callback_data="send_inactive_reminder_exec")
+        InlineKeyboardButton(text=f"📢 {cnt} ta Nofaolga Xabar + 5 Ball Berish", callback_data="send_inactive_reminder_exec")
     ]])
     
     await message.answer(txt, parse_mode="HTML", reply_markup=kb)
@@ -3755,7 +3755,8 @@ async def send_inactive_reminder_exec_cb(callback: CallbackQuery):
     
     msg = (
         f"🍿 <b>SIZNI SOG'INDIK!</b> ✨\n\n"
-        f"Hurmatli foydalanuvchi, botimizga juda ko'p yangi eng sara va premera kinolar qo'shildi! 🎬\n\n"
+        f"Hurmatli foydalanuvchi, botimizga juda ko'p yangi eng sara va premyera kinolar qo'shildi! 🎬\n\n"
+        f"🎁 <b>Sizga qaytganingiz uchun +5 💎 bonus ball taqdim etildi!</b>\n\n"
         f"👇 <i>Kiring va eng so'nggi kinolarni maza qilib tomosha qiling:</i>"
     )
     
@@ -3763,6 +3764,7 @@ async def send_inactive_reminder_exec_cb(callback: CallbackQuery):
     if inactives:
         for uid in inactives:
             try:
+                await db_req.add_points(uid, 5) # Re-engagement bonus points
                 await callback.bot.send_message(uid, msg, parse_mode="HTML")
                 sent_cnt += 1
                 import asyncio
@@ -3770,7 +3772,31 @@ async def send_inactive_reminder_exec_cb(callback: CallbackQuery):
             except Exception:
                 pass
                 
-    await callback.message.edit_text(f"✅ <b>Eslatma {sent_cnt} ta nofaol foydalanuvchiga muvaffaqiyatli yetkazildi!</b>", parse_mode="HTML")
+    await callback.message.edit_text(f"✅ <b>Eslatma va +5 ballik bonus {sent_cnt} ta nofaol foydalanuvchiga muvaffaqiyatli yetkazildi!</b>", parse_mode="HTML")
+
+
+# ─── WATERMARK SOZLAMALARI (FEATURE #10) ───────────────────────────────────────
+@router.message(Command("setwatermark"))
+@router.message(Command("watermark"))
+async def admin_set_watermark_cmd(message: Message, state: FSMContext):
+    if message.from_user.id not in config.ADMINS:
+        await message.answer("❌ Bu amal faqat Bosh Admin uchun!")
+        return
+    args = message.text.split(maxsplit=1)
+    if len(args) > 1:
+        wm_text = args[1].strip()
+        await db_req.set_setting("custom_watermark_text", wm_text)
+        await message.answer(f"✅ <b>Watermark matni muvaffaqiyatli o'rnatildi:</b>\n\n{wm_text}", parse_mode="HTML")
+    else:
+        current_wm = await db_req.get_setting("custom_watermark_text")
+        disp = current_wm if current_wm else f"🎬 <b>@{config.BOT_USERNAME} — Eng sara kinolar bazasi 🍿</b>"
+        await message.answer(
+            f"🏷️ <b>KINO WATERMARK / CAPTION SOZLAMASI (FEATURE #10):</b>\n\n"
+            f"📌 <b>Hozirgi watermark matni:</b>\n{disp}\n\n"
+            f"💡 <i>Yangi watermark o'rnatish uchun buyruqdan foydalaning:</i>\n"
+            f"<code>/setwatermark 🎬 @uzkinobaza_bot — Rasmiy kino kanali 🍿</code>",
+            parse_mode="HTML"
+        )
 
 
 # ─── ADMINDAN FOYDALANUVCHIGA BALL SOVG'A QILISH (/gift) ──────────────────────
