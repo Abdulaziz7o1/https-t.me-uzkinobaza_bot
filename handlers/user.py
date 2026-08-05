@@ -207,36 +207,43 @@ async def check_subscription_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     bot = callback.bot
 
-    db_admins = await db_req.get_all_admins()
-    if user_id in config.ADMINS or user_id in db_admins:
-        await callback.message.edit_text("Siz adminsiz! Kino kodini yuborishingiz mumkin.")
-        await callback.answer()
-        return
-
     db_channels = await db_req.get_sponsor_channels()
-    all_channels = list(config.CHANNELS) + [c[1] for c in db_channels]
-    not_subscribed = []
+    formatted_channels = []
+    for ch in config.CHANNELS:
+        formatted_channels.append((ch, ch))
+    for db_ch in db_channels:
+        formatted_channels.append((db_ch[1], db_ch[2] or db_ch[1]))
 
-    for channel in all_channels:
+    not_subscribed = []
+    for ch_tuple in formatted_channels:
+        ch_id = ch_tuple[0]
+        ch_target = str(ch_id).strip()
+        if "t.me/" in ch_target:
+            parts = ch_target.split("t.me/")[1].strip("/")
+            if not parts.startswith("+") and not parts.startswith("joinchat/") and not parts.startswith("c/"):
+                ch_target = "@" + parts.split("/")[0]
+
         try:
-            member = await bot.get_chat_member(chat_id=channel, user_id=user_id)
+            member = await bot.get_chat_member(chat_id=ch_target, user_id=user_id)
             if member.status not in ["creator", "administrator", "member"]:
-                not_subscribed.append(channel)
+                not_subscribed.append(ch_tuple)
         except Exception as e:
-            print(f"Kanal tekshirishda xato ({channel}): {e}")
+            print(f"Kanal tekshirishda xato ({ch_target}): {e}")
+            not_subscribed.append(ch_tuple)
 
     if not_subscribed:
-        await callback.answer("Hali barcha kanallarga a'zo bo'lmadingiz!", show_alert=True)
+        await callback.answer("❌ Hali barcha homiy kanallarga a'zo bo'lmadingiz! Iltimos, a'zo bo'lib qayta bosing.", show_alert=True)
         return
 
-    # Referal mukofotini tekshirish va berish (bot argument birinchi keladi)
+    # Referal mukofotini tekshirish va berish
     await db_req.check_and_reward_referral(callback.bot, user_id)
 
     await callback.message.edit_text(
-        "✅ Rahmat! Barcha kanallarga a'zo bo'ldingiz.\n\n"
-        "Endi kino kodini yuborishingiz mumkin.",
+        "✅ <b>Rahmat! Barcha homiy kanallarga muvaffaqiyatli a'zo bo'ldingiz.</b>\n\n"
+        "Endi kino nomini yoki kodini yuborishingiz mumkin! 🍿",
+        parse_mode="HTML"
     )
-    await callback.answer("Muvaffaqiyatli! ✅", show_alert=True)
+    await callback.answer("A'zolik tasdiqlandi! ✅", show_alert=True)
 
 
 # ─── KINO KODINI QIDIRISH ─────────────────────────────────────────────────────

@@ -44,21 +44,25 @@ class CheckSubMiddleware(BaseMiddleware):
         from database.requests import update_user_activity
         await update_user_activity(user_id)
         
-        # Agar admin bo'lsa tekshiruvdan o'tkazib yuboramiz
-        if user_id in config.ADMINS:
-            return await handler(event, data)
-        
-        # Moderatorlarni ham tekshiruvdan o'tkazib yuboramiz
+        # Adminlar uchun faqat admin paneli buyruqlarida aylanib o'tiladi
+        is_admin_user = (user_id in config.ADMINS)
         from database.requests import get_all_admins, is_user_premium
         db_admins = await get_all_admins()
         if user_id in db_admins:
+            is_admin_user = True
+            
+        state_obj = data.get("state")
+        curr_state = await state_obj.get_state() if state_obj else None
+        if is_admin_user and curr_state and "AdminStates" in str(curr_state):
+            return await handler(event, data)
+        if is_admin_user and event.text and any(cmd in event.text for cmd in ["Kino qo'shish", "Kino o'chirish", "Statistika", "Reklama", "/admin", "/backup", "/promo", "Baza zaxirasi"]):
             return await handler(event, data)
 
         # 1.5. Bot Yangilanmoqda (Maintenance Mode) tekshiruvi
         from database.requests import get_setting
         m_mode = await get_setting("bot_maintenance_mode")
         if m_mode == "1":
-            if user_id not in config.ADMINS and user_id not in db_admins:
+            if not is_admin_user:
                 await event.answer(
                     "🛠️ <b>BOT YANGILANMOQDA!</b> 🚀\n\n"
                     "Hurmatli foydalanuvchi, botimizga siz uchun yanada ko'p qulayliklar va yangi va zo'r funksiyalar qo'shilmoqda! ✨\n\n"
@@ -76,31 +80,44 @@ class CheckSubMiddleware(BaseMiddleware):
             
         # 2. Kanallarni olish (static + dynamic)
         db_channels = await get_sponsor_channels()
-        all_channels = list(config.CHANNELS) + [c[1] for c in db_channels]
+        formatted_channels = []
+        for ch in config.CHANNELS:
+            formatted_channels.append((ch, ch))
+        for db_ch in db_channels:
+            formatted_channels.append((db_ch[1], db_ch[2] or db_ch[1]))
 
         # Agar kanallar sozlanmagan bo'lsa tekshirmaymiz
-        if not all_channels:
+        if not formatted_channels:
             return await handler(event, data)
 
         bot = data["bot"]
         not_subscribed_channels = []
 
-        for channel in all_channels:
+        for ch_tuple in formatted_channels:
+            ch_id = ch_tuple[0]
+            ch_target = str(ch_id).strip()
+            
+            # Link shaklida bo'lsa chat_id ni tozalash (masalan: https://t.me/kanal_nomi -> @kanal_nomi)
+            if "t.me/" in ch_target:
+                parts = ch_target.split("t.me/")[1].strip("/")
+                if not parts.startswith("+") and not parts.startswith("joinchat/") and not parts.startswith("c/"):
+                    ch_target = "@" + parts.split("/")[0]
+
             try:
-                member = await bot.get_chat_member(chat_id=channel, user_id=user_id)
+                member = await bot.get_chat_member(chat_id=ch_target, user_id=user_id)
                 if member.status not in ["creator", "administrator", "member"]:
-                    not_subscribed_channels.append(channel)
+                    not_subscribed_channels.append(ch_tuple)
             except Exception as e:
-                # Agar bot kanalda admin bo'lmasa yoki kanal topilmasa xato berishi mumkin
-                print(f"Kanal tekshirishda xato ({channel}): {e}")
+                print(f"Kanal tekshirishda xato ({ch_target}): {e}")
+                not_subscribed_channels.append(ch_tuple)
 
         if not_subscribed_channels:
-            # Agar obuna bo'lmagan kanallar bo'lsa
             await event.answer(
-                "Botdan foydalanish uchun homiy kanallarimizga a'zo bo'ling!",
+                "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
+                parse_mode="HTML",
                 reply_markup=get_subscription_keyboard(not_subscribed_channels)
             )
-            return  # So'rovni handlerga yubormaymiz (bloklaymiz)
+            return
 
         return await handler(event, data)
 

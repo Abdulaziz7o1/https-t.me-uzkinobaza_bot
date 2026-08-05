@@ -7,20 +7,27 @@ def get_subscription_keyboard(channels: list) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     
     for idx, channel in enumerate(channels, 1):
-        # channel bu tuple bo'lishi mumkin: (channel_id, channel_name)
-        # yoki shunchaki string: "@username"
-        if isinstance(channel, tuple):
-            ch_id, ch_name = channel
+        if isinstance(channel, (tuple, list)):
+            ch_id = channel[0]
+            ch_name = channel[1] if len(channel) > 1 else str(ch_id)
         else:
-            ch_id, ch_name = channel, channel
+            ch_id, ch_name = channel, str(channel)
             
-        if str(ch_id).startswith("@"):
-            link = f"https://t.me/{ch_id[1:]}"
+        ch_str = str(ch_id).strip()
+        if ch_str.startswith("http://") or ch_str.startswith("https://"):
+            link = ch_str
+        elif ch_str.startswith("t.me/"):
+            link = "https://" + ch_str
+        elif ch_str.startswith("@"):
+            link = f"https://t.me/{ch_str[1:]}"
         else:
-            # Agar ID bo'lsa, username bo'lmagani sababli oddiy havola yoki t.me/c/
-            link = f"https://t.me/{ch_id}"
+            link = f"https://t.me/{ch_str}"
             
-        builder.button(text=f"{idx}-kanal 📢 ({ch_name})", url=link)
+        display_name = ch_name if ch_name and str(ch_name) != str(ch_id) else f"{idx}-Kanal"
+        if not display_name.startswith("📢") and not display_name.endswith("📢"):
+            display_name = f"📢 {display_name}"
+            
+        builder.button(text=display_name, url=link)
             
     builder.button(text="A'zo bo'ldim ✅", callback_data="check_sub")
     builder.adjust(1)
