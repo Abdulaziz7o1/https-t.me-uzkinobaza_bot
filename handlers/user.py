@@ -265,16 +265,16 @@ async def search_movie_by_code(message: Message):
             return
 
     if movie:
-        # Kunlik limitni oshirish va 5 soniyalik timer (faqat bepul foydalanuvchilar uchun)
+        # Kunlik limitni oshirish va 3 soniyalik timer (faqat bepul foydalanuvchilar uchun)
         if not skip_wait:
             await db_req.increment_daily_movie_count(user_id)
             cd_msg = await message.answer(
-                "⏳ <b>Kino yuklanmoqda... 5...</b>\n\n"
+                "⏳ <b>Kino yuklanmoqda... 3...</b>\n\n"
                 "💎 <i>Premium olsangiz har bir kino uchun kutish vaqti 0 second bo'ladi!</i>",
                 parse_mode="HTML"
             )
             import asyncio
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
             try:
                 await cd_msg.delete()
             except Exception:
