@@ -2090,6 +2090,11 @@ async def user_daily_bonus(message: Message, state: FSMContext):
 # ─── MATNLI QIDIRUV (FALLBACK AT THE VERY END OF FILE) ───────────────────────
 @router.message(F.text, ~F.text.startswith("/"))
 async def search_movie_by_text(message: Message, state: FSMContext = None):
+    if state:
+        current_state = await state.get_state()
+        if current_state is not None:
+            return
+
     query = message.text.strip()
     # Raqamlar va URL havolalar kino nomi emas
     if query.isdigit() or query.lstrip('/').isdigit() or query.startswith(("http://", "https://", "t.me/")) or "://" in query:
