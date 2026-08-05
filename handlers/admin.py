@@ -864,6 +864,36 @@ async def bc_skip_media_callback(callback: CallbackQuery, state: FSMContext):
 
 @router.message(AdminStates.waiting_for_bc_caption)
 async def bc_caption_handler(message: Message, state: FSMContext):
+    data = await state.get_data()
+    media_type = data.get("bc_media_type")
+
+    # Agar foydalanuvchi stiker yuborgan bo'lsa
+    if message.sticker:
+        if media_type in ["photo", "video", "animation"]:
+            await message.answer(
+                "⚠️ <b>Rasm yoki videoli reklama uchun stiker yuborib bo'lmaydi!</b>\n\n"
+                "<i>Telegram cheklovlari sababli rasm/video ostida stiker ko'rinmaydi. "
+                "Iltimos, reklama uchun matn (text) yoki emojili matn yozib yuboring:</i>",
+                parse_mode="HTML"
+            )
+            return
+        else:
+            # Rasm yuborilmagan bo'lsa, stikerni asosiy media sifatida qabul qilamiz
+            await state.update_data(bc_media_id=message.sticker.file_id, bc_media_type="sticker", bc_caption="")
+            await state.set_state(AdminStates.waiting_for_bc_button)
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="O'tkazib yuborish ⏭ (Standart bot tugmasi)", callback_data="bc_skip_button")],
+                [InlineKeyboardButton(text="Bekor qilish ❌", callback_data="bc_cancel")]
+            ])
+            await message.answer(
+                "✅ Stiker reklama classi sifatida qabul qilindi!\n\n"
+                "🔗 <b>Reklama ostidagi tugma uchun nom va havola yuboring:</b>\n"
+                "<i>Format: Tugma nomi - https://havola.com</i>",
+                parse_mode="HTML",
+                reply_markup=kb
+            )
+            return
+
     caption = ""
     if message.text:
         caption = message.text.strip()
