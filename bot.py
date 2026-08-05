@@ -452,18 +452,23 @@ async def start_health_web_server():
         logging.warning(f"Web serverni ishga tushirishda ogohlantirish: {e}")
 
 async def keep_alive_self_ping():
-    """Render Free Web Service 15 daqiqada uyquga (spin down) ketmasligi uchun avtomatik 3 daqiqada o'ziga ping yuboradi (24/7 $0/oy)"""
-    await asyncio.sleep(15)
+    """Render Free Web Service 15 daqiqada uyquga ketmasligi uchun har 2 daqiqada uzluksiz ping yuborish"""
+    await asyncio.sleep(10)
     render_url = os.getenv("RENDER_EXTERNAL_URL", "https://uzkinobaza-bot.onrender.com/health")
+    root_url = "https://uzkinobaza-bot.onrender.com/"
     local_port = os.getenv("PORT")
     
     import aiohttp
+    from aiohttp import ClientTimeout
+    
     while True:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(render_url, timeout=ClientTimeout(total=10)) as resp:
-                    logging.info(f"Keep-Alive ping: {resp.status}")
-        except Exception:
+                    logging.info(f"Keep-Alive ping /health: {resp.status}")
+                async with session.get(root_url, timeout=ClientTimeout(total=10)) as resp:
+                    logging.info(f"Keep-Alive ping /: {resp.status}")
+        except Exception as e:
             if local_port:
                 try:
                     async with aiohttp.ClientSession() as session:
@@ -471,7 +476,7 @@ async def keep_alive_self_ping():
                             logging.info(f"Local Keep-Alive ping: {resp.status}")
                 except Exception:
                     pass
-        await asyncio.sleep(180)
+        await asyncio.sleep(120)
 
 async def main():
     # Database yaratish va sozlash
