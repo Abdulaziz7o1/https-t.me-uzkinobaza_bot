@@ -102,15 +102,14 @@ async def broadcast_scheduler(bot: Bot):
 
 async def daily_movie_scheduler(bot: Bot):
     """Har kuni soat 09:00 (Tashkent vaqti)da avtomatik Kun Kinosini yuboradi"""
-    from datetime import datetime
+    from datetime import datetime, timedelta, timezone
     import database.requests as db_req
     
+    uzb_tz = timezone(timedelta(hours=5))
     while True:
-        # Har 10 daqiqada tekshiradi
-        await asyncio.sleep(600)
+        await asyncio.sleep(60)
         try:
-            now = datetime.now()
-            # Soat 9:00 va 10:00 oralig'ida bo'lsa va bugun hali yuborilmagan bo'lsa
+            now = datetime.now(uzb_tz)
             if now.hour == 9:
                 today_movie = await db_req.get_today_daily_movie()
                 if not today_movie:
@@ -192,13 +191,14 @@ async def biweekly_premium_scheduler(bot: Bot):
 
 async def birthday_scheduler(bot: Bot):
     """Har kuni soat 09:00 da bugun tug'ilgan kunli a'zolarga +50 ball va 1 kun VIP beradi"""
-    from datetime import datetime
+    from datetime import datetime, timedelta, timezone
     import database.requests as db_req
     
+    uzb_tz = timezone(timedelta(hours=5))
     while True:
-        await asyncio.sleep(3600)  # Har soatda tekshirish
+        await asyncio.sleep(600)  # Har 10 daqiqada tekshirish
         try:
-            now = datetime.now()
+            now = datetime.now(uzb_tz)
             if now.hour == 9:
                 curr_year = now.year
                 today_bdays = await db_req.get_today_birthdays()
@@ -324,18 +324,19 @@ async def biyearly_global_unban_scheduler(bot: Bot):
             logging.error(f"Bi-yearly global unban scheduler xatosi: {e}")
 
 async def daily_kassa_report_scheduler(bot: Bot):
-    """Har kuni soat 09:00 da adminlarga 2 ta alohida xabar yuboradi:
+    """Har kuni soat 09:00 (O'zbekiston / Namangan vaqti) da adminlarga 2 ta alohida xabar yuboradi:
        1) Yangi foydalanuvchilar hisoboti
        2) Kassa hisoboti (ostida Kassani 0 ga tenglash tugmasi bilan)
     """
-    from datetime import datetime
+    from datetime import datetime, timedelta, timezone
     import database.requests as db_req
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     
+    uzb_tz = timezone(timedelta(hours=5))
     while True:
-        await asyncio.sleep(600) # Har 10 daqiqada tekshirish
+        await asyncio.sleep(60) # Har 1 daqiqada tekshirish
         try:
-            now = datetime.now()
+            now = datetime.now(uzb_tz)
             if now.hour == 9:
                 today_str = now.strftime("%Y-%m-%d")
                 last_sent = await db_req.get_setting("last_daily_kassa_report_date")

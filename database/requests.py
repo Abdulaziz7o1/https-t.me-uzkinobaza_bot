@@ -4,8 +4,9 @@ import config
 async def add_user(user_id: int, username: str, full_name: str, referred_by: int = None):
     """Foydalanuvchini bazaga qo'shish, rolini tekshirish va referalni bog'lash"""
     role = 'admin' if user_id in config.ADMINS else 'member'
-    from datetime import datetime
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    from datetime import datetime, timedelta, timezone
+    uzb_tz = timezone(timedelta(hours=5))
+    now_str = datetime.now(uzb_tz).strftime("%Y-%m-%d %H:%M:%S")
     
     async with get_db() as db:
         # Foydalanuvchi allaqachon bor-yo'qligini tekshirish
@@ -21,9 +22,9 @@ async def add_user(user_id: int, username: str, full_name: str, referred_by: int
                         valid_ref = referred_by
                         
             await db.execute(
-                """INSERT INTO users (id, username, full_name, role, referred_by, last_active_at, referral_rewarded) 
-                   VALUES (?, ?, ?, ?, ?, ?, 0)""",
-                (user_id, username, full_name, role, valid_ref, now_str)
+                """INSERT INTO users (id, username, full_name, role, referred_by, created_at, last_active_at, referral_rewarded) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 0)""",
+                (user_id, username, full_name, role, valid_ref, now_str, now_str)
             )
             # Mukofot obuna tekshiruvidan so'ng check_and_reward_referral funksiyasida beriladi
         else:
@@ -2210,13 +2211,14 @@ async def get_recent_payments(limit: int = 10) -> list:
             return await cursor.fetchall()
 
 async def get_today_new_users_count() -> int:
-    """Bugun ro'yxatdan o'tgan yangi foydalanuvchilar soni"""
-    from datetime import date
-    today = str(date.today())
+    """Bugun (Uzbekistan / Namangan vaqti bilan) ro'yxatdan o'tgan yangi foydalanuvchilar soni"""
+    from datetime import datetime, timedelta, timezone
+    uzb_tz = timezone(timedelta(hours=5))
+    today_uzb = datetime.now(uzb_tz).strftime("%Y-%m-%d")
     async with get_db() as db:
         async with db.execute(
-            "SELECT COUNT(*) FROM users WHERE date(created_at) = date('now') OR created_at LIKE ?",
-            (f"{today}%",)
+            "SELECT COUNT(*) FROM users WHERE created_at LIKE ?",
+            (f"{today_uzb}%",)
         ) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else 0
