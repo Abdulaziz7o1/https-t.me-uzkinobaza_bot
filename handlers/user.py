@@ -287,13 +287,14 @@ async def search_movie_by_code(message: Message):
             except Exception:
                 pass
 
-        file_id, caption = movie
+        file_id, caption, *rest = movie
+        views_count = rest[0] if rest else 1
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         is_fav = await db_req.is_favorite(message.from_user.id, movie_id)
         likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
 
         rating_stars = "⭐" * round(avg_rating) if avg_rating else ""
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
 
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
@@ -909,11 +910,12 @@ async def random_movie(message: Message, state: FSMContext):
 
         await db_req.add_to_watch_history(user_id, random_id)
 
-        file_id, caption = movie
+        file_id, caption, *rest = movie
+        views_count = rest[0] if rest else 1
         avg_rating, votes = await db_req.get_movie_rating(random_id)
         is_fav = await db_req.is_favorite(user_id, random_id)
 
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{random_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{random_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)"
         cap += f"\n\n🤖 {config.BOT_USERNAME}"

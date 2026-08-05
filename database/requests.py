@@ -177,13 +177,23 @@ async def movie_exists_db(movie_id: int) -> bool:
             return row is not None
 
 async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
-    """Belgilangan ID (kino kodi) bilan yangi kinoni yangilab yoki yangi qo'shish"""
+    """Belgilangan ID (kino kodi) bilan yangi kinoni qo'shish (yuklashlar va statistikalar 0 dan boshlanadi)"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
     async with get_db() as db:
+        await db.execute("DELETE FROM movies WHERE id = ?", (movie_id,))
+        await db.execute("DELETE FROM favorites WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM ratings WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM comments WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM watch_history WHERE movie_id = ?", (movie_id,))
+        await db.execute("DELETE FROM movie_reports WHERE movie_id = ?", (movie_id,))
+        try:
+            await db.execute("DELETE FROM movie_reactions WHERE movie_id = ?", (movie_id,))
+        except Exception:
+            pass
         await db.execute(
-            "INSERT OR REPLACE INTO movies (id, file_id, caption) VALUES (?, ?, ?)",
+            "INSERT INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, 0)",
             (movie_id, file_id, caption)
         )
         await db.commit()
@@ -191,21 +201,23 @@ async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
         return True
 
 async def get_movie(movie_id: int):
-    """Kino ma'lumotlarini to'g'ridan-to'g'ri bazadan real-vaqt rejimida olish"""
+    """Kino ma'lumotlarini to'g'ridan-to'g'ri bazadan real-vaqt rejimida olish va yuklashlar sonini oshirish"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
     async with get_db() as db:
-        async with db.execute("SELECT file_id, caption FROM movies WHERE id = ?", (movie_id,)) as cursor:
+        async with db.execute("SELECT file_id, caption, views_count FROM movies WHERE id = ?", (movie_id,)) as cursor:
             movie = await cursor.fetchone()
         if movie:
-            # Ko'rishlar sonini bittaga oshirish
-            await db.execute("UPDATE movies SET views_count = views_count + 1 WHERE id = ?", (movie_id,))
+            current_views = movie[2] or 0
+            new_views = current_views + 1
+            await db.execute("UPDATE movies SET views_count = ? WHERE id = ?", (new_views, movie_id))
             await db.commit()
-        return movie
+            return (movie[0], movie[1], new_views)
+        return None
 
 async def delete_movie(movie_id: int) -> bool:
-    """Kinoni bazadan, keshdan va barcha xotira bo'limlaridan butunlay yo'q qilish"""
+    """Kinoni bazadan, keshdan va barcha xotira bo'limlaridan butunlay yo'q qilish (yuklashlar va reaksiyalarni 0 ga tenglash)"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
@@ -222,7 +234,13 @@ async def delete_movie(movie_id: int) -> bool:
         await db.execute("DELETE FROM comments WHERE movie_id = ?", (movie_id,))
         await db.execute("DELETE FROM watch_history WHERE movie_id = ?", (movie_id,))
         await db.execute("DELETE FROM movie_reports WHERE movie_id = ?", (movie_id,))
+        try:
+            await db.execute("DELETE FROM movie_reactions WHERE movie_id = ?", (movie_id,))
+        except Exception:
+            pass
         await db.commit()
+        cache.delete(f"movie_{movie_id}")
+        return True
 
         cache.delete(f"movie_{movie_id}")
         cache.clear()
