@@ -1,0 +1,124 @@
+{
+  "movies": [],
+  "sponsor_channels": [
+    {
+      "id": 5,
+      "channel_id": "@MadridPrimee",
+      "channel_name": "Real Madrid 🇪🇸🇪🇸"
+    }
+  ],
+  "users": [
+    {
+      "id": 1356851382,
+      "username": "Abdulaziiz701",
+      "full_name": ".",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-07-18 07:53:22",
+      "birthday": null,
+      "premium_until": null
+    },
+    {
+      "id": 7140599182,
+      "username": "Abdulazizbee_701",
+      "full_name": "ABDULAZIZ",
+      "role": "admin",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-07-18 07:45:45",
+      "birthday": null,
+      "premium_until": null
+    },
+    {
+      "id": 8245305906,
+      "username": "Abdulaziz7o1",
+      "full_name": "ABDULAZIZ",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-07-20 06:20:55",
+      "birthday": "10.10.2013",
+      "premium_until": null
+    },
+    {
+      "id": 8352596257,
+      "username": "MadridPrimee_reklama",
+      "full_name": "MadridPrimee",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-07-18 08:40:56",
+      "birthday": null,
+      "premium_until": null
+    }
+  ],
+  "premium_subscriptions": [],
+  "payment_records": [],
+  "settings": {
+    "ref_promo_file_id": "AgACAgIAAxkBAAICT2pbkU-uA-sFtRB2yFL5vF99_aHeAALMG2sbForYSmae4Hz9OSKYAQADAgADeAADPQQ",
+    "ref_promo_media_type": "photo",
+    "ref_promo_caption": "Abdulaziz",
+    "comment_moderation": "1",
+    "admin_card_number": "5614 6818 2032 8148 GANIYEV ABDULXAY",
+    "last_biweekly_premium_run": "2026-08-04 10:00:10",
+    "bot_maintenance_mode": "0",
+    "kassa_total": "0",
+    "points_referral": "20",
+    "referral_2x_event": "0",
+    "premium_price_1m": "20000",
+    "premium_price_3m": "55000"
+  },
+  "promo_codes": [],
+  "requests": [],
+  "tickets": [
+    {
+      "id": 1,
+      "user_id": 8245305906,
+      "message_text": "SAlom",
+      "status": "pending",
+      "reply_text": null,
+      "admin_id": null,
+      "created_at": "2026-08-04 05:37:36"
+    },
+    {
+      "id": 2,
+      "user_id": 8245305906,
+      "message_text": "Salom",
+      "status": "replied",
+      "reply_text": "(Media / Rasm / Stiker javob)",
+      "admin_id": 7140599182,
+      "created_at": "2026-08-04 05:51:57"
+    }
+  ],
+  "favorites": [
+    {
+      "user_id": 8352596257,
+      "movie_id": 1
+    },
+    {
+      "user_id": 7140599182,
+      "movie_id": 1
+    }
+  ],
+  "ratings": [],
+  "comments": [],
+  "movie_reactions": [],
+  "abuse_logs": [],
+  "moderator_permissions": [
+    {
+      "user_id": 1356851382,
+      "add_movie": 1,
+      "delete_movie": 0,
+      "view_stats": 0,
+      "send_broadcast": 0,
+      "manage_sponsors": 0,
+      "view_trends": 0,
+      "backup_db": 0
+    }
+  ]
+}

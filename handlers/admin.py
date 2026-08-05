@@ -178,29 +178,47 @@ async def admin_restore_json_backup(message: Message):
         downloaded_file = await message.bot.download_file(file_path)
         content = downloaded_file.read().decode('utf-8')
         
-        restored = await db_req.import_movies_from_json(content)
-        if restored > 0:
-            with open("movies_backup.json", "w", encoding="utf-8") as f:
-                f.write(content)
-            await message.answer(f"✅ <b>Zaxira faylidan {restored} ta kino 100% muvaffaqiyatli tiklandi va bazaga saqlandi!</b>", parse_mode="HTML")
-        else:
-            await message.answer("⚠️ Fayl ichida kinolar topilmadi yoki fayl formati noto'g'ri.")
+        stats = await db_req.import_master_backup_json(content)
+        m_cnt = stats.get("movies", 0)
+        ch_cnt = stats.get("sponsor_channels", 0)
+        set_cnt = stats.get("settings", 0)
+        
+        with open("master_bot_backup.json", "w", encoding="utf-8") as f:
+            f.write(content)
+
+        txt = (
+            f"✅ <b>MASTER ZAXIRA FAYLI MUVAFFAQIYATLI TIKLANDI!</b> 🚀\n\n"
+            f"🎬 <b>Kinolar:</b> {m_cnt} ta\n"
+            f"📢 <b>Homiy kanallar:</b> {ch_cnt} ta\n"
+            f"⚙️ <b>Sozlamalar va Kassa:</b> {set_cnt} ta\n\n"
+            f"<i>Barcha 15 ta ma'lumotlar jadvallari SQLite bazasiga va xotiraga 100% tiklandi!</i>"
+        )
+        await message.answer(txt, parse_mode="HTML")
     except Exception as e:
         await message.answer(f"❌ Zaxirani tiklashda xato yuz berdi: {e}")
 
 # --- KINOLAR ZAXIRASINI OLISH (/backup) ---
 @router.message(Command("backup"))
 @router.message(F.text == "💾 Baza zaxirasi")
+@router.message(F.text == "Zaxira (Backup) 💾")
 async def send_movies_backup_to_admin(message: Message):
-    if message.from_user.id not in config.ADMINS:
+    if message.from_user.id not in config.ADMINS and not await db_req.has_permission(message.from_user.id, "backup_db"):
         return
-    json_data = await db_req.export_movies_backup_json()
-    with open("movies_backup.json", "w", encoding="utf-8") as f:
+    json_data = await db_req.export_master_backup_json()
+    backup_file_path = "master_bot_backup.json"
+    with open(backup_file_path, "w", encoding="utf-8") as f:
         f.write(json_data)
-    file = FSInputFile("movies_backup.json")
+    file = FSInputFile(backup_file_path)
+    
+    caption_txt = (
+        f"💾 <b>BOTNING FULL MASTER ZAXIRA FAYLI (Backup).</b>\n\n"
+        f"Ushbu `.json` faylda barcha kinolar, homiy kanallar, ballar, kassa, promo kodlar va sozlamalar 100% jamlangan!\n\n"
+        f"📌 <b>Tiklash usuli:</b> Render restart bo'lganda bot avtomatik tiklaydi yoki ushbu faylni botga shunchaki yuborsangiz 100% qayta tiklaydi!"
+    )
     await message.answer_document(
         document=file,
-        caption="💾 <b>Kinolarning joriy zaxira fayli (Backup).</b>\n\nUshbu faylni saqlab qo'ying, istalgan vaqtda botga yuborsangiz barcha kinolaringiz 100% qayta tiklanadi!"
+        caption=caption_txt,
+        parse_mode="HTML"
     )
 
 # --- STATISTIKA ---

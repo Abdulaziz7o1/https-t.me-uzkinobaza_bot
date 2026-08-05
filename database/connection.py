@@ -2,7 +2,7 @@ import aiosqlite
 import os
 from datetime import datetime, timedelta
 
-DB_PATH = "kino_bot.db"
+DB_PATH = os.getenv("DB_PATH", "kino_bot.db")
 
 # Simple in-memory cache with TTL
 class SimpleCache:

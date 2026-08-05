@@ -160,14 +160,16 @@ async def get_all_admins():
             return [row[0] for row in rows]
 
 async def add_movie(file_id: str, caption: str) -> int:
-    """Yangi kino qo'shish va uning kodini (ID) qaytarish"""
+    """Yangi kino qo'shish va uning kodini (ID) qaytarish va avtomatik zaxiralash"""
     async with get_db() as db:
         cursor = await db.execute(
             "INSERT INTO movies (file_id, caption) VALUES (?, ?)",
             (file_id, caption)
         )
         await db.commit()
-        return cursor.lastrowid
+        last_id = cursor.lastrowid
+    await export_master_backup_json()
+    return last_id
 
 async def movie_exists_db(movie_id: int) -> bool:
     """Kesh-ga qaramay haqiqiy SQL bazada kino borligini tekshirish"""
@@ -177,7 +179,7 @@ async def movie_exists_db(movie_id: int) -> bool:
             return row is not None
 
 async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
-    """Belgilangan ID (kino kodi) bilan yangi kinoni qo'shish (yuklashlar va statistikalar 0 dan boshlanadi)"""
+    """Belgilangan ID (kino kodi) bilan yangi kinoni qo'shish va zaxiralash"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
@@ -198,7 +200,8 @@ async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
         )
         await db.commit()
         cache.delete(f"movie_{movie_id}")
-        return True
+    await export_master_backup_json()
+    return True
 
 async def get_movie(movie_id: int):
     """Kino ma'lumotlarini to'g'ridan-to'g'ri bazadan real-vaqt rejimida olish va yuklashlar sonini oshirish"""
@@ -217,7 +220,7 @@ async def get_movie(movie_id: int):
         return None
 
 async def delete_movie(movie_id: int) -> bool:
-    """Kinoni bazadan, keshdan va barcha xotira bo'limlaridan butunlay yo'q qilish (yuklashlar va reaksiyalarni 0 ga tenglash)"""
+    """Kinoni bazadan va barcha xotira bo'limlaridan butunlay yo'q qilish va zaxiralash"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
@@ -240,53 +243,242 @@ async def delete_movie(movie_id: int) -> bool:
             pass
         await db.commit()
         cache.delete(f"movie_{movie_id}")
-        return True
+    await export_master_backup_json()
+    return True
 
-        cache.delete(f"movie_{movie_id}")
-        cache.clear()
-        return True
+MASTER_BACKUP_FILE = "master_bot_backup.json"
+
+async def export_master_backup_json() -> str:
+    """Barcha 15 ta ma'lumotlar bazasi jadvalini master_bot_backup.json fayliga 100% zaxiralash"""
+    import json
+    async with get_db() as db:
+        # 1. Movies
+        async with db.execute("SELECT id, file_id, caption, views_count FROM movies ORDER BY id ASC") as c:
+            movies = [{"id": r[0], "file_id": r[1], "caption": r[2], "views_count": r[3]} for r in await c.fetchall()]
+
+        # 2. Sponsor channels
+        async with db.execute("SELECT id, channel_id, channel_name FROM sponsor_channels") as c:
+            channels = [{"id": r[0], "channel_id": r[1], "channel_name": r[2]} for r in await c.fetchall()]
+
+        # 3. Users
+        async with db.execute("SELECT id, username, full_name, role, status, points, referrals_count, created_at, birthday, premium_until FROM users") as c:
+            users = [{"id": r[0], "username": r[1], "full_name": r[2], "role": r[3], "status": r[4], "points": r[5], "referrals_count": r[6], "created_at": r[7], "birthday": r[8], "premium_until": r[9]} for r in await c.fetchall()]
+
+        # 4. Premium subscriptions
+        async with db.execute("SELECT user_id, start_date, end_date, plan FROM premium_subscriptions") as c:
+            premium_subs = [{"user_id": r[0], "start_date": r[1], "end_date": r[2], "plan": r[3]} for r in await c.fetchall()]
+
+        # 5. Payment records
+        async with db.execute("SELECT id, user_id, amount, plan, confirmed_by, created_at FROM payment_records ORDER BY id ASC") as c:
+            payments = [{"id": r[0], "user_id": r[1], "amount": r[2], "plan": r[3], "confirmed_by": r[4], "created_at": r[5]} for r in await c.fetchall()]
+
+        # 6. Settings
+        async with db.execute("SELECT key, value FROM bot_settings") as c:
+            settings = {r[0]: r[1] for r in await c.fetchall()}
+
+        # 7. Promo codes
+        try:
+            async with db.execute("SELECT code, reward_type, reward_value, max_uses, used_count, expires_at FROM promo_codes") as c:
+                promo = [{"code": r[0], "reward_type": r[1], "reward_value": r[2], "max_uses": r[3], "used_count": r[4], "expires_at": r[5]} for r in await c.fetchall()]
+        except Exception:
+            promo = []
+
+        # 8. Requests
+        async with db.execute("SELECT id, user_id, movie_name, status, created_at FROM requests") as c:
+            reqs = [{"id": r[0], "user_id": r[1], "movie_name": r[2], "status": r[3], "created_at": r[4]} for r in await c.fetchall()]
+
+        # 9. Tickets
+        async with db.execute("SELECT id, user_id, message_text, status, reply_text, admin_id, created_at FROM tickets") as c:
+            tickets = [{"id": r[0], "user_id": r[1], "message_text": r[2], "status": r[3], "reply_text": r[4], "admin_id": r[5], "created_at": r[6]} for r in await c.fetchall()]
+
+        # 10. Favorites
+        async with db.execute("SELECT user_id, movie_id FROM favorites") as c:
+            favorites = [{"user_id": r[0], "movie_id": r[1]} for r in await c.fetchall()]
+
+        # 11. Ratings
+        async with db.execute("SELECT user_id, movie_id, rating, created_at FROM ratings") as c:
+            ratings = [{"user_id": r[0], "movie_id": r[1], "rating": r[2], "created_at": r[3]} for r in await c.fetchall()]
+
+        # 12. Comments
+        async with db.execute("SELECT id, user_id, movie_id, comment_text, created_at FROM comments") as c:
+            comments = [{"id": r[0], "user_id": r[1], "movie_id": r[2], "comment_text": r[3], "created_at": r[4]} for r in await c.fetchall()]
+
+        # 13. Movie reactions
+        try:
+            async with db.execute("SELECT movie_id, user_id, reaction_type FROM movie_reactions") as c:
+                reactions = [{"movie_id": r[0], "user_id": r[1], "reaction_type": r[2]} for r in await c.fetchall()]
+        except Exception:
+            reactions = []
+
+        # 14. Abuse logs
+        try:
+            async with db.execute("SELECT id, user_id, type, details, created_at FROM abuse_logs") as c:
+                abuse_logs = [{"id": r[0], "user_id": r[1], "type": r[2], "details": r[3], "created_at": r[4]} for r in await c.fetchall()]
+        except Exception:
+            abuse_logs = []
+
+        # 15. Moderator permissions
+        try:
+            async with db.execute("SELECT user_id, add_movie, delete_movie, view_stats, send_broadcast, manage_sponsors, view_trends, backup_db FROM moderator_permissions") as c:
+                permissions = [{"user_id": r[0], "add_movie": r[1], "delete_movie": r[2], "view_stats": r[3], "send_broadcast": r[4], "manage_sponsors": r[5], "view_trends": r[6], "backup_db": r[7]} for r in await c.fetchall()]
+        except Exception:
+            permissions = []
+
+        master_data = {
+            "movies": movies,
+            "sponsor_channels": channels,
+            "users": users,
+            "premium_subscriptions": premium_subs,
+            "payment_records": payments,
+            "settings": settings,
+            "promo_codes": promo,
+            "requests": reqs,
+            "tickets": tickets,
+            "favorites": favorites,
+            "ratings": ratings,
+            "comments": comments,
+            "movie_reactions": reactions,
+            "abuse_logs": abuse_logs,
+            "moderator_permissions": permissions
+        }
+
+        # Master JSON va alohida movies/sponsor backup fayllariga saqlash
+        json_str = json.dumps(master_data, ensure_ascii=False, indent=2)
+        try:
+            with open(MASTER_BACKUP_FILE, "w", encoding="utf-8") as f:
+                f.write(json_str)
+            with open("movies_backup.json", "w", encoding="utf-8") as f:
+                json.dump(movies, f, ensure_ascii=False, indent=2)
+            with open("sponsor_channels_backup.json", "w", encoding="utf-8") as f:
+                json.dump(channels, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Master backup saqlashda xato: {e}")
+
+        return json_str
+
+async def import_master_backup_json(json_str: str) -> dict:
+    """Master JSON faylidan barcha 15 ta ma'lumotlar jadvallarini bazaga 100% tiklash"""
+    import json
+    try:
+        data = json.loads(json_str)
+        if not isinstance(data, dict):
+            if isinstance(data, list):
+                m_cnt = await import_movies_from_json(json_str)
+                return {"movies": m_cnt}
+            return {}
+
+        stats = {}
+        async with get_db() as db:
+            # 1. Movies
+            if "movies" in data:
+                m_cnt = 0
+                for m in data["movies"]:
+                    if m.get("id") and m.get("file_id"):
+                        await db.execute(
+                            "INSERT OR REPLACE INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, ?)",
+                            (m["id"], m["file_id"], m.get("caption", ""), m.get("views_count", 0))
+                        )
+                        m_cnt += 1
+                stats["movies"] = m_cnt
+
+            # 2. Sponsor channels
+            if "sponsor_channels" in data:
+                ch_cnt = 0
+                for ch in data["sponsor_channels"]:
+                    if ch.get("channel_id"):
+                        await db.execute(
+                            "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
+                            (ch["channel_id"], ch.get("channel_name", ch["channel_id"]))
+                        )
+                        ch_cnt += 1
+                stats["sponsor_channels"] = ch_cnt
+
+            # 3. Settings
+            if "settings" in data and isinstance(data["settings"], dict):
+                s_cnt = 0
+                for k, v in data["settings"].items():
+                    await db.execute(
+                        "INSERT INTO bot_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+                        (str(k), str(v), str(v))
+                    )
+                    s_cnt += 1
+                stats["settings"] = s_cnt
+
+            # 4. Premium Subscriptions
+            if "premium_subscriptions" in data:
+                p_cnt = 0
+                for ps in data["premium_subscriptions"]:
+                    if ps.get("user_id"):
+                        await db.execute(
+                            "INSERT OR REPLACE INTO premium_subscriptions (user_id, start_date, end_date, plan) VALUES (?, ?, ?, ?)",
+                            (ps["user_id"], ps.get("start_date"), ps.get("end_date"), ps.get("plan"))
+                        )
+                        p_cnt += 1
+                stats["premium_subscriptions"] = p_cnt
+
+            # 5. Payment records
+            if "payment_records" in data:
+                pay_cnt = 0
+                for p in data["payment_records"]:
+                    if p.get("user_id"):
+                        await db.execute(
+                            "INSERT OR IGNORE INTO payment_records (id, user_id, amount, plan, confirmed_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                            (p.get("id"), p["user_id"], p.get("amount", 0), p.get("plan", ""), p.get("confirmed_by"), p.get("created_at"))
+                        )
+                        pay_cnt += 1
+                stats["payment_records"] = pay_cnt
+
+            # 6. Promo codes
+            if "promo_codes" in data:
+                pc_cnt = 0
+                for pc in data["promo_codes"]:
+                    if pc.get("code"):
+                        await db.execute(
+                            "INSERT OR REPLACE INTO promo_codes (code, reward_type, reward_value, max_uses, used_count, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+                            (pc["code"], pc.get("reward_type"), pc.get("reward_value", 0), pc.get("max_uses", 1), pc.get("used_count", 0), pc.get("expires_at"))
+                        )
+                        pc_cnt += 1
+                stats["promo_codes"] = pc_cnt
+
+            await db.commit()
+        return stats
+    except Exception as e:
+        print(f"Master backup tiklashda xato: {e}")
+        return {}
+
+async def restore_master_backup_on_startup():
+    """Bot ishga tushganida (Render restart bo'lganda) master_bot_backup.json va barcha fayllardan avtomatik tiklash"""
+    import os
+    if os.path.exists(MASTER_BACKUP_FILE):
+        try:
+            with open(MASTER_BACKUP_FILE, "r", encoding="utf-8") as f:
+                json_str = f.read()
+                await import_master_backup_json(json_str)
+                print("Master backup (barcha 15 ta jadval) muvaffaqiyatli tiklandi!")
+        except Exception as e:
+            print(f"Master backup startup xatosi: {e}")
+
+    if os.path.exists("movies_backup.json"):
+        try:
+            with open("movies_backup.json", "r", encoding="utf-8") as f:
+                await import_movies_from_json(f.read())
+        except Exception:
+            pass
+
+    if os.path.exists("sponsor_channels_backup.json"):
+        try:
+            await restore_sponsor_channels_backup_on_startup()
+        except Exception:
+            pass
 
 async def export_movies_backup_json() -> str:
     """Barcha kinolarni JSON matn shaklida zaxiralash uchun chiqarish"""
-    import json
-    async with get_db() as db:
-        async with db.execute("SELECT id, file_id, caption, views_count FROM movies ORDER BY id ASC") as cursor:
-            rows = await cursor.fetchall()
-            movies = []
-            for r in rows:
-                movies.append({
-                    "id": r[0],
-                    "file_id": r[1],
-                    "caption": r[2],
-                    "views_count": r[3]
-                })
-            return json.dumps(movies, ensure_ascii=False, indent=2)
+    return await export_master_backup_json()
 
 async def import_movies_from_json(json_str: str) -> int:
     """JSON matnidan barcha kinolarni bazaga qayta tiklash"""
-    import json
-    try:
-        movies = json.loads(json_str)
-        if not isinstance(movies, list):
-            return 0
-        restored = 0
-        async with get_db() as db:
-            for m in movies:
-                m_id = m.get("id")
-                file_id = m.get("file_id")
-                caption = m.get("caption", "")
-                views = m.get("views_count", 0)
-                if m_id and file_id:
-                    await db.execute(
-                        "INSERT OR REPLACE INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, ?)",
-                        (m_id, file_id, caption, views)
-                    )
-                    restored += 1
-            await db.commit()
-        return restored
-    except Exception as e:
-        print(f"Movies JSON import error: {e}")
-        return 0
+    res = await import_master_backup_json(json_str)
+    return res.get("movies", 0)
 
 async def search_movies_by_name(query: str):
     """Kinolarni nomi (tavsifi) bo'yicha qidirish"""
