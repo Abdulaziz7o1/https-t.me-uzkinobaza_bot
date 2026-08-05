@@ -354,6 +354,7 @@ async def report_movie_cb(callback: CallbackQuery):
     await callback.answer("Shikoyatingiz adminga yetkazildi! Rahmat! 🙏", show_alert=True)
 
 # ─── KINO NOMI BO'YICHA QIDIRISH ───────────────────────────────────────────────
+@router.message(Command("search"))
 @router.message(F.text.in_(["🔍 Kino qidirish", "Kino qidirish 🔍", "Kino qidirish"]))
 async def start_movie_search(message: Message, state: FSMContext):
     await state.set_state(UserStates.waiting_for_movie_search)
@@ -386,6 +387,7 @@ async def search_movie_by_name(message: Message, state: FSMContext):
 
 
 # ─── PREMIUM OBUNA ─────────────────────────────────────────────────────────────
+@router.message(Command("premium"))
 @router.message(F.text == "/premium")
 @router.message(F.text == "💎 Premium")
 async def premium_info(message: Message):
@@ -856,6 +858,7 @@ async def show_favorites(message: Message, state: FSMContext):
     await message.answer(text)
 
 # ─── TASODIFIY KINO ─────────────────────────────────────────────────────────
+@router.message(Command("random"))
 @router.message(F.text.regexp(r"(?i).*(tasodifiy kino).*"))
 async def random_movie(message: Message, state: FSMContext):
     await state.clear()
@@ -1772,6 +1775,7 @@ async def show_favorites_profile_cb(callback: CallbackQuery):
 
 
 # ─── QO'LLAB-QUVVATLASH / ADMINGA MUROJAAT (SUPPORT TICKETS) ───────────────────
+@router.message(Command("help"))
 @router.message(F.text.regexp(r"(?i).*(yordam|murojaat).*"))
 async def user_support_ticket_start(message: Message, state: FSMContext):
     await state.clear()
@@ -1819,6 +1823,7 @@ async def user_support_ticket_save(message: Message, state: FSMContext):
 
 
 # ─── USER 4: 👑 MENING PROFILIM (PROFILE CARD & LEVELS) ───────────────────────
+@router.message(Command("profile"))
 @router.message(F.text.in_(["👑 Profilim", "Profilim 👑", "Profilim", "Mening Profilim 👑", "Mening Profilim"]))
 async def user_profile_card(message: Message, state: FSMContext):
     await state.clear()
@@ -1878,6 +1883,7 @@ async def show_watch_history_callback(callback: CallbackQuery):
 
 
 # ─── USER 6: 🔝 TOP 100 ENG YUQORI BAHOLANGAN KINOLAR ────────────────────────
+@router.message(Command("top"))
 @router.message(F.text.in_(["🔝 TOP Kinolar", "TOP Kinolar 🔝", "TOP Kinolar"]))
 async def user_top_movies_list(message: Message, state: FSMContext):
     await state.clear()
@@ -2073,6 +2079,7 @@ async def show_movie_callback(callback: CallbackQuery):
 
 
 # ─── KUNLIK BONUS (+3 BALL) ───────────────────────────────────────────────────
+@router.message(Command("bonus"))
 @router.message(F.text.regexp(r"(?i).*(kunlik bonus).*"))
 async def user_daily_bonus(message: Message, state: FSMContext):
     await state.clear()
