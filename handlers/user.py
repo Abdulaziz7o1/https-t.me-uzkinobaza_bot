@@ -76,7 +76,7 @@ async def execute_start_logic(message: Message, state: FSMContext):
         await message.answer(
             f"👋 <b>Assalomu alaykum, Bosh Admin {name_to_show}!</b>\n\n"
             f"🛠 <b>Bot boshqaruv paneliga xush kelibsiz.</b>\n"
-            f"Quyidagi menyudan foydalanib botni boshqarishingiz mumkin:",
+            f"Quyidagi menyudan foydalanib botni boshqarishingiz mumkin:{CONTACT_FOOTER}",
             parse_mode="HTML",
             reply_markup=get_admin_menu()
         )
@@ -84,7 +84,7 @@ async def execute_start_logic(message: Message, state: FSMContext):
         await message.answer(
             f"👋 <b>Assalomu alaykum, Moderator {name_to_show}!</b>\n\n"
             f"🛠 <b>Moderator paneliga xush kelibsiz.</b>\n"
-            f"Quyidagi menyudan foydalanib botni boshqarishingiz mumkin:",
+            f"Quyidagi menyudan foydalanib botni boshqarishingiz mumkin:{CONTACT_FOOTER}",
             parse_mode="HTML",
             reply_markup=get_moderator_menu()
         )
@@ -93,7 +93,7 @@ async def execute_start_logic(message: Message, state: FSMContext):
             f"👋 <b>Assalomu alaykum, {name_to_show}!</b>\n\n"
             f"🍿 <b>Kino botiga xush kelibsiz!</b>\n\n"
             f"🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n"
-            f"⚡ Quyidagi menyudan foydalaning:",
+            f"⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}",
             parse_mode="HTML",
             reply_markup=get_user_menu()
         )
@@ -122,7 +122,7 @@ async def cmd_start(message: Message, state: FSMContext):
                     await message.answer(
                         f"⚠️ <b>Kunlik limit tugadi!</b>\n\n"
                         f"Siz bugun {max_allowed} ta kino ko'rishingiz mumkin edi.\n"
-                        f"Premium obuna olish uchun /premium buyrug'ini yozing.",
+                        f"Premium obuna olish uchun /premium buyrug'ini yozing.{CONTACT_FOOTER}",
                         parse_mode="HTML"
                     )
                     return
@@ -172,7 +172,7 @@ async def btn_start(message: Message, state: FSMContext):
         await message.answer(
             f"👋 Assalomu alaykum, {name_to_show}!\n\n"
             f"🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n"
-            f"⚡ Quyidagi menyudan foydalaning:",
+            f"⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}",
             parse_mode="HTML",
             reply_markup=get_user_menu()
         )
@@ -194,7 +194,7 @@ async def btn_start(message: Message, state: FSMContext):
 
         await message.answer(
             f"👋 Assalomu alaykum, {name_to_show}!\n\n"
-            f"🎬 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:",
+            f"🎬 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:{CONTACT_FOOTER}",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=channel_buttons)
         )
@@ -202,7 +202,7 @@ async def btn_start(message: Message, state: FSMContext):
         await message.answer(
             f"👋 Assalomu alaykum, {name_to_show}!\n\n"
             f"🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n"
-            f"⚡ Quyidagi menyudan foydalaning:",
+            f"⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}",
             parse_mode="HTML",
             reply_markup=get_user_menu()
         )
@@ -272,7 +272,7 @@ async def search_movie_by_code(message: Message):
             await message.answer(
                 f"⚠️ <b>Kunlik limit tugadi!</b>\n\n"
                 f"Siz bugun {max_allowed} ta kino ko'rishingiz mumkin edi.\n"
-                f"Premium obuna olish uchun /premium buyrug'ini yozing.",
+                f"Premium obuna olish uchun /premium buyrug'ini yozing.{CONTACT_FOOTER}",
                 parse_mode="HTML"
             )
             return
@@ -317,7 +317,7 @@ async def search_movie_by_code(message: Message):
         await message.answer(
             f"❌ <b>Kino topilmadi!</b>\n\n"
             f"Kino kodi <code>{movie_id}</code> bo'yicha kino mavjud emas.\n"
-            f"Iltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning.",
+            f"Iltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning.{CONTACT_FOOTER}",
             parse_mode="HTML"
         )
         return
@@ -479,7 +479,7 @@ async def premium_info(message: Message):
             f"• Kunlik limit yo'q\n"
             f"• Cheklovsiz kino ko'rish\n"
             f"• Prioritet qo'llab-quvvatlash\n\n"
-            f"<i>Rahmat! Siz bizning Premium a'zomiz! 🙏</i>",
+            f"<i>Rahmat! Siz bizning Premium a'zomiz! 🙏</i>{CONTACT_FOOTER}",
             parse_mode="HTML"
         )
         return
@@ -611,7 +611,7 @@ async def user_promo_cmd(message: Message, state: FSMContext):
                     f"✅ <b>Obuna holati:</b> Faol (30 kun)\n"
                     f"💳 <b>To'lov summasi:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>0 UZS</b>\n\n"
                     f"📌 <i>Premium obunangiz tafsilotlarini ko'rish uchun /premium buyrug'ini yuboring.</i>\n"
-                    f"🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>",
+                    f"🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>{CONTACT_FOOTER}",
                     parse_mode="HTML"
                 )
                 await _notify_admin_promo_100(message.bot, user_id, uname, code)
@@ -701,7 +701,7 @@ async def user_promo_input_exec(message: Message, state: FSMContext):
                 f"✅ <b>Obuna holati:</b> Faol (30 kun)\n"
                 f"💳 <b>To'lov summasi:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>0 UZS</b>\n\n"
                 f"📌 <i>Premium obunangiz tafsilotlarini ko'rish uchun /premium buyrug'ini yuboring.</i>\n"
-                f"🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>",
+                f"🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>{CONTACT_FOOTER}",
                 parse_mode="HTML"
             )
             await _notify_admin_promo_100(message.bot, user_id, uname, code)
@@ -933,7 +933,7 @@ async def random_movie(message: Message, state: FSMContext):
             await message.answer(
                 f"⚠️ <b>Kunlik limit tugadi!</b>\n\n"
                 f"Siz bugun {max_allowed} ta kino ko'rishingiz mumkin edi.\n"
-                f"Premium obuna olish uchun /premium buyrug'ini yozing.",
+                f"Premium obuna olish uchun /premium buyrug'ini yozing.{CONTACT_FOOTER}",
                 parse_mode="HTML"
             )
             return
@@ -974,7 +974,7 @@ async def random_movie(message: Message, state: FSMContext):
             reply_markup=get_movie_action_keyboard(random_id, is_fav, avg_rating)
         )
     else:
-        await message.answer(f"❌ Kino topilmadi (ID: {random_id})")
+        await message.answer(f"❌ Kino topilmadi (ID: {random_id}){CONTACT_FOOTER}")
 
 
 # ─── REYTINGLAR (LEADERBOARD) ─────────────────────────────────────────────────
@@ -1136,7 +1136,7 @@ async def process_movie_request(message: Message, state: FSMContext):
         f"✅ <b>So'rov qabul qilindi!</b>\n\n"
         f"🎬 Kino: {movie_name}\n"
         f"📊 Adminlar tez orada ko'rib chiqishadi.\n\n"
-        f"⏰ Kino qo'shilganda sizga xabar beramiz.",
+        f"⏰ Kino qo'shilganda sizga xabar beramiz.{CONTACT_FOOTER}",
         parse_mode="HTML"
     )
 
@@ -1792,7 +1792,7 @@ async def toggle_comment_like_callback(callback: CallbackQuery):
     comm_id = int(callback.data.split("_")[2])
     liked, count = await db_req.toggle_comment_like(comm_id, callback.from_user.id)
     status_txt = "Like bosildi! ❤️" if liked else "Like olib tashlandi 💔"
-    await callback.answer(f"{status_txt} (Jami: {count})")
+    await callback.answer(f"{status_txt} (Jami: {count}){CONTACT_FOOTER}")
 
 
 # ─── SAQLANGAN KINOLAR (FAVORITES) ───────────────────────────────────────────
@@ -2017,7 +2017,7 @@ async def user_birthday_start(message: Message, state: FSMContext):
         await message.answer(
             f"🎂 <b>Sizning saqlangan tug'ilgan kuningiz:</b> <code>{existing_bday}</code>\n\n"
             f"⚠️ <i>Eslatma: Tug'ilgan kun ma'lumotlari 1 marta saqlanadi va o'zgartirib bo'lmaydi.\n"
-            f"Har yili ushbu kunda sizga <b>+50 💎 ball</b> va <b>👑 1 kunlik VIP</b> taqdim etiladi!</i>",
+            f"Har yili ushbu kunda sizga <b>+50 💎 ball</b> va <b>👑 1 kunlik VIP</b> taqdim etiladi!</i>{CONTACT_FOOTER}",
             parse_mode="HTML"
         )
         return
@@ -2076,7 +2076,7 @@ async def user_birthday_save(message: Message, state: FSMContext):
         await state.clear()
         await message.answer(
             f"❌ <b>Uzr!</b> Botimizdan foydalanish va tug'ilgan kun bonusini olish uchun yoshingiz kamida <b>12 da</b> bo'lishi kerak.\n\n"
-            f"Siz kiritgan sana bo'yicha yoshingiz <b>{age} da</b> bo'lgani sababli tug'ilgan kuningiz saqlanmadi va qayta kiritish imkoniyati berilmaydi.",
+            f"Siz kiritgan sana bo'yicha yoshingiz <b>{age} da</b> bo'lgani sababli tug'ilgan kuningiz saqlanmadi va qayta kiritish imkoniyati berilmaydi.{CONTACT_FOOTER}",
             parse_mode="HTML"
         )
         return
@@ -2087,7 +2087,7 @@ async def user_birthday_save(message: Message, state: FSMContext):
     if success:
         await message.answer(
             f"🎉 <b>Tabriklaymiz! Tug'ilgan kuningiz ({text}) muvaffaqiyatli saqlandi!</b>\n\n"
-            f"Har yili ushbu kunda botimiz sizga <b>+50 💎 ball</b> va <b>👑 1 kunlik VIP maqomi</b> taqdim etadi!",
+            f"Har yili ushbu kunda botimiz sizga <b>+50 💎 ball</b> va <b>👑 1 kunlik VIP maqomi</b> taqdim etadi!{CONTACT_FOOTER}",
             parse_mode="HTML"
         )
     else:
@@ -2238,7 +2238,7 @@ async def search_movie_by_text(message: Message, state: FSMContext = None):
                 reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating)
             )
         else:
-            await message.answer(f"❌ <b>{movie_id}</b> kodli kino topilmadi.")
+            await message.answer(f"❌ <b>{movie_id}</b> kodli kino topilmadi.{CONTACT_FOOTER}")
         return
 
     results = await db_req.search_movies_by_name(query)
