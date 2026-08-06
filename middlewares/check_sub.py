@@ -109,12 +109,16 @@ class CheckSubMiddleware(BaseMiddleware):
                 not_subscribed_channels.append(ch_tuple)
 
         if not_subscribed_channels:
-            await event.answer(
-                "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
-                parse_mode="HTML",
-                reply_markup=get_subscription_keyboard(not_subscribed_channels)
-            )
-            return
+            try:
+                await event.answer(
+                    "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
+                    parse_mode="HTML",
+                    reply_markup=get_subscription_keyboard(not_subscribed_channels)
+                )
+                return
+            except Exception as sub_err:
+                print(f"Obuna klaviaturasi xatosi: {sub_err}")
+                return await handler(event, data)
 
         return await handler(event, data)
 

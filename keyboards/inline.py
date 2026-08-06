@@ -14,16 +14,30 @@ def get_subscription_keyboard(channels: list) -> InlineKeyboardMarkup:
             ch_id, ch_name = channel, str(channel)
             
         ch_str = str(ch_id).strip()
-        if ch_str.startswith("http://") or ch_str.startswith("https://"):
+        name_str = str(ch_name).strip()
+        
+        # Safe URL Resolution (Never produce invalid t.me/-100... links!)
+        if name_str.startswith(("http://", "https://")):
+            link = name_str
+        elif name_str.startswith("t.me/"):
+            link = "https://" + name_str
+        elif ch_str.startswith(("http://", "https://")):
             link = ch_str
         elif ch_str.startswith("t.me/"):
             link = "https://" + ch_str
         elif ch_str.startswith("@"):
             link = f"https://t.me/{ch_str[1:]}"
-        else:
+        elif name_str.startswith("@"):
+            link = f"https://t.me/{name_str[1:]}"
+        elif not ch_str.startswith("-") and ch_str.isalnum():
             link = f"https://t.me/{ch_str}"
+        elif not name_str.startswith("-") and name_str.isalnum():
+            link = f"https://t.me/{name_str}"
+        else:
+            bot_user = config.BOT_USERNAME.lstrip('@')
+            link = f"https://t.me/{bot_user}"
             
-        display_name = ch_name if ch_name and str(ch_name) != str(ch_id) else f"{idx}-Kanal"
+        display_name = ch_name if ch_name and not str(ch_name).startswith("-") else f"{idx}-Kanal"
         if not display_name.startswith("📢") and not display_name.endswith("📢"):
             display_name = f"📢 {display_name}"
             
