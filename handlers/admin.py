@@ -448,22 +448,35 @@ async def add_movie_caption(message: Message, state: FSMContext):
 # --- KINO O'CHIRISH ---
 @router.message(F.text == "Kino o'chirish ❌")
 async def delete_movie_start(message: Message, state: FSMContext):
-    await state.clear()  # Oldingi holatni bekor qilish
+    await state.clear()
     if not await db_req.has_permission(message.from_user.id, "delete_movie"):
         return
     await state.set_state(AdminStates.waiting_for_movie_delete)
-    await message.answer("O'chirmoqchi bo'lgan kino kodini yuboring:")
+    await message.answer(
+        "🗑️ <b>Kino o'chirish rejimi:</b>\n\n"
+        "O'chirmoqchi bo'lgan kino kodini (masalan: <code>1</code> yoki <code>501</code>) yuboring:",
+        parse_mode="HTML"
+    )
 
-@router.message(AdminStates.waiting_for_movie_delete, F.text.isdigit())
+@router.message(AdminStates.waiting_for_movie_delete, F.text.regexp(r"^\d+$"))
 async def delete_movie_exec(message: Message, state: FSMContext):
     movie_id = int(message.text)
     deleted = await db_req.delete_movie(movie_id)
     await state.clear()
     if deleted:
-        await message.answer(f"✅ Kodli kino bazadan o'chirildi: {movie_id}")
+        await message.answer(
+            f"✅ <b>Kino muvaffaqiyatli o'chirildi!</b>\n\n"
+            f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+            f"🗑️ <i>Shu kino bilan bog'liq barcha unikal yuklashlar va zaxiralar 0 ga tenglandi!</i>",
+            parse_mode="HTML"
+        )
         await sync_movies_backup_storage(message.bot)
     else:
-        await message.answer(f"❌ Bunday kodli kino topilmadi: {movie_id}")
+        await message.answer(
+            f"❌ <b>Bunday kodli kino bazada mavjud emas: {movie_id}</b>\n\n"
+            f"<i>Kino ilgari o'chirilgan yoki bazaga qo'shilmadi.</i>",
+            parse_mode="HTML"
+        )
 
 # --- KINO TRENDLARI ---
 @router.message(F.text == "Kino Trendlari 📈")
