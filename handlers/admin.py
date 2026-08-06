@@ -483,16 +483,20 @@ async def delete_movie_start(message: Message, state: FSMContext):
         return
     await state.set_state(AdminStates.waiting_for_movie_delete)
     await message.answer(
-        "🗑️ <b>Kino o'chirish rejimi:</b>\n\n"
-        "O'chirmoqchi bo'lgan kino kodini (masalan: <code>1</code> yoki <code>501</code>) yuboring:",
+        "🗑️ <b>Kino o'chirish rejimi faollashtirildi!</b>\n\n"
+        "O'chirmoqchi bo'lgan kino kodini yuboring (masalan: <code>1</code>, <code>2</code>, <code>501</code>).\n"
+        "<i>Eslatma: Ketma-ket istalgancha kino kodlarini yuborib o'chirishingiz mumkin.</i>",
         parse_mode="HTML"
     )
 
 @router.message(AdminStates.waiting_for_movie_delete, F.text)
 async def delete_movie_exec(message: Message, state: FSMContext):
     text = message.text.strip()
-    if text in MENU_BUTTONS:
+    if text in MENU_BUTTONS or text.startswith("/"):
         await state.clear()
+        if text == "/start" or text == "/cancel":
+            from handlers.user import execute_start_logic
+            await execute_start_logic(message, state)
         return
 
     if not text.isdigit():
@@ -501,19 +505,19 @@ async def delete_movie_exec(message: Message, state: FSMContext):
 
     movie_id = int(text)
     deleted = await db_req.delete_movie(movie_id)
-    await state.clear()
     if deleted:
         await message.answer(
             f"✅ <b>Kino muvaffaqiyatli o'chirildi!</b>\n\n"
             f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
-            f"🗑️ <i>Shu kino bilan bog'liq barcha unikal yuklashlar va zaxiralar 0 ga tenglandi!</i>",
+            f"🗑️ <i>Shu kino bilan bog'liq barcha unikal yuklashlar va zaxiralar 0 ga tenglandi!</i>\n\n"
+            f"<i>Yana o'chirmoqchi bo'lsangiz, navbatdagi kino kodini yuboring:</i>",
             parse_mode="HTML"
         )
         await sync_movies_backup_storage(message.bot)
     else:
         await message.answer(
             f"❌ <b>Bunday kodli kino bazada mavjud emas: {movie_id}</b>\n\n"
-            f"<i>Kino ilgari o'chirilgan yoki bazaga qo'shilmadi.</i>",
+            f"<i>Kino ilgari o'chirilgan yoki bazaga qo'shilmadi. Navbatdagi kodni yuborishingiz mumkin:</i>",
             parse_mode="HTML"
         )
 
