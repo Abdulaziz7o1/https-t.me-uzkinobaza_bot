@@ -7,3 +7,7 @@ kino_bot.db
 *.db
 *.sqlite
 *.sqlite3
+master_bot_backup.json
+movies_backup.json
+sponsor_channels_backup.json
+data/

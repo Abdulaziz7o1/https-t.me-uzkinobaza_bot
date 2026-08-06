@@ -379,6 +379,12 @@ async def export_master_backup_json() -> str:
         except Exception:
             pass
 
+        try:
+            import asyncio
+            asyncio.create_task(sync_master_backup_to_mongodb(master_data))
+        except Exception:
+            pass
+
         return json_str
 
 async def import_master_backup_json(json_str: str) -> dict:
@@ -484,9 +490,60 @@ async def import_master_backup_json(json_str: str) -> dict:
         print(f"Master backup tiklashda xato: {e}")
         return {}
 
-async def restore_master_backup_on_startup():
-    """Bot ishga tushganida (Render restart bo'lganda) barcha zaxira manbalaridan avtomatik 100% tiklash"""
+async def sync_master_backup_to_mongodb(master_data: dict):
+    """MongoDB Cloud bor bo'lsa (MONGO_URI env kiritilgan bo'lsa), barcha 15 ta jadvalni MongoDB Atlas Bulutli bazaga avtomatik zaxiralash"""
     import os
+    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL")
+    if not mongo_uri:
+        return
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+        client = AsyncIOMotorClient(mongo_uri)
+        db = client["kino_bot_database"]
+        collection = db["master_backups"]
+        
+        doc = {
+            "_id": "latest_master_backup",
+            "data": master_data,
+            "updated_at": os.getenv("TZ", "Asia/Tashkent")
+        }
+        await collection.replace_one({"_id": "latest_master_backup"}, doc, upsert=True)
+        print("MongoDB Cloud: Barcha 15 ta jadval Bulutli bazaga (MongoDB Atlas) muvaffaqiyatli saqlandi! ☁️🚀")
+    except Exception as e:
+        print(f"MongoDB Cloud sync error: {e}")
+
+async def restore_from_mongodb_cloud() -> bool:
+    """MongoDB Cloud'dan eng so'nggi zaxira faylini olib SQLite bazaga 100% tiklash"""
+    import os
+    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL")
+    if not mongo_uri:
+        return False
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+        client = AsyncIOMotorClient(mongo_uri)
+        db = client["kino_bot_database"]
+        collection = db["master_backups"]
+        
+        doc = await collection.find_one({"_id": "latest_master_backup"})
+        if doc and "data" in doc:
+            import json
+            master_json = json.dumps(doc["data"], ensure_ascii=False)
+            res = await import_master_backup_json(master_json)
+            print(f"MongoDB Cloud: Bulutli bazadan barcha ma'lumotlar 100% tiklandi! ☁️✅: {res}")
+            return True
+    except Exception as e:
+        print(f"MongoDB Cloud restore error: {e}")
+    return False
+
+async def restore_master_backup_on_startup():
+    """Bot ishga tushganida (Render restart bo'lganda) barcha zaxira manbalaridan va MongoDB bulutdan avtomatik 100% tiklash"""
+    import os
+    
+    # 1. Avval MongoDB Bulutli bazasini tekshiramiz
+    restored_mongo = await restore_from_mongodb_cloud()
+    if restored_mongo:
+        print("MongoDB Cloud orqali barcha kinolar va ma'lumotlar tiklandi!")
+        
     candidate_paths = [
         "/var/data/master_bot_backup.json",
         "data/master_bot_backup.json",
