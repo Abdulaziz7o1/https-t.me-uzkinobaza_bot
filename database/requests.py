@@ -1788,12 +1788,16 @@ async def clear_all_caches():
     cache.clear()
     
 async def get_next_available_movie_id() -> int:
-    """Navbatdagi mavjud kino kodini (MAX(id) + 1) qaytaradi"""
+    """Eng birinchi bo'sh bo'lgan kino kodini (1, 2, 3, 4 ... 100000) topib qaytarish (bo'sh o'rinlarni to'ldiradi)"""
     async with get_db() as db:
-        async with db.execute("SELECT MAX(id) FROM movies") as cursor:
-            row = await cursor.fetchone()
-            max_id = row[0] if row and row[0] else 0
-            return max_id + 1
+        async with db.execute("SELECT id FROM movies ORDER BY id ASC") as cursor:
+            rows = await cursor.fetchall()
+            existing_ids = set(r[0] for r in rows if r[0] is not None)
+            
+            candidate = 1
+            while candidate in existing_ids:
+                candidate += 1
+            return candidate
 
 
 # --- KUNLIK BONUS (+3 BALL) ---

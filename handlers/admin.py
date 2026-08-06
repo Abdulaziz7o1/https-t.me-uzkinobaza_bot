@@ -2293,7 +2293,7 @@ async def reject_comment_callback(callback: CallbackQuery):
 
 
 # ─── OMMAVIY KINO YUKLASH (BULK MOVIE UPLOAD) ─────────────────────────────────
-@router.message(F.text == "Ommaviy yuklash 🔄")
+@router.message(F.text.regexp(r"(?i).*(ommaviy yuklash).*"))
 async def bulk_upload_start(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, "add_movie"):
@@ -2305,12 +2305,13 @@ async def bulk_upload_start(message: Message, state: FSMContext):
         InlineKeyboardButton(text="Yakunlash ✅ (Done)", callback_data="bulk_upload_finish")
     ]])
     
+    first_free = await db_req.get_next_available_movie_id()
     await message.answer(
         "🔄 <b>Ommaviy kino yuklash rejimi faollashtirildi!</b>\n\n"
         "Siz ketma-ket istalgancha video yoki hujjat shaklidagi kinolarni yuborishingiz mumkin.\n\n"
-        "💡 <b>Qoida:</b>\n"
-        "• Agar video tavsifi (caption) raqam bilan boshlansa (masalan: <code>501 - Spiderman</code>), bot <b>501</b> ni kino kodi qilib oladi.\n"
-        "• Agar tavsifda raqam bo'lmasa, bot avtomatik ravishda bo'sh kodni band etadi.\n\n"
+        "💡 <b>Avtomatik kodlash tartibi:</b>\n"
+        f"• Kinolarga avtomatik ravishda bo'sh bo'lgan eng birinchi kodlar ketma-ket beriladi (masalan: <b>{first_free}</b>, <b>{first_free + 1}</b>, <b>{first_free + 2}</b>...)\n"
+        "• Agar video tavsifida (caption) aniq raqam bo'lsa (masalan: <code>501 - Spiderman</code>), bot <b>501</b> ni kino kodi deb oladi.\n\n"
         "Yuklab bo'lgach, quyidagi <b>«Yakunlash ✅»</b> tugmasini bosing.",
         parse_mode="HTML",
         reply_markup=kb
@@ -2331,7 +2332,6 @@ async def bulk_upload_process(message: Message, state: FSMContext):
         
     raw_caption = (message.caption or "").strip()
     
-    # Kodni aniqlash
     import re
     code_match = re.match(r"^(\d+)\s*[-:]?\s*(.*)$", raw_caption, re.DOTALL)
     
@@ -2340,27 +2340,29 @@ async def bulk_upload_process(message: Message, state: FSMContext):
     
     if code_match:
         target_id = int(code_match.group(1))
-        movie_caption = code_match.group(2).strip()
-        existing = await db_req.get_movie(target_id)
+        candidate_cap = code_match.group(2).strip()
+        existing = await db_req.movie_exists_db(target_id)
         if not existing:
             movie_id = target_id
+            movie_caption = candidate_cap
             
     if movie_id is None:
         movie_id = await db_req.get_next_available_movie_id()
         
     formatted_caption = db_req.clean_and_format_caption(movie_caption)
     await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
+    await sync_movies_backup_storage(message.bot)
     
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="Yakunlash ✅ (Done)", callback_data="bulk_upload_finish")
     ]])
     
-    cap_display = movie_caption[:30] if movie_caption else "(nomsiz)"
+    cap_display = movie_caption[:40] if movie_caption else "(Nomsiz kino)"
     await message.answer(
-        f"✅ <b>Kino ommaviy yuklandi!</b>\n"
-        f"🎬 Kodi: <code>{movie_id}</code>\n"
-        f"📝 Tavsif: <i>{cap_display}</i>\n\n"
-        f"Yana yuborishingiz yoki tugatgach «Yakunlash ✅» tugmasini bosishingiz mumkin.",
+        f"✅ <b>Kino ommaviy yuklandi!</b>\n\n"
+        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+        f"📝 <b>Tavsif:</b> <i>{cap_display}</i>\n\n"
+        f"<i>Yana yuborishingiz yoki tugatgach «Yakunlash ✅» tugmasini bosishingiz mumkin.</i>",
         parse_mode="HTML",
         reply_markup=kb
     )
