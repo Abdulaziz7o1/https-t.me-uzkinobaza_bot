@@ -551,14 +551,18 @@ async def delete_movie_exec(message: Message, state: FSMContext):
             )
 
 # --- KINO TRENDLARI ---
-@router.message(F.text == "Kino Trendlari 📈")
+@router.message(F.text.regexp(r"(?i).*(kino trendlari|trending movies).*"))
 async def show_trending_movies(message: Message, state: FSMContext):
-    await state.clear()  # Oldingi holatni bekor qilish
+    await state.clear()
     if not await db_req.has_permission(message.from_user.id, "view_trends"):
         return
     trends = await db_req.get_trending_movies()
     if not trends:
-        await message.answer("Trendlarni ko'rsatish uchun hali ma'lumot yetarli emas.")
+        await message.answer(
+            "📈 <b>Hozircha trenddagi kinolar statistikasi yetarli emas!</b>\n\n"
+            "<i>Foydalanuvchilar kinolarni tomosha qilishni boshlagach, eng ko'p ko'rilgan TOP 10 kinolar avtomatik bu yerda ko'rinadi.</i>",
+            parse_mode="HTML"
+        )
         return
         
     text = "📈 <b>Eng ko'p ko'rilgan TOP 10 kino:</b>\n\n"

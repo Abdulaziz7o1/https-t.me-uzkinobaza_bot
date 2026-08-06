@@ -178,8 +178,10 @@ class AntiFloodMiddleware(BaseMiddleware):
             
         user_id = event.from_user.id
         
-        # Bosh adminlarni tekshirmaymiz
-        if user_id in config.ADMINS:
+        # Bosh admin va Moderatorlar Anti-Flood cheklovidan 100% ozod qilinadi
+        user_id_int = int(user_id)
+        admin_ids = [int(a) for a in config.ADMINS]
+        if user_id_int in admin_ids:
             return await handler(event, data)
             
         import time
