@@ -476,60 +476,71 @@ async def premium_info(message: Message):
             f"<i>Rahmat! Siz bizning Premium a'zomiz! 🙏</i>",
             parse_mode="HTML"
         )
+        return
 
-        is_repeat = await db_req.has_user_bought_premium_before(user_id)
-        p_1w_b, p_1m_b, p_3m_b, p_6m_b, p_1y_b = 7000, 20000, 55000, 100000, 180000
-        
-        if discount_pct > 0:
-            calc = lambda p: max(1000, (int(p * (100 - discount_pct) / 100) // 1000) * 1000)
-            discount_hdr = f" 🔥 (<b>{discount_pct}% PROMO SKIDKA QO'LLANILDI!</b>)"
-        elif is_repeat:
-            calc = lambda p: max(1000, (int(p * 0.85) // 1000) * 1000)
-            discount_hdr = " 🎉 (<b>15% TAKRORIY CHEGIRMA QO'LLANILDI!</b>)"
-        else:
-            calc = lambda p: p
-            discount_hdr = ""
+    await send_or_edit_premium_plans_menu(message, user_id, is_edit=False)
 
-        p_1w, p_1m, p_3m, p_6m, p_1y = calc(p_1w_b), calc(p_1m_b), calc(p_3m_b), calc(p_6m_b), calc(p_1y_b)
+async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool = False):
+    discount_pct = await db_req.get_user_active_discount(user_id)
+    is_repeat = await db_req.has_user_bought_premium_before(user_id)
+    
+    p_1w_b, p_1m_b, p_3m_b, p_6m_b, p_1y_b = 7000, 20000, 55000, 100000, 180000
+    
+    if discount_pct > 0:
+        calc = lambda p: max(1000, (int(p * (100 - discount_pct) / 100) // 1000) * 1000)
+        discount_hdr = f" 🔥 (<b>{discount_pct}% PROMO SKIDKA QO'LLANILDI!</b>)"
+    elif is_repeat:
+        calc = lambda p: max(1000, (int(p * 0.85) // 1000) * 1000)
+        discount_hdr = " 🎉 (<b>15% TAKRORIY CHEGIRMA QO'LLANILDI!</b>)"
+    else:
+        calc = lambda p: p
+        discount_hdr = ""
 
-        txt_plans = (
-            f"1️⃣ <b>1 haftalik (7 kun):</b> {p_1w:,} UZS\n"
-            f"2️⃣ <b>1 oylik (30 kun):</b> {p_1m:,} UZS\n"
-            f"3️⃣ <b>3 oylik (90 kun):</b> {p_3m:,} UZS\n"
-            f"4️⃣ <b>6 oylik (180 kun):</b> {p_6m:,} UZS\n"
-            f"5️⃣ <b>1 yillik (365 kun):</b> {p_1y:,} UZS"
-        )
+    p_1w, p_1m, p_3m, p_6m, p_1y = calc(p_1w_b), calc(p_1m_b), calc(p_3m_b), calc(p_6m_b), calc(p_1y_b)
 
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {p_1w:,} UZS", callback_data="premium_1w"),
-                InlineKeyboardButton(text=f"2️⃣ 1 oylik - {p_1m:,} UZS", callback_data="premium_monthly")
-            ],
-            [
-                InlineKeyboardButton(text=f"3️⃣ 3 oylik - {p_3m:,} UZS", callback_data="premium_quarterly"),
-                InlineKeyboardButton(text=f"4️⃣ 6 oylik - {p_6m:,} UZS", callback_data="premium_6m")
-            ],
-            [
-                InlineKeyboardButton(text=f"5️⃣ 1 yillik - {p_1y:,} UZS", callback_data="premium_1y")
-            ],
-            [
-                InlineKeyboardButton(text="🏷️ Promo kod kiritish", callback_data="user_enter_promo"),
-                InlineKeyboardButton(text="📞 Manual to'lov", callback_data="premium_manual")
-            ]
-        ])
+    txt_plans = (
+        f"1️⃣ <b>1 haftalik (7 kun):</b> {p_1w:,} UZS\n"
+        f"2️⃣ <b>1 oylik (30 kun):</b> {p_1m:,} UZS\n"
+        f"3️⃣ <b>3 oylik (90 kun):</b> {p_3m:,} UZS\n"
+        f"4️⃣ <b>6 oylik (180 kun):</b> {p_6m:,} UZS\n"
+        f"5️⃣ <b>1 yillik (365 kun):</b> {p_1y:,} UZS"
+    )
 
-        await message.answer(
-            f"💎 <b>Premium obuna:{discount_hdr}</b>\n\n"
-            f"📋 <b>Obuna rejalari:</b>\n\n"
-            f"{txt_plans}\n\n"
-            f"🎁 <b>Premium imtiyozlari:</b>\n"
-            f"• Kunlik limit yo'q\n"
-            f"• Cheklovsiz kino ko'rish\n"
-            f"• Prioritet qo'llab-quvvatlash\n\n"
-            f"👇 <b>Plan tanlang yoki Promo kod kiriting:</b>",
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {p_1w:,} UZS", callback_data="premium_1w"),
+            InlineKeyboardButton(text=f"2️⃣ 1 oylik - {p_1m:,} UZS", callback_data="premium_monthly")
+        ],
+        [
+            InlineKeyboardButton(text=f"3️⃣ 3 oylik - {p_3m:,} UZS", callback_data="premium_quarterly"),
+            InlineKeyboardButton(text=f"4️⃣ 6 oylik - {p_6m:,} UZS", callback_data="premium_6m")
+        ],
+        [
+            InlineKeyboardButton(text=f"5️⃣ 1 yillik - {p_1y:,} UZS", callback_data="premium_1y")
+        ],
+        [
+            InlineKeyboardButton(text="🏷️ Promo kod kiritish", callback_data="user_enter_promo"),
+            InlineKeyboardButton(text="📞 Manual to'lov", callback_data="premium_manual")
+        ]
+    ])
+
+    text = (
+        f"💎 <b>Premium obuna:{discount_hdr}</b>\n\n"
+        f"📋 <b>Obuna rejalari:</b>\n\n"
+        f"{txt_plans}\n\n"
+        f"🎁 <b>Premium imtiyozlari:</b>\n"
+        f"• Kunlik limit yo'q\n"
+        f"• Cheklovsiz kino ko'rish\n"
+        f"• Prioritet qo'llab-quvvatlash\n\n"
+        f"👇 <b>Plan tanlang yoki Promo kod kiriting:</b>"
+    )
+
+    if is_edit and isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+    elif isinstance(event, Message):
+        await event.answer(text, parse_mode="HTML", reply_markup=keyboard)
+    elif isinstance(event, CallbackQuery):
+        await event.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
 @router.callback_query(F.data == "user_enter_promo")
 async def user_enter_promo_cb(callback: CallbackQuery, state: FSMContext):
@@ -773,51 +784,7 @@ async def process_premium_payment_cb(callback: CallbackQuery, state: FSMContext)
 @router.callback_query(F.data == "back_to_premium")
 async def back_to_premium_cb(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    user_id = callback.from_user.id
-    discount_pct = await db_req.get_user_active_discount(user_id)
-    
-    if discount_pct > 0:
-        p_1m = int(10000 * (100 - discount_pct) / 100)
-        p_3m = int(25000 * (100 - discount_pct) / 100)
-        
-        discount_hdr = f" 🔥 (<b>{discount_pct}% SKIDKA QO'LLANILDI!</b>)"
-        txt_1m = f"1️⃣ <b>1 oylik:</b> <s>10,000 UZS</s> ➔ <b>{p_1m:,} UZS</b>"
-        txt_3m = f"2️⃣ <b>3 oylik:</b> <s>25,000 UZS</s> ➔ <b>{p_3m:,} UZS</b>"
-        
-        btn_1m = f"1️⃣ 1 oylik - {p_1m:,} UZS"
-        btn_3m = f"2️⃣ 3 oylik - {p_3m:,} UZS"
-    else:
-        discount_hdr = ""
-        txt_1m = "1️⃣ <b>1 oylik - 10,000 UZS</b>"
-        txt_3m = "2️⃣ <b>3 oylik - 25,000 UZS</b> (5,000 UZS tejang!)"
-        
-        btn_1m = "1️⃣ 1 oylik - 10,000 UZS"
-        btn_3m = "2️⃣ 3 oylik - 25,000 UZS"
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text=btn_1m, callback_data="premium_monthly"),
-            InlineKeyboardButton(text=btn_3m, callback_data="premium_quarterly")
-        ],
-        [
-            InlineKeyboardButton(text="🏷️ Promo kod kiritish", callback_data="user_enter_promo"),
-            InlineKeyboardButton(text="📞 Manual to'lov", callback_data="premium_manual")
-        ]
-    ])
-
-    await callback.message.edit_text(
-        f"💎 <b>Premium obuna:{discount_hdr}</b>\n\n"
-        f"📋 <b>Obuna rejalari:</b>\n\n"
-        f"{txt_1m}\n"
-        f"{txt_3m}\n\n"
-        f"🎁 <b>Premium imtiyozlari:</b>\n"
-        f"• Kunlik limit yo'q\n"
-        f"• Cheklovsiz kino ko'rish\n"
-        f"• Prioritet qo'llab-quvvatlash\n\n"
-        f"👇 <b>Plan tanlang yoki Promo kod kiriting:</b>",
-        parse_mode="HTML",
-        reply_markup=keyboard
-    )
+    await send_or_edit_premium_plans_menu(callback, callback.from_user.id, is_edit=True)
     await callback.answer()
 
 @router.message(UserStates.waiting_for_payment_receipt, F.photo | F.document)
