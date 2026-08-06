@@ -12,6 +12,12 @@ from keyboards.inline import get_subscription_keyboard, get_movie_action_keyboar
 
 router = Router()
 
+def fmt_price(n: int) -> str:
+    """Narxni 'X ming so'm' yoki 'X ming Y so'm' formatda qaytarish"""
+    m = n // 1000
+    r = n % 1000
+    return f"{m} ming {r} so'm" if r else f"{m} ming so'm"
+
 USER_MENU_BUTTONS = [
     "🔍 Kino qidirish", "Kino qidirish 🔍", "Kino qidirish",
     "Tanlanganlar ⭐️", "Saqlanganlar ⭐️", "⭐️ Saqlanganlar", "Tanlanganlar", "Saqlanganlar",
@@ -621,18 +627,15 @@ async def user_promo_cmd(message: Message, state: FSMContext):
                 p_3m = int(p_3m_base * (100 - disc_pct) / 100)
                 p_6m = int(p_6m_base * (100 - disc_pct) / 100)
                 p_1y = int(p_1y_base * (100 - disc_pct) / 100)
-                def _fmt(n):
-                    m = n // 1000; r = n % 1000
-                    return f"{m} ming {r} so'm" if r else f"{m} ming so'm"
                 msg = (
                     f"✅ <b>PROMO KOD MUVAFFAQIYATLI ISHLATILDI!</b> 🎉\n\n"
                     f"🏷️ <b>Sizga {disc_pct}% SKIDKA taqdim etildi!</b>\n\n"
                     f"💰 <b>SKIDKADAGI YANGI NARXLARINGIZ:</b>\n"
-                    f"1️⃣ <b>1 haftalik:</b> <s>{_fmt(p_1w_base)}</s> ➔ <b>{_fmt(p_1w)}</b>\n"
-                    f"2️⃣ <b>1 oylik:</b> <s>{_fmt(p_1m_base)}</s> ➔ <b>{_fmt(p_1m)}</b>\n"
-                    f"3️⃣ <b>3 oylik:</b> <s>{_fmt(p_3m_base)}</s> ➔ <b>{_fmt(p_3m)}</b>\n"
-                    f"4️⃣ <b>6 oylik:</b> <s>{_fmt(p_6m_base)}</s> ➔ <b>{_fmt(p_6m)}</b>\n"
-                    f"5️⃣ <b>1 yillik:</b> <s>{_fmt(p_1y_base)}</s> ➔ <b>{_fmt(p_1y)}</b>\n\n"
+                    f"1️⃣ <b>1 haftalik:</b> <s>{fmt_price(p_1w_base)}</s> ➔ <b>{fmt_price(p_1w)}</b>\n"
+                    f"2️⃣ <b>1 oylik:</b> <s>{fmt_price(p_1m_base)}</s> ➔ <b>{fmt_price(p_1m)}</b>\n"
+                    f"3️⃣ <b>3 oylik:</b> <s>{fmt_price(p_3m_base)}</s> ➔ <b>{fmt_price(p_3m)}</b>\n"
+                    f"4️⃣ <b>6 oylik:</b> <s>{fmt_price(p_6m_base)}</s> ➔ <b>{fmt_price(p_6m)}</b>\n"
+                    f"5️⃣ <b>1 yillik:</b> <s>{fmt_price(p_1y_base)}</s> ➔ <b>{fmt_price(p_1y)}</b>\n\n"
                     f"👉 To'lovni amalga oshirish va obunani faollashtirish uchun /premium buyrug'ini yuboring!"
                 )
             else:
@@ -717,9 +720,7 @@ async def user_promo_input_exec(message: Message, state: FSMContext):
             p_6m = int(p_6m_base * (100 - disc_pct) / 100)
             p_1y = int(p_1y_base * (100 - disc_pct) / 100)
             
-            def _fmt(n):
-                m = n // 1000; r = n % 1000
-                return f"{m} ming {r} so'm" if r else f"{m} ming so'm"
+            def _fmt(n): return fmt_price(n)
             
             detail_msg = (
                 f"✅ <b>PROMO KOD QABUL QILINDI!</b> 🎉\n\n"
@@ -735,15 +736,15 @@ async def user_promo_input_exec(message: Message, state: FSMContext):
             )
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [
-                    InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {p_1w:,} UZS", callback_data="premium_1w"),
-                    InlineKeyboardButton(text=f"2️⃣ 1 oylik - {p_1m:,} UZS", callback_data="premium_monthly")
+                    InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {_fmt(p_1w)}", callback_data="premium_1w"),
+                    InlineKeyboardButton(text=f"2️⃣ 1 oylik - {_fmt(p_1m)}", callback_data="premium_monthly")
                 ],
                 [
-                    InlineKeyboardButton(text=f"3️⃣ 3 oylik - {p_3m:,} UZS", callback_data="premium_quarterly"),
-                    InlineKeyboardButton(text=f"4️⃣ 6 oylik - {p_6m:,} UZS", callback_data="premium_6m")
+                    InlineKeyboardButton(text=f"3️⃣ 3 oylik - {_fmt(p_3m)}", callback_data="premium_quarterly"),
+                    InlineKeyboardButton(text=f"4️⃣ 6 oylik - {_fmt(p_6m)}", callback_data="premium_6m")
                 ],
                 [
-                    InlineKeyboardButton(text=f"5️⃣ 1 yillik - {p_1y:,} UZS", callback_data="premium_yearly")
+                    InlineKeyboardButton(text=f"5️⃣ 1 yillik - {_fmt(p_1y)}", callback_data="premium_yearly")
                 ],
                 [
                     InlineKeyboardButton(text="📞 Manual to'lov", callback_data="premium_manual")
