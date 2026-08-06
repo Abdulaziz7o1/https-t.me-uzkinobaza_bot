@@ -2380,9 +2380,9 @@ async def get_admin_card_number() -> str:
     return await get_setting("admin_card_number")
 
 def format_user_card_display(raw_card_text: str) -> str:
-    """Admin kiritgan karta ma'lumotlarini foydalanuvchilar uchun Uzcard shaklida formatlaydi"""
+    """Admin kiritgan karta ma'lumotlarini foydalanuvchilar uchun Humo shaklida formatlaydi"""
     if not raw_card_text:
-        return "• Uzcard: <i>Hozircha kiritilmagan</i>"
+        return "• Humo: <i>Hozircha kiritilmagan</i>"
         
     import re
     digits_match = re.search(r"(\d{4}\s*\d{4}\s*\d{4}\s*\d{4}|\d{16})", raw_card_text)
@@ -2391,12 +2391,12 @@ def format_user_card_display(raw_card_text: str) -> str:
         formatted_num = f"{card_num[0:4]} {card_num[4:8]} {card_num[8:12]} {card_num[12:16]}"
         name_part = raw_card_text.replace(digits_match.group(0), "").strip()
         
-        res = f"• Uzcard: <code>{formatted_num}</code>"
+        res = f"• Humo: <code>{formatted_num}</code>"
         if name_part:
             res += f"\n  {name_part}"
         return res
     else:
-        return f"• Uzcard: <code>{raw_card_text}</code>"
+        return f"• Humo: <code>{raw_card_text}</code>"
 
 async def set_admin_card_number(card_text: str):
     """Admin karta raqamini saqlash"""
