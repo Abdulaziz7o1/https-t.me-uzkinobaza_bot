@@ -203,8 +203,8 @@ async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
     await export_master_backup_json()
     return True
 
-async def get_movie(movie_id: int):
-    """Kino ma'lumotlarini to'g'ridan-to'g'ri bazadan real-vaqt rejimida olish va yuklashlar sonini oshirish"""
+async def get_movie(movie_id: int, user_id: int = None):
+    """Kino ma'lumotlarini bazadan olish va faqat UNIKAL foydalanuvchilar birinchi marta so'raganida +1 qilish (1 user 100 marta so'rasa ham +0)"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
@@ -213,14 +213,26 @@ async def get_movie(movie_id: int):
             movie = await cursor.fetchone()
         if movie:
             current_views = movie[2] or 0
-            new_views = current_views + 1
-            await db.execute("UPDATE movies SET views_count = ? WHERE id = ?", (new_views, movie_id))
-            await db.commit()
+            new_views = current_views
+
+            if user_id is not None:
+                # User allaqachon shu kinoni ilgari yuklab olganmi?
+                async with db.execute("SELECT 1 FROM movie_unique_downloads WHERE user_id = ? AND movie_id = ?", (user_id, movie_id)) as cursor:
+                    has_downloaded = await cursor.fetchone()
+                
+                if not has_downloaded:
+                    # Birinchi marta yuklayapti -> +1 oshiramiz
+                    await db.execute("INSERT OR IGNORE INTO movie_unique_downloads (user_id, movie_id) VALUES (?, ?)", (user_id, movie_id))
+                    async with db.execute("SELECT COUNT(*) FROM movie_unique_downloads WHERE movie_id = ?", (movie_id,)) as cursor:
+                        cnt_row = await cursor.fetchone()
+                        new_views = cnt_row[0] if cnt_row else current_views + 1
+                    await db.execute("UPDATE movies SET views_count = ? WHERE id = ?", (new_views, movie_id))
+                    await db.commit()
             return (movie[0], movie[1], new_views)
         return None
 
 async def delete_movie(movie_id: int) -> bool:
-    """Kinoni bazadan va barcha xotira bo'limlaridan butunlay yo'q qilish va zaxiralash"""
+    """Kinoni bazadan va barcha xotira bo'limlaridan butunlay yo'q qilish va unikal yuklashlarni 0 ga tenglash"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
@@ -239,6 +251,7 @@ async def delete_movie(movie_id: int) -> bool:
         await db.execute("DELETE FROM movie_reports WHERE movie_id = ?", (movie_id,))
         try:
             await db.execute("DELETE FROM movie_reactions WHERE movie_id = ?", (movie_id,))
+            await db.execute("DELETE FROM movie_unique_downloads WHERE movie_id = ?", (movie_id,))
         except Exception:
             pass
         await db.commit()

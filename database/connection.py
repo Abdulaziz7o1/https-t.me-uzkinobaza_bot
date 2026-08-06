@@ -85,6 +85,15 @@ async def init_db():
         await db.execute("DELETE FROM movies WHERE caption NOT LIKE '%Qimorda%' AND (caption IS NULL OR caption = '' OR file_id LIKE '%BAACAgI%')")
         await db.commit()
         
+        # Movie Unique Downloads jadvali (Unikal foydalanuvchilar yuklashi)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS movie_unique_downloads (
+                user_id INTEGER,
+                movie_id INTEGER,
+                PRIMARY KEY (user_id, movie_id)
+            )
+        """)
+        
         # Favorites jadvali (tanlangan kinolar)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS favorites (

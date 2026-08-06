@@ -251,7 +251,7 @@ async def check_subscription_callback(callback: CallbackQuery):
 async def search_movie_by_code(message: Message):
     user_id = message.from_user.id
     movie_id = int(message.text.lstrip('/'))
-    movie = await db_req.get_movie(movie_id)
+    movie = await db_req.get_movie(movie_id, user_id=user_id)
 
     # Admin, Moderator va Premium foydalanuvchilar uchun kutish va limiti yo'q (0 second)
     is_premium = await db_req.is_premium_user(user_id)
@@ -923,7 +923,7 @@ async def random_movie(message: Message, state: FSMContext):
         return
 
     random_id = random.choice(all_ids)[0]
-    movie = await db_req.get_movie(random_id)
+    movie = await db_req.get_movie(random_id, user_id=user_id)
 
     if movie:
         if not is_premium:
