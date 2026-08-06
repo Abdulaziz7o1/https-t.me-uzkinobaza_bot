@@ -502,7 +502,12 @@ async def sync_master_backup_to_mongodb(master_data: dict):
         return
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
-        client = AsyncIOMotorClient(mongo_uri)
+        client = AsyncIOMotorClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=5000,
+            tls=True,
+            tlsAllowInvalidCertificates=True
+        )
         db = client["kino_bot_database"]
         collection = db["master_backups"]
         
@@ -524,7 +529,12 @@ async def restore_from_mongodb_cloud() -> bool:
         return False
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
-        client = AsyncIOMotorClient(mongo_uri)
+        client = AsyncIOMotorClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=5000,
+            tls=True,
+            tlsAllowInvalidCertificates=True
+        )
         db = client["kino_bot_database"]
         collection = db["master_backups"]
         

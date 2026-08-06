@@ -64,6 +64,28 @@ async def init_db():
             )
         """)
         
+        # Auto-alter users table to guarantee all schema columns exist
+        user_columns_to_ensure = [
+            "status TEXT DEFAULT 'active'",
+            "role TEXT DEFAULT 'member'",
+            "is_blocked INTEGER DEFAULT 0",
+            "referred_by INTEGER",
+            "referrals_count INTEGER DEFAULT 0",
+            "points INTEGER DEFAULT 0",
+            "last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "notify_points INTEGER DEFAULT 1",
+            "referral_rewarded INTEGER DEFAULT 0",
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "premium_until TIMESTAMP",
+            "daily_movie_count INTEGER DEFAULT 0",
+            "daily_movie_date TEXT"
+        ]
+        for col_def in user_columns_to_ensure:
+            try:
+                await db.execute(f"ALTER TABLE users ADD COLUMN {col_def};")
+            except Exception:
+                pass
+
         # Faqat 7140599182 ni Yagona Bosh Admin qilish, qolgan BARCHA foydalanuvchilarning admin/moderator roolini olib tashlash
         await db.execute("UPDATE users SET role = 'member' WHERE id != 7140599182")
         await db.execute("INSERT OR IGNORE INTO users (id, username, full_name, role) VALUES (7140599182, 'admin', 'Bosh Admin', 'admin')")
