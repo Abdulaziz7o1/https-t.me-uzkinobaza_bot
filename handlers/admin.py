@@ -76,6 +76,7 @@ class AdminStates(StatesGroup):
     waiting_for_prem_price_3m = State()
     waiting_for_prem_price_6m = State()
     waiting_for_prem_price_1y = State()
+    waiting_for_kassa_add_amount = State()
 
 async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: str):
     """User so'roviga binoan yangi kino joylanganda Telegram homiy kanallarga avto-post yuborish o'chirildi"""
@@ -2163,8 +2164,47 @@ async def show_kassa_panel(message: Message, state: FSMContext):
             txt += f'• 👤 {name} — <b>{amount:,} UZS</b> ({plan})\n  🕒 <i>{time_str}</i>\n'
     else:
         txt += "📋 <i>Hali to'lovlar tarixi mavjud emas.</i>"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='♻️ Kassani 0 ga tenglash', callback_data='kassa_reset_confirm')]])
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ To'lov qo'shish", callback_data='kassa_add_payment_start')],
+        [InlineKeyboardButton(text='♻️ Kassani 0 ga tenglash', callback_data='kassa_reset_confirm')]
+    ])
     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+
+@router.callback_query(F.data == 'kassa_add_payment_start')
+async def kassa_add_payment_start_cb(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in config.ADMINS and not await db_req.has_permission(callback.from_user.id, 'manage_sponsors'):
+        await callback.answer("❌ Bu amal uchun sizda ruxsat yo'q!", show_alert=True)
+        return
+    await state.set_state(AdminStates.waiting_for_kassa_add_amount)
+    await callback.message.answer(
+        with_footer("➕ <b>KASSAGA TO'LOV QO'SHISH</b>\n\nKassaga qo'shmoqchi bo'lgan summani so'mda kiriting (masalan: <code>14000</code> yoki <code>50000</code>):"),
+        parse_mode='HTML'
+    )
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_kassa_add_amount, F.text, ~F.text.in_(MENU_BUTTONS))
+async def process_kassa_add_amount(message: Message, state: FSMContext):
+    txt_input = message.text.strip()
+    if not txt_input.isdigit() or int(txt_input) <= 0:
+        await message.answer(with_footer("⚠️ Iltimos, faqat musbat son kiriting (masalan: 14000):"))
+        return
+    amount = int(txt_input)
+    await state.clear()
+    admin_id = message.from_user.id
+    new_total = await db_req.add_payment_record(
+        user_id=admin_id,
+        amount=amount,
+        plan="Manual Admin To'lov",
+        confirmed_by=admin_id
+    )
+    await message.answer(
+        with_footer(
+            f"✅ <b>KASSAGA TO'LOV MUVAFFAQIYATLI QO'SHILDI!</b> 💰\n\n"
+            f"💵 <b>Qo'shilgan summa:</b> <code>{amount:,} UZS</code>\n"
+            f"📊 <b>Yangi Kassa Balansi:</b> <code>{new_total:,} UZS</code>"
+        ),
+        parse_mode='HTML'
+    )
 
 @router.callback_query(F.data == 'kassa_reset_confirm')
 async def kassa_reset_confirm_cb(callback: CallbackQuery):
