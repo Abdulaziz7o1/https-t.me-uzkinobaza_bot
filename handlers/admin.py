@@ -2361,9 +2361,30 @@ async def bulk_upload_finish_callback(callback: CallbackQuery, state: FSMContext
     await callback.message.edit_text("✅ <b>Ommaviy yuklash yakunlandi!</b>", parse_mode="HTML")
     await callback.answer("Ommaviy yuklash yakunlandi ✅")
 
-@router.message(AdminStates.waiting_for_bulk_movies, F.video | F.document | F.animation)
+@router.message(AdminStates.waiting_for_bulk_movies)
 async def bulk_upload_process(message: Message, state: FSMContext):
-    file_id = message.video.file_id if message.video else (message.document.file_id if message.document else message.animation.file_id)
+    if message.text:
+        if message.text in MENU_BUTTONS or message.text.startswith("/"):
+            await state.clear()
+            if message.text == "/start" or message.text == "/cancel":
+                from handlers.user import execute_start_logic
+                await execute_start_logic(message, state)
+            return
+
+    file_id = None
+    if message.video:
+        file_id = message.video.file_id
+    elif message.document:
+        file_id = message.document.file_id
+    elif message.animation:
+        file_id = message.animation.file_id
+    elif message.video_note:
+        file_id = message.video_note.file_id
+        
+    if not file_id:
+        await message.answer("⚠️ Iltimos, kino video faylini yuboring yoki «Yakunlash ✅» tugmasini bosing.")
+        return
+        
     raw_caption = (message.caption or "").strip()
     
     import re
@@ -2403,11 +2424,11 @@ async def bulk_upload_process(message: Message, state: FSMContext):
     cap_display = movie_caption[:50] if movie_caption else "(Nomsiz video fayl)"
     await message.answer(
         f"✅ <b>KINO OMMAVIY MUVAFFAQIYATLI YUKLANDI!</b>\n\n"
+        f"📌 <b>Nomi / Tavsifi:</b> <i>{cap_display}</i>\n"
         f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
-        f"📝 <b>Tavsif:</b> <i>{cap_display}</i>\n"
         f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
         f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
-        f"<i>Yana 1 ta yoki bir nechta videolarni yuborishingiz mumkin. Yakunlash uchun «Yakunlash ✅» tugmasini bosing.</i>",
+        f"<i>Kino avtomatik SQLite hamda MongoDB Atlas Cloud bazangizga saqlandi! Yana yuborishingiz mumkin.</i>",
         parse_mode="HTML",
         reply_markup=kb
     )
