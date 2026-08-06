@@ -61,8 +61,11 @@ class AdminStates(StatesGroup):
     waiting_for_promo_uses = State()
     waiting_for_promo_edit_value = State()
     waiting_for_promo_edit_name = State()
+    waiting_for_prem_price_1w = State()
     waiting_for_prem_price_1m = State()
     waiting_for_prem_price_3m = State()
+    waiting_for_prem_price_6m = State()
+    waiting_for_prem_price_1y = State()
 
 
 # --- KEYBOARD BUILDERS ---
@@ -4124,25 +4127,70 @@ async def show_premium_settings_panel(message: Message, state: FSMContext):
         await message.answer("❌ Bu amal uchun sizda ruxsat yo'q.")
         return
 
+    p_1w = await db_req.get_premium_price_1w()
     p_1m = await db_req.get_premium_price_1m()
     p_3m = await db_req.get_premium_price_3m()
+    p_6m = await db_req.get_premium_price_6m()
+    p_1y = await db_req.get_premium_price_1y()
 
     txt = (
-        f"👑 <b>PREMIUM OBUNA SOZLAMALARI:</b>\n\n"
-        f"💰 <b>1 oylik Premium narxi:</b> <code>{p_1m:,} UZS</code>\n"
-        f"💰 <b>3 oylik Premium narxi:</b> <code>{p_3m:,} UZS</code>\n\n"
+        f"👑 <b>PREMIUM OBUNA SOZLAMALARI (5 TA PLAN):</b>\n\n"
+        f"1️⃣ <b>1 haftalik (7 kun):</b> <code>{p_1w:,} UZS</code>\n"
+        f"2️⃣ <b>1 oylik (30 kun):</b> <code>{p_1m:,} UZS</code>\n"
+        f"3️⃣ <b>3 oylik (90 kun):</b> <code>{p_3m:,} UZS</code>\n"
+        f"4️⃣ <b>6 oylik (180 kun):</b> <code>{p_6m:,} UZS</code>\n"
+        f"5️⃣ <b>1 yillik (365 kun):</b> <code>{p_1y:,} UZS</code>\n\n"
         f"<i>Narxlarni o'zgartirish uchun quyidagi tugmalardan birini tanlang:</i>"
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text=f"✏️ 1 oylik ({p_1m:,} UZS)", callback_data="set_prem_price_1m_start"),
-            InlineKeyboardButton(text=f"✏️ 3 oylik ({p_3m:,} UZS)", callback_data="set_prem_price_3m_start")
+            InlineKeyboardButton(text=f"✏️ 1 haftalik ({p_1w:,} UZS)", callback_data="set_prem_price_1w_start"),
+            InlineKeyboardButton(text=f"✏️ 1 oylik ({p_1m:,} UZS)", callback_data="set_prem_price_1m_start")
+        ],
+        [
+            InlineKeyboardButton(text=f"✏️ 3 oylik ({p_3m:,} UZS)", callback_data="set_prem_price_3m_start"),
+            InlineKeyboardButton(text=f"✏️ 6 oylik ({p_6m:,} UZS)", callback_data="set_prem_price_6m_start")
+        ],
+        [
+            InlineKeyboardButton(text=f"✏️ 1 yillik ({p_1y:,} UZS)", callback_data="set_prem_price_1y_start")
         ]
     ])
 
     await message.answer(txt, parse_mode="HTML", reply_markup=kb)
 
+# 1 HAFTALIK
+@router.callback_query(F.data == "set_prem_price_1w_start")
+async def set_prem_price_1w_start_cb(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await state.set_state(AdminStates.waiting_for_prem_price_1w)
+    p_1w = await db_req.get_premium_price_1w()
+    await callback.message.edit_text(
+        f"✏️ <b>1 haftalik Premium uchun yangi narxni kiriting (UZS):</b>\n\n"
+        f"Hozirgi narx: <code>{p_1w:,} UZS</code>\n"
+        f"<i>Masalan: 7000</i>",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_prem_price_1w, F.text, ~F.text.in_(MENU_BUTTONS))
+async def process_prem_price_1w_input(message: Message, state: FSMContext):
+    text = message.text.strip().replace(" ", "").replace(",", "")
+    if not text.isdigit() or int(text) <= 0:
+        await message.answer("⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 7000):")
+        return
+    new_price = int(text)
+    await state.clear()
+    await db_req.set_premium_price_1w(new_price)
+    await message.answer(
+        f"✅ <b>1 haftalik Premium narxi muvaffaqiyatli o'zgartirildi!</b>\n\n"
+        f"💵 <b>Yangi narx:</b> <code>{new_price:,} UZS</code>",
+        parse_mode="HTML"
+    )
+
+# 1 OYLIK
 @router.callback_query(F.data == "set_prem_price_1m_start")
 async def set_prem_price_1m_start_cb(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id not in config.ADMINS:
@@ -4173,6 +4221,7 @@ async def process_prem_price_1m_input(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
 
+# 3 OYLIK
 @router.callback_query(F.data == "set_prem_price_3m_start")
 async def set_prem_price_3m_start_cb(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id not in config.ADMINS:
@@ -4190,6 +4239,80 @@ async def set_prem_price_3m_start_cb(callback: CallbackQuery, state: FSMContext)
 
 @router.message(AdminStates.waiting_for_prem_price_3m, F.text, ~F.text.in_(MENU_BUTTONS))
 async def process_prem_price_3m_input(message: Message, state: FSMContext):
+    text = message.text.strip().replace(" ", "").replace(",", "")
+    if not text.isdigit() or int(text) <= 0:
+        await message.answer("⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 50000):")
+        return
+    new_price = int(text)
+    await state.clear()
+    await db_req.set_premium_price_3m(new_price)
+    await message.answer(
+        f"✅ <b>3 oylik Premium narxi muvaffaqiyatli o'zgartirildi!</b>\n\n"
+        f"💵 <b>Yangi narx:</b> <code>{new_price:,} UZS</code>",
+        parse_mode="HTML"
+    )
+
+# 6 OYLIK
+@router.callback_query(F.data == "set_prem_price_6m_start")
+async def set_prem_price_6m_start_cb(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await state.set_state(AdminStates.waiting_for_prem_price_6m)
+    p_6m = await db_req.get_premium_price_6m()
+    await callback.message.edit_text(
+        f"✏️ <b>6 oylik Premium uchun yangi narxni kiriting (UZS):</b>\n\n"
+        f"Hozirgi narx: <code>{p_6m:,} UZS</code>\n"
+        f"<i>Masalan: 100000</i>",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_prem_price_6m, F.text, ~F.text.in_(MENU_BUTTONS))
+async def process_prem_price_6m_input(message: Message, state: FSMContext):
+    text = message.text.strip().replace(" ", "").replace(",", "")
+    if not text.isdigit() or int(text) <= 0:
+        await message.answer("⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 100000):")
+        return
+    new_price = int(text)
+    await state.clear()
+    await db_req.set_premium_price_6m(new_price)
+    await message.answer(
+        f"✅ <b>6 oylik Premium narxi muvaffaqiyatli o'zgartirildi!</b>\n\n"
+        f"💵 <b>Yangi narx:</b> <code>{new_price:,} UZS</code>",
+        parse_mode="HTML"
+    )
+
+# 1 YILLIK
+@router.callback_query(F.data == "set_prem_price_1y_start")
+async def set_prem_price_1y_start_cb(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await state.set_state(AdminStates.waiting_for_prem_price_1y)
+    p_1y = await db_req.get_premium_price_1y()
+    await callback.message.edit_text(
+        f"✏️ <b>1 yillik Premium uchun yangi narxni kiriting (UZS):</b>\n\n"
+        f"Hozirgi narx: <code>{p_1y:,} UZS</code>\n"
+        f"<i>Masalan: 180000</i>",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_prem_price_1y, F.text, ~F.text.in_(MENU_BUTTONS))
+async def process_prem_price_1y_input(message: Message, state: FSMContext):
+    text = message.text.strip().replace(" ", "").replace(",", "")
+    if not text.isdigit() or int(text) <= 0:
+        await message.answer("⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 180000):")
+        return
+    new_price = int(text)
+    await state.clear()
+    await db_req.set_premium_price_1y(new_price)
+    await message.answer(
+        f"✅ <b>1 yillik Premium narxi muvaffaqiyatli o'zgartirildi!</b>\n\n"
+        f"💵 <b>Yangi narx:</b> <code>{new_price:,} UZS</code>",
+        parse_mode="HTML"
+    )
     text = message.text.strip().replace(" ", "").replace(",", "")
     if not text.isdigit() or int(text) <= 0:
         await message.answer("⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 50000):")

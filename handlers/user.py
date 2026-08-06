@@ -484,7 +484,11 @@ async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool = F
     discount_pct = await db_req.get_user_active_discount(user_id)
     is_repeat = await db_req.has_user_bought_premium_before(user_id)
     
-    p_1w_b, p_1m_b, p_3m_b, p_6m_b, p_1y_b = 7000, 20000, 55000, 100000, 180000
+    p_1w_b = await db_req.get_premium_price_1w()
+    p_1m_b = await db_req.get_premium_price_1m()
+    p_3m_b = await db_req.get_premium_price_3m()
+    p_6m_b = await db_req.get_premium_price_6m()
+    p_1y_b = await db_req.get_premium_price_1y()
     
     if discount_pct > 0:
         calc = lambda p: max(1000, (int(p * (100 - discount_pct) / 100) // 1000) * 1000)
@@ -728,7 +732,12 @@ async def process_premium_payment_cb(callback: CallbackQuery, state: FSMContext)
     card_text = await db_req.get_admin_card_number()
     card_display = db_req.format_user_card_display(card_text)
     
-    if action == "premium_monthly":
+    if action == "premium_1w":
+        plan_name = "1 haftalik Premium"
+        base_price = await db_req.get_premium_price_1w()
+        days = 7
+        plan_label = "1 haftalik"
+    elif action == "premium_monthly":
         plan_name = "1 oylik Premium"
         base_price = await db_req.get_premium_price_1m()
         days = 30
@@ -738,6 +747,16 @@ async def process_premium_payment_cb(callback: CallbackQuery, state: FSMContext)
         base_price = await db_req.get_premium_price_3m()
         days = 90
         plan_label = "3 oylik"
+    elif action == "premium_6m":
+        plan_name = "6 oylik Premium"
+        base_price = await db_req.get_premium_price_6m()
+        days = 180
+        plan_label = "6 oylik"
+    elif action == "premium_1y":
+        plan_name = "1 yillik Premium"
+        base_price = await db_req.get_premium_price_1y()
+        days = 365
+        plan_label = "1 yillik"
     else:
         plan_name = "Premium Obuna"
         base_price = await db_req.get_premium_price_1m()
@@ -746,12 +765,11 @@ async def process_premium_payment_cb(callback: CallbackQuery, state: FSMContext)
 
     is_repeat = await db_req.has_user_bought_premium_before(user_id)
 
-    if discount_pct > 0 and action in ["premium_monthly", "premium_quarterly"]:
-        final_price = (int(base_price * (100 - discount_pct) / 100) // 1000) * 1000
+    if discount_pct > 0 and action != "premium_manual":
+        final_price = max(1000, (int(base_price * (100 - discount_pct) / 100) // 1000) * 1000)
         amount = f"{final_price:,} UZS ({discount_pct}% PROMO SKIDKA QO'LLANDI!)"
-    elif is_repeat and action in ["premium_monthly", "premium_quarterly"]:
-        # 2-marta olishiga 15% chegirma va 1000 ga pastga yaxlitlash (masalan 46,750 -> 46,000 UZS)
-        final_price = (int(base_price * 0.85) // 1000) * 1000
+    elif is_repeat and action != "premium_manual":
+        final_price = max(1000, (int(base_price * 0.85) // 1000) * 1000)
         amount = f"{final_price:,} UZS (🎉 15% TAKRORIY CHEGIRMA QO'LLANDI!)"
     else:
         final_price = base_price

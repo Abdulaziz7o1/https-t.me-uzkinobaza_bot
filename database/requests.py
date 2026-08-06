@@ -973,6 +973,10 @@ async def get_config_int(key: str, default: int) -> int:
     val = await get_setting(key)
     return int(val) if val and val.lstrip('-').isdigit() else default
 
+async def get_premium_price_1w() -> int:
+    """1 haftalik Premium narxini olish (default: 7000 UZS)"""
+    return await get_config_int("premium_price_1w", 7000)
+
 async def get_premium_price_1m() -> int:
     """1 oylik Premium narxini olish (default: 20000 UZS)"""
     return await get_config_int("premium_price_1m", 20000)
@@ -981,6 +985,18 @@ async def get_premium_price_3m() -> int:
     """3 oylik Premium narxini olish (default: 50000 UZS)"""
     return await get_config_int("premium_price_3m", 50000)
 
+async def get_premium_price_6m() -> int:
+    """6 oylik Premium narxini olish (default: 100000 UZS)"""
+    return await get_config_int("premium_price_6m", 100000)
+
+async def get_premium_price_1y() -> int:
+    """1 yillik Premium narxini olish (default: 180000 UZS)"""
+    return await get_config_int("premium_price_1y", 180000)
+
+async def set_premium_price_1w(price: int):
+    """1 haftalik Premium narxini saqlash"""
+    await set_setting("premium_price_1w", str(price))
+
 async def set_premium_price_1m(price: int):
     """1 oylik Premium narxini saqlash"""
     await set_setting("premium_price_1m", str(price))
@@ -988,6 +1004,14 @@ async def set_premium_price_1m(price: int):
 async def set_premium_price_3m(price: int):
     """3 oylik Premium narxini saqlash"""
     await set_setting("premium_price_3m", str(price))
+
+async def set_premium_price_6m(price: int):
+    """6 oylik Premium narxini saqlash"""
+    await set_setting("premium_price_6m", str(price))
+
+async def set_premium_price_1y(price: int):
+    """1 yillik Premium narxini saqlash"""
+    await set_setting("premium_price_1y", str(price))
 
 # --- BALL TIZIMI (POINTS SYSTEM) ---
 async def add_points(user_id: int, amount: int, bypass_daily_limit: bool = False) -> tuple[int, bool]:
