@@ -489,9 +489,18 @@ async def delete_movie_start(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
 
-@router.message(AdminStates.waiting_for_movie_delete, F.text.regexp(r"^\d+$"))
+@router.message(AdminStates.waiting_for_movie_delete, F.text)
 async def delete_movie_exec(message: Message, state: FSMContext):
-    movie_id = int(message.text)
+    text = message.text.strip()
+    if text in MENU_BUTTONS:
+        await state.clear()
+        return
+
+    if not text.isdigit():
+        await message.answer("⚠️ Iltimos, faqat musbat sonlardan iborat kino kodini kiriting (masalan: 1 yoki 501):")
+        return
+
+    movie_id = int(text)
     deleted = await db_req.delete_movie(movie_id)
     await state.clear()
     if deleted:
