@@ -26,6 +26,7 @@ if channels_raw:
 
 # Bot usernamesi (captionlarda ko'rsatish uchun)
 BOT_USERNAME = os.getenv("BOT_USERNAME", "@uzkinobaza_bot")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "@Abdulaziz7o1")
 
 # Proxy settings (optional - agar Telegram bloklangan bo'lsa)
 # Masalan: PROXY_URL=http://username:password@proxy-server:port

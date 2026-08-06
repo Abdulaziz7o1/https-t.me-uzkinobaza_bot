@@ -141,7 +141,7 @@ async def cmd_start(message: Message, state: FSMContext):
                 cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
                 if avg_rating > 0:
                     cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
-                cap += f"\n\n🤖 {config.BOT_USERNAME}"
+                cap += f"\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
                 await message.answer_video(
                     video=file_id,
                     caption=cap,
@@ -304,7 +304,7 @@ async def search_movie_by_code(message: Message):
 
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
-        cap += f"\n\n🤖 {config.BOT_USERNAME}"
+        cap += f"\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
 
         await message.answer_video(
             video=file_id,
@@ -964,7 +964,7 @@ async def random_movie(message: Message, state: FSMContext):
         cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{random_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)"
-        cap += f"\n\n🤖 {config.BOT_USERNAME}"
+        cap += f"\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
 
         await message.answer_video(
             video=file_id,
@@ -1418,7 +1418,7 @@ async def back_to_movie_menu(callback: CallbackQuery):
     cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>"
     if avg_rating > 0:
         cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
-    cap += f"\n\n🤖 {config.BOT_USERNAME}"
+    cap += f"\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
     
     try:
         if callback.message.text is not None:
@@ -1712,7 +1712,8 @@ async def inline_query_handler(inline_query: InlineQuery):
         shared_caption = (
             f"{movie_caption or ''}"
             f"\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
-            f"🤖 {config.BOT_USERNAME}"
+            f"🤖 {config.BOT_USERNAME}\n"
+            f"📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
         )
         
         inline_results.append(
@@ -2125,7 +2126,7 @@ async def show_movie_callback(callback: CallbackQuery):
         cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
         if avg_rating > 0:
             cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)"
-        cap += f"\n\n🤖 {config.BOT_USERNAME}"
+        cap += f"\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
 
         await callback.message.answer_video(
             video=file_id,
@@ -2229,7 +2230,7 @@ async def search_movie_by_text(message: Message, state: FSMContext = None):
             cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
             if avg_rating > 0:
                 cap += f"\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}"
-            cap += f"\n\n🤖 {config.BOT_USERNAME}"
+            cap += f"\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
             await message.answer_video(
                 video=file_id,
                 caption=cap,
