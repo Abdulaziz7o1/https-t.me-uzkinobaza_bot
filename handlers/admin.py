@@ -388,50 +388,64 @@ async def admin_direct_video_handler(message: Message, state: FSMContext):
     )
 
 async def process_and_save_movie_with_code(event_obj, state: FSMContext, movie_id: int, file_id: str, raw_caption: str, is_callback: bool = False):
-    exists = await db_req.movie_exists_db(movie_id)
-    if exists:
-        next_free = await db_req.get_next_available_movie_id()
-        msg_txt = (
-            f"❌ <b>{movie_id}</b> kodli kino allaqachon bazada mavjud!\n\n"
-            f"💡 Bo'sh bo'lgan navbatdagi kod: <code>{next_free}</code>\n"
-            f"Iltimos, boshqa kod kiriting (masalan: {next_free} yoki 501):"
-        )
-        if is_callback:
-            await event_obj.message.answer(msg_txt, parse_mode="HTML")
-        else:
-            await event_obj.answer(msg_txt, parse_mode="HTML")
-        return False
+    try:
+        exists = await db_req.movie_exists_db(movie_id)
+        if exists:
+            next_free = await db_req.get_next_available_movie_id()
+            msg_txt = (
+                f"❌ <b>{movie_id}</b> kodli kino allaqachon bazada mavjud!\n\n"
+                f"💡 Bo'sh bo'lgan navbatdagi kod: <code>{next_free}</code>\n"
+                f"Iltimos, boshqa kod kiriting (masalan: {next_free} yoki 501):"
+            )
+            if is_callback:
+                await event_obj.message.answer(msg_txt, parse_mode="HTML")
+                await event_obj.answer("Kino allaqachon mavjud ⚠️")
+            else:
+                await event_obj.answer(msg_txt, parse_mode="HTML")
+            return False
 
-    formatted_caption = db_req.clean_and_format_caption(raw_caption)
-    await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
-    await state.clear()
-    bot_inst = event_obj.bot
-    await sync_movies_backup_storage(bot_inst)
-    
-    total_movies = await db_req.get_total_movies_count()
-    next_free = await db_req.get_next_available_movie_id()
-    
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f"get_movie_{movie_id}"),
-        InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"edit_movie_start_{movie_id}")
-    ]])
-    
-    cap_display = raw_caption[:50] if raw_caption else "(Nomsiz video fayl)"
-    confirm_txt = (
-        f"✅ <b>KINO BAZAGA MUVAFFAQIYATLI QO'SHILDI!</b>\n\n"
-        f"📌 <b>Kino nomi / tavsifi:</b> <i>{cap_display}</i>\n"
-        f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
-        f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
-        f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
-        f"☁️ <i>Kino SQLite hamda MongoDB Atlas Cloud bulutingizga 100% saqlandi!</i>"
-    )
-    
-    if is_callback:
-        await event_obj.message.edit_text(confirm_txt, parse_mode="HTML", reply_markup=kb)
-        await event_obj.answer(f"Kino {movie_id} kodi bilan saqlandi ✅")
-    else:
-        await event_obj.answer(confirm_txt, parse_mode="HTML", reply_markup=kb)
-    return True
+        formatted_caption = db_req.clean_and_format_caption(raw_caption)
+        await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
+        await state.clear()
+        
+        bot_inst = event_obj.bot
+        await sync_movies_backup_storage(bot_inst)
+        
+        total_movies = await db_req.get_total_movies_count()
+        next_free = await db_req.get_next_available_movie_id()
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f"get_movie_{movie_id}"),
+            InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"edit_movie_start_{movie_id}")
+        ]])
+        
+        cap_display = raw_caption[:50] if raw_caption else "(Nomsiz video fayl)"
+        confirm_txt = (
+            f"✅ <b>KINO BAZAGA MUVAFFAQIYATLI QO'SHILDI!</b>\n\n"
+            f"📌 <b>Kino nomi / tavsifi:</b> <i>{cap_display}</i>\n"
+            f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
+            f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
+            f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
+            f"☁️ <i>Kino SQLite hamda MongoDB Atlas Cloud bulutingizga 100% saqlandi!</i>"
+        )
+        
+        if is_callback:
+            try:
+                await event_obj.message.edit_text(confirm_txt, parse_mode="HTML", reply_markup=kb)
+            except Exception:
+                await event_obj.message.answer(confirm_txt, parse_mode="HTML", reply_markup=kb)
+            await event_obj.answer(f"Kino {movie_id} kodi bilan saqlandi ✅")
+        else:
+            await event_obj.answer(confirm_txt, parse_mode="HTML", reply_markup=kb)
+        return True
+    except Exception as e:
+        import logging
+        logging.error(f"process_and_save_movie_with_code error: {e}")
+        if is_callback:
+            await event_obj.answer("❌ Xatolik yuz berdi!", show_alert=True)
+        else:
+            await event_obj.answer(f"❌ Xatolik yuz berdi: {e}")
+        return False
 
 @router.message(StateFilter(AdminStates.waiting_for_movie_id_for_video, AdminStates.waiting_for_movie_id), F.text)
 async def admin_save_direct_video_code(message: Message, state: FSMContext):
@@ -453,7 +467,6 @@ async def admin_save_direct_video_code(message: Message, state: FSMContext):
     raw_caption = data.get("direct_caption", "")
 
     if not file_id:
-        # If user entered code first in waiting_for_movie_id
         exists = await db_req.movie_exists_db(movie_id)
         if exists:
             next_free = await db_req.get_next_available_movie_id()
@@ -477,17 +490,22 @@ async def admin_save_direct_video_code(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("save_direct_auto_"))
 async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
-    movie_id = int(callback.data.split("_")[-1])
-    data = await state.get_data()
-    file_id = data.get("direct_file_id")
-    raw_caption = data.get("direct_caption", "")
-    
-    if not file_id:
-        await callback.answer("⚠️ Video topilmadi. Qaytadan yuboring.", show_alert=True)
-        await state.clear()
-        return
+    try:
+        movie_id = int(callback.data.split("_")[-1])
+        data = await state.get_data()
+        file_id = data.get("direct_file_id")
+        raw_caption = data.get("direct_caption", "")
+        
+        if not file_id:
+            await callback.answer("⚠️ Video ma'lumotlari toza bo'lgan. Qaytadan video yuboring.", show_alert=True)
+            await state.clear()
+            return
 
-    await process_and_save_movie_with_code(callback, state, movie_id, file_id, raw_caption, is_callback=True)
+        await process_and_save_movie_with_code(callback, state, movie_id, file_id, raw_caption, is_callback=True)
+    except Exception as err:
+        import logging
+        logging.error(f"save_direct_auto_callback error: {err}")
+        await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
 
 MENU_BUTTONS = [
     "Kino qo'shish ➕", "Kino o'chirish ❌", "Statistika 📊",
