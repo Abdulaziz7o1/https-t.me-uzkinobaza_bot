@@ -387,6 +387,66 @@ async def admin_direct_video_handler(message: Message, state: FSMContext):
         reply_markup=kb
     )
 
+@router.message(AdminStates.waiting_for_movie_id_for_video, F.text)
+async def admin_save_direct_video_code(message: Message, state: FSMContext):
+    text = message.text.strip()
+    if text in MENU_BUTTONS or text.startswith("/"):
+        await state.clear()
+        if text == "/start" or text == "/cancel":
+            from handlers.user import execute_start_logic
+            await execute_start_logic(message, state)
+        return
+
+    if not text.isdigit():
+        await message.answer("⚠️ Iltimos, faqat musbat sonlardan iborat kino kodini kiriting (masalan: 1 yoki 501):")
+        return
+
+    movie_id = int(text)
+    exists = await db_req.movie_exists_db(movie_id)
+    if exists:
+        next_free = await db_req.get_next_available_movie_id()
+        await message.answer(
+            f"❌ <b>{movie_id}</b> kodli kino allaqachon bazada mavjud!\n\n"
+            f"💡 Bo'sh bo'lgan navbatdagi kod: <code>{next_free}</code>\n"
+            f"Iltimos, boshqa kod kiriting (masalan: {next_free} yoki 501):",
+            parse_mode="HTML"
+        )
+        return
+
+    data = await state.get_data()
+    file_id = data.get("direct_file_id")
+    raw_caption = data.get("direct_caption", "")
+
+    if not file_id:
+        await message.answer("⚠️ Video fayli topilmadi. Qaytadan video yuboring.")
+        await state.clear()
+        return
+
+    formatted_caption = db_req.clean_and_format_caption(raw_caption)
+    await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
+    await state.clear()
+    await sync_movies_backup_storage(message.bot)
+    
+    total_movies = await db_req.get_total_movies_count()
+    next_free = await db_req.get_next_available_movie_id()
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f"get_movie_{movie_id}"),
+        InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"edit_movie_start_{movie_id}")
+    ]])
+    
+    cap_display = raw_caption[:50] if raw_caption else "(Nomsiz video fayl)"
+    await message.answer(
+        f"✅ <b>KINO BAZAGA MUVAFFAQIYATLI QO'SHILDI!</b>\n\n"
+        f"📌 <b>Kino nomi / tavsifi:</b> <i>{cap_display}</i>\n"
+        f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
+        f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
+        f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
+        f"☁️ <i>Kino SQLite hamda MongoDB Atlas Cloud bulutingizga 100% saqlandi!</i>",
+        parse_mode="HTML",
+        reply_markup=kb
+    )
+
 @router.callback_query(F.data.startswith("save_direct_auto_"))
 async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
     movie_id = int(callback.data.split("_")[-1])
