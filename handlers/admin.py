@@ -484,13 +484,16 @@ async def direct_delete_command_handler(message: Message, state: FSMContext):
         return
     for id_str in ids:
         movie_id = int(id_str)
-        deleted = await db_req.delete_movie(movie_id)
-        if deleted:
+        deleted_flag, m_cap = await db_req.delete_movie(movie_id)
+        if deleted_flag:
+            total_movies = await db_req.get_total_movies_count()
+            name_str = m_cap[:50] if m_cap else "(Nomsiz kino)"
             await message.answer(
-                f"✅ <b>Kino muvaffaqiyatli o'chirildi!</b>\n\n"
+                f"🗑️ <b>KINO BAZADAN O'CHIRILDI!</b>\n\n"
                 f"🎬 <b>O'chirilgan Kino kodi:</b> <code>{movie_id}</code>\n"
-                f"🗑️ <i>Shu kino bilan bog'liq barcha statistikalar 0 ga tenglandi!</i>\n"
-                f"☁️ <i>O'chirish SQLite hamda MongoDB Atlas Cloud bazasiga sinxronlandi!</i>",
+                f"📌 <b>O'chirilgan Kino nomi:</b> <i>{name_str}</i>\n"
+                f"📊 <b>Bazada qolgan jami kinolar:</b> <code>{total_movies} ta</code>\n"
+                f"☁️ <i>O'chirish SQLite hamda MongoDB Atlas Cloud bulutingizdan to'liq amamalga oshirildi!</i>",
                 parse_mode="HTML"
             )
             await sync_movies_backup_storage(message.bot)
@@ -508,7 +511,7 @@ async def delete_movie_start(message: Message, state: FSMContext):
         return
     await state.set_state(AdminStates.waiting_for_movie_delete)
     await message.answer(
-        "🗑️ <b>Kino o'chirish rejimi faollashtirildi!</b>\n\n"
+        "🗑️ <b>KINO O'CHIRISH REJIMI FAOLLASHDI!</b>\n\n"
         "O'chirmoqchi bo'lgan kino kodlarini yuboring (masalan: <code>1</code>, <code>2</code>, <code>501</code> yoki birga: <code>1, 2, 3</code>).\n"
         "<i>Eslatma: Bitta yuborishda 1 ta yoki bir nechta kino kodlarini yuborib o'chirishingiz mumkin.</i>",
         parse_mode="HTML"
@@ -532,13 +535,16 @@ async def delete_movie_exec(message: Message, state: FSMContext):
 
     for id_str in ids_found:
         movie_id = int(id_str)
-        deleted = await db_req.delete_movie(movie_id)
-        if deleted:
+        deleted_flag, m_cap = await db_req.delete_movie(movie_id)
+        if deleted_flag:
+            total_movies = await db_req.get_total_movies_count()
+            name_str = m_cap[:50] if m_cap else "(Nomsiz kino)"
             await message.answer(
-                f"✅ <b>Kino muvaffaqiyatli o'chirildi!</b>\n\n"
+                f"🗑️ <b>KINO BAZADAN O'CHIRILDI!</b>\n\n"
                 f"🎬 <b>O'chirilgan Kino kodi:</b> <code>{movie_id}</code>\n"
-                f"🗑️ <i>Shu kino bilan bog'liq barcha unikal yuklashlar va zaxiralar 0 ga tenglandi!</i>\n"
-                f"☁️ <i>O'chirish SQLite hamda MongoDB Atlas Cloud bazasiga sinxronlandi!</i>",
+                f"📌 <b>O'chirilgan Kino nomi:</b> <i>{name_str}</i>\n"
+                f"📊 <b>Bazada qolgan jami kinolar:</b> <code>{total_movies} ta</code>\n"
+                f"☁️ <i>O'chirish SQLite hamda MongoDB Atlas Cloud bulutingizdan to'liq amalga oshirildi!</i>",
                 parse_mode="HTML"
             )
             await sync_movies_backup_storage(message.bot)

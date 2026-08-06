@@ -231,17 +231,19 @@ async def get_movie(movie_id: int, user_id: int = None):
             return (movie[0], movie[1], new_views)
         return None
 
-async def delete_movie(movie_id: int) -> bool:
-    """Kinoni bazadan va barcha xotira bo'limlaridan butunlay yo'q qilish va unikal yuklashlarni 0 ga tenglash"""
+async def delete_movie(movie_id: int):
+    """Kinoni bazadan va barcha xotira bo'limlaridan yo'q qilish hamda tavsifini qaytarish"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
+    caption = ""
     async with get_db() as db:
-        async with db.execute("SELECT id FROM movies WHERE id = ?", (movie_id,)) as cursor:
+        async with db.execute("SELECT caption FROM movies WHERE id = ?", (movie_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 cache.delete(f"movie_{movie_id}")
-                return False
+                return False, ""
+            caption = row[0] or ""
 
         await db.execute("DELETE FROM movies WHERE id = ?", (movie_id,))
         await db.execute("DELETE FROM favorites WHERE movie_id = ?", (movie_id,))
@@ -257,7 +259,7 @@ async def delete_movie(movie_id: int) -> bool:
         await db.commit()
         cache.delete(f"movie_{movie_id}")
     await export_master_backup_json()
-    return True
+    return True, caption
 
 MASTER_BACKUP_FILE = "master_bot_backup.json"
 
