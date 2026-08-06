@@ -1420,13 +1420,13 @@ async def edit_movie_caption(message: Message, state: FSMContext):
     await message.answer(f"✅ <b>{movie_id}</b> kodli kino tavsifi muvaffaqiyatli tahrirlandi!", parse_mode="HTML")
 
 # --- KINO FAYLINI YANGILASH ---
-@router.message(F.text == "Kino faylini yangilash 🔄")
+@router.message(F.text.regexp(r"(?i).*(kino faylini yangilash|replace movie|replace video).*"))
 async def replace_movie_start(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, "add_movie"):
         return
     await state.set_state(AdminStates.waiting_for_movie_replace_id)
-    await message.answer("🔄 <b>Video faylini almashtirmoqchi bo'lgan kino kodini yuboring:</b>", parse_mode="HTML")
+    await message.answer("🔄 <b>Video faylini almashtirmoqchi bo'lgan kino kodini yuboring (masalan: 1):</b>", parse_mode="HTML")
 
 @router.message(AdminStates.waiting_for_movie_replace_id, F.text, ~F.text.in_(MENU_BUTTONS))
 async def replace_movie_id(message: Message, state: FSMContext):
@@ -1449,19 +1449,29 @@ async def replace_movie_id(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
 
-@router.message(AdminStates.waiting_for_movie_replace_video, F.video | F.document)
+@router.message(AdminStates.waiting_for_movie_replace_video, F.video | F.document | F.animation | F.video_note)
 async def replace_movie_video(message: Message, state: FSMContext):
-    if message.video:
-        file_id = message.video.file_id
-    else:
-        file_id = message.document.file_id
+    file_id = message.video.file_id if message.video else (message.document.file_id if message.document else (message.animation.file_id if message.animation else message.video_note.file_id))
         
     data = await state.get_data()
     movie_id = data["replace_movie_id"]
     
     await db_req.update_movie_video(movie_id, file_id)
     await state.clear()
-    await message.answer(f"✅ <b>{movie_id}</b> kodli kino video fayli muvaffaqiyatli almashtirildi!", parse_mode="HTML")
+    await sync_movies_backup_storage(message.bot)
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f"get_movie_{movie_id}"),
+        InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"edit_movie_start_{movie_id}")
+    ]])
+    
+    await message.answer(
+        f"✅ <b>KINO FAYLI MUVAFFAQIYATLI ALMASHTIRILDI!</b>\n\n"
+        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+        f"🔄 <i>Yangi video fayl SQLite va MongoDB Atlas Cloud bulutingizga saqlandi!</i>",
+        parse_mode="HTML",
+        reply_markup=kb
+    )
 
 # --- REJALASHTIRILGAN REKLAMA ---
 @router.message(F.text == "Rejalashtirilgan reklama 📅")
