@@ -604,16 +604,25 @@ async def user_promo_cmd(message: Message, state: FSMContext):
                 await _notify_admin_promo_100(message.bot, user_id, uname, code)
                 return
             elif disc_pct > 0:
+                p_1w_base = await db_req.get_premium_price_1w()
                 p_1m_base = await db_req.get_premium_price_1m()
                 p_3m_base = await db_req.get_premium_price_3m()
+                p_6m_base = await db_req.get_premium_price_6m()
+                p_1y_base = await db_req.get_premium_price_1y()
+                p_1w = int(p_1w_base * (100 - disc_pct) / 100)
                 p_1m = int(p_1m_base * (100 - disc_pct) / 100)
                 p_3m = int(p_3m_base * (100 - disc_pct) / 100)
+                p_6m = int(p_6m_base * (100 - disc_pct) / 100)
+                p_1y = int(p_1y_base * (100 - disc_pct) / 100)
                 msg = (
                     f"✅ <b>PROMO KOD MUVAFFAQIYATLI ISHLATILDI!</b> 🎉\n\n"
                     f"🏷️ <b>Sizga {disc_pct}% SKIDKA taqdim etildi!</b>\n\n"
                     f"💰 <b>SKIDKADAGI YANGI NARXLARINGIZ:</b>\n"
-                    f"1️⃣ <b>1 oylik Premium:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>{p_1m:,} UZS</b>\n"
-                    f"2️⃣ <b>3 oylik Premium:</b> <s>{p_3m_base:,} UZS</s> ➔ <b>{p_3m:,} UZS</b>\n\n"
+                    f"1️⃣ <b>1 haftalik:</b> <s>{p_1w_base:,} UZS</s> ➔ <b>{p_1w:,} UZS</b>\n"
+                    f"2️⃣ <b>1 oylik:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>{p_1m:,} UZS</b>\n"
+                    f"3️⃣ <b>3 oylik:</b> <s>{p_3m_base:,} UZS</s> ➔ <b>{p_3m:,} UZS</b>\n"
+                    f"4️⃣ <b>6 oylik:</b> <s>{p_6m_base:,} UZS</s> ➔ <b>{p_6m:,} UZS</b>\n"
+                    f"5️⃣ <b>1 yillik:</b> <s>{p_1y_base:,} UZS</s> ➔ <b>{p_1y:,} UZS</b>\n\n"
                     f"👉 To'lovni amalga oshirish va obunani faollashtirish uchun /premium buyrug'ini yuboring!"
                 )
             else:
@@ -687,24 +696,40 @@ async def user_promo_input_exec(message: Message, state: FSMContext):
 
         # ── Oddiy skidka ──────────────────────────────────────────────────────
         if disc_pct > 0:
+            p_1w_base = await db_req.get_premium_price_1w()
             p_1m_base = await db_req.get_premium_price_1m()
             p_3m_base = await db_req.get_premium_price_3m()
+            p_6m_base = await db_req.get_premium_price_6m()
+            p_1y_base = await db_req.get_premium_price_1y()
+            p_1w = int(p_1w_base * (100 - disc_pct) / 100)
             p_1m = int(p_1m_base * (100 - disc_pct) / 100)
             p_3m = int(p_3m_base * (100 - disc_pct) / 100)
+            p_6m = int(p_6m_base * (100 - disc_pct) / 100)
+            p_1y = int(p_1y_base * (100 - disc_pct) / 100)
             
             detail_msg = (
                 f"✅ <b>PROMO KOD QABUL QILINDI!</b> 🎉\n\n"
                 f"🏷️ <b>Sizga to'lov uchun {disc_pct}% SKIDKA taqdim etildi!</b>\n\n"
                 f"💰 <b>SKIDKADAGI YANGI NARXLARINGIZ:</b>\n"
-                f"1️⃣ <b>1 oylik Premium:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>{p_1m:,} UZS</b>\n"
-                f"2️⃣ <b>3 oylik Premium:</b> <s>{p_3m_base:,} UZS</s> ➔ <b>{p_3m:,} UZS</b>\n\n"
+                f"1️⃣ <b>1 haftalik:</b> <s>{p_1w_base:,} UZS</s> ➔ <b>{p_1w:,} UZS</b>\n"
+                f"2️⃣ <b>1 oylik:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>{p_1m:,} UZS</b>\n"
+                f"3️⃣ <b>3 oylik:</b> <s>{p_3m_base:,} UZS</s> ➔ <b>{p_3m:,} UZS</b>\n"
+                f"4️⃣ <b>6 oylik:</b> <s>{p_6m_base:,} UZS</s> ➔ <b>{p_6m:,} UZS</b>\n"
+                f"5️⃣ <b>1 yillik:</b> <s>{p_1y_base:,} UZS</s> ➔ <b>{p_1y:,} UZS</b>\n\n"
                 f"📌 <i>Istalgan vaqtda qayta ko'rish uchun /premium buyrug'idan foydalanishingiz mumkin!</i>\n\n"
                 f"👇 To'lov qilish uchun quyidagi obuna planlaridan birini tanlang:"
             )
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [
-                    InlineKeyboardButton(text=f"1️⃣ 1 oylik - {p_1m:,} UZS", callback_data="premium_monthly"),
-                    InlineKeyboardButton(text=f"2️⃣ 3 oylik - {p_3m:,} UZS", callback_data="premium_quarterly")
+                    InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {p_1w:,} UZS", callback_data="premium_1w"),
+                    InlineKeyboardButton(text=f"2️⃣ 1 oylik - {p_1m:,} UZS", callback_data="premium_monthly")
+                ],
+                [
+                    InlineKeyboardButton(text=f"3️⃣ 3 oylik - {p_3m:,} UZS", callback_data="premium_quarterly"),
+                    InlineKeyboardButton(text=f"4️⃣ 6 oylik - {p_6m:,} UZS", callback_data="premium_6m")
+                ],
+                [
+                    InlineKeyboardButton(text=f"5️⃣ 1 yillik - {p_1y:,} UZS", callback_data="premium_yearly")
                 ],
                 [
                     InlineKeyboardButton(text="📞 Manual to'lov", callback_data="premium_manual")
