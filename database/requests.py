@@ -357,15 +357,27 @@ async def export_master_backup_json() -> str:
 
         # Master JSON va alohida movies/sponsor backup fayllariga saqlash
         json_str = json.dumps(master_data, ensure_ascii=False, indent=2)
+        candidate_files = ["master_bot_backup.json", "data/master_bot_backup.json"]
+        if os.path.exists("/var/data"):
+            candidate_files.append("/var/data/master_bot_backup.json")
+            
+        for b_file in candidate_files:
+            try:
+                b_dir = os.path.dirname(b_file)
+                if b_dir and not os.path.exists(b_dir):
+                    os.makedirs(b_dir, exist_ok=True)
+                with open(b_file, "w", encoding="utf-8") as f:
+                    f.write(json_str)
+            except Exception as e:
+                print(f"Master backup write error [{b_file}]: {e}")
+
         try:
-            with open(MASTER_BACKUP_FILE, "w", encoding="utf-8") as f:
-                f.write(json_str)
             with open("movies_backup.json", "w", encoding="utf-8") as f:
                 json.dump(movies, f, ensure_ascii=False, indent=2)
             with open("sponsor_channels_backup.json", "w", encoding="utf-8") as f:
                 json.dump(channels, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"Master backup saqlashda xato: {e}")
+        except Exception:
+            pass
 
         return json_str
 
@@ -396,52 +408,65 @@ async def import_master_backup_json(json_str: str) -> dict:
 
             # 2. Sponsor channels
             if "sponsor_channels" in data:
-                ch_cnt = 0
-                for ch in data["sponsor_channels"]:
-                    if ch.get("channel_id"):
+                c_cnt = 0
+                for c in data["sponsor_channels"]:
+                    if c.get("channel_id"):
                         await db.execute(
-                            "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
-                            (ch["channel_id"], ch.get("channel_name", ch["channel_id"]))
+                            "INSERT OR REPLACE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
+                            (c["channel_id"], c.get("channel_name", str(c["channel_id"])))
                         )
-                        ch_cnt += 1
-                stats["sponsor_channels"] = ch_cnt
+                        c_cnt += 1
+                stats["sponsor_channels"] = c_cnt
 
-            # 3. Settings
-            if "settings" in data and isinstance(data["settings"], dict):
-                s_cnt = 0
-                for k, v in data["settings"].items():
-                    await db.execute(
-                        "INSERT INTO bot_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
-                        (str(k), str(v), str(v))
-                    )
-                    s_cnt += 1
-                stats["settings"] = s_cnt
+            # 3. Users
+            if "users" in data:
+                u_cnt = 0
+                for u in data["users"]:
+                    if u.get("id"):
+                        await db.execute(
+                            "INSERT OR REPLACE INTO users (id, username, full_name, role, points, is_blocked, referred_by, created_at, last_active_at, premium_until, daily_movie_count, daily_movie_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            (u["id"], u.get("username"), u.get("full_name"), u.get("role", "member"), u.get("points", 0), u.get("is_blocked", 0), u.get("referred_by"), u.get("created_at"), u.get("last_active_at"), u.get("premium_until"), u.get("daily_movie_count", 0), u.get("daily_movie_date"))
+                        )
+                        u_cnt += 1
+                stats["users"] = u_cnt
 
-            # 4. Premium Subscriptions
+            # 4. Premium subscriptions
             if "premium_subscriptions" in data:
-                p_cnt = 0
+                ps_cnt = 0
                 for ps in data["premium_subscriptions"]:
                     if ps.get("user_id"):
                         await db.execute(
-                            "INSERT OR REPLACE INTO premium_subscriptions (user_id, start_date, end_date, plan) VALUES (?, ?, ?, ?)",
-                            (ps["user_id"], ps.get("start_date"), ps.get("end_date"), ps.get("plan"))
+                            "INSERT OR REPLACE INTO premium_subscriptions (user_id, start_date, end_date, plan, status) VALUES (?, ?, ?, ?, ?)",
+                            (ps["user_id"], ps.get("start_date"), ps.get("end_date"), ps.get("plan"), ps.get("status", "active"))
                         )
-                        p_cnt += 1
-                stats["premium_subscriptions"] = p_cnt
+                        ps_cnt += 1
+                stats["premium_subscriptions"] = ps_cnt
 
             # 5. Payment records
             if "payment_records" in data:
-                pay_cnt = 0
-                for p in data["payment_records"]:
-                    if p.get("user_id"):
+                pr_cnt = 0
+                for pr in data["payment_records"]:
+                    if pr.get("user_id"):
                         await db.execute(
-                            "INSERT OR IGNORE INTO payment_records (id, user_id, amount, plan, confirmed_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                            (p.get("id"), p["user_id"], p.get("amount", 0), p.get("plan", ""), p.get("confirmed_by"), p.get("created_at"))
+                            "INSERT OR REPLACE INTO payment_records (user_id, amount, plan, payment_method, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                            (pr["user_id"], pr.get("amount", 0), pr.get("plan"), pr.get("payment_method"), pr.get("status"), pr.get("created_at"))
                         )
-                        pay_cnt += 1
-                stats["payment_records"] = pay_cnt
+                        pr_cnt += 1
+                stats["payment_records"] = pr_cnt
 
-            # 6. Promo codes
+            # 6. Settings
+            if "settings" in data:
+                s_cnt = 0
+                for s in data["settings"]:
+                    if s.get("key"):
+                        await db.execute(
+                            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                            (s["key"], str(s.get("value", "")))
+                        )
+                        s_cnt += 1
+                stats["settings"] = s_cnt
+
+            # 7. Promo codes
             if "promo_codes" in data:
                 pc_cnt = 0
                 for pc in data["promo_codes"]:
@@ -460,23 +485,28 @@ async def import_master_backup_json(json_str: str) -> dict:
         return {}
 
 async def restore_master_backup_on_startup():
-    """Bot ishga tushganida (Render restart bo'lganda) master_bot_backup.json va barcha fayllardan avtomatik tiklash"""
+    """Bot ishga tushganida (Render restart bo'lganda) barcha zaxira manbalaridan avtomatik 100% tiklash"""
     import os
-    if os.path.exists(MASTER_BACKUP_FILE):
-        try:
-            with open(MASTER_BACKUP_FILE, "r", encoding="utf-8") as f:
-                json_str = f.read()
-                await import_master_backup_json(json_str)
-                print("Master backup (barcha 15 ta jadval) muvaffaqiyatli tiklandi!")
-        except Exception as e:
-            print(f"Master backup startup xatosi: {e}")
-
-    if os.path.exists("movies_backup.json"):
-        try:
-            with open("movies_backup.json", "r", encoding="utf-8") as f:
-                await import_movies_from_json(f.read())
-        except Exception:
-            pass
+    candidate_paths = [
+        "/var/data/master_bot_backup.json",
+        "data/master_bot_backup.json",
+        "master_bot_backup.json",
+        "/var/data/movies_backup.json",
+        "data/movies_backup.json",
+        "movies_backup.json"
+    ]
+    
+    for path in candidate_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if content.strip():
+                        res = await import_master_backup_json(content)
+                        if res:
+                            print(f"Master backup [{path}] dan muvaffaqiyatli tiklandi! 🚀: {res}")
+            except Exception as e:
+                print(f"Master backup startup xatosi [{path}]: {e}")
 
     if os.path.exists("sponsor_channels_backup.json"):
         try:
