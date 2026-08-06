@@ -544,7 +544,8 @@ async def restore_master_backup_on_startup():
     # 1. Avval MongoDB Bulutli bazasini tekshiramiz
     restored_mongo = await restore_from_mongodb_cloud()
     if restored_mongo:
-        print("MongoDB Cloud orqali barcha kinolar va ma'lumotlar tiklandi!")
+        print("MongoDB Cloud orqali barcha kinolar va ma'lumotlar tiklandi! Eskirgan disk fayllari bilan qayta yozilmaydi. ☁️✅")
+        return
         
     candidate_paths = [
         "/var/data/master_bot_backup.json",
@@ -562,8 +563,9 @@ async def restore_master_backup_on_startup():
                     content = f.read()
                     if content.strip():
                         res = await import_master_backup_json(content)
-                        if res:
+                        if res and res.get("movies", 0) > 0:
                             print(f"Master backup [{path}] dan muvaffaqiyatli tiklandi! 🚀: {res}")
+                            break
             except Exception as e:
                 print(f"Master backup startup xatosi [{path}]: {e}")
 
