@@ -349,42 +349,41 @@ async def add_movie_video(message: Message, state: FSMContext):
     )
 
 # --- DIRECT VIDEO SENDING BY ADMIN (VIDEO FIRST -> CODE SECOND) ---
-@router.message(StateFilter(None), F.video | F.document)
+@router.message(StateFilter(None), F.video | F.document | F.animation)
 async def admin_direct_video_handler(message: Message, state: FSMContext):
     if not await db_req.has_permission(message.from_user.id, "add_movie"):
         return
-    file_id = message.video.file_id if message.video else message.document.file_id
+    file_id = message.video.file_id if message.video else (message.document.file_id if message.document else message.animation.file_id)
     raw_caption = message.caption or ""
     
     import re
     code_match = re.match(r"^(\d+)\s*[-:]?\s*(.*)$", raw_caption.strip(), re.DOTALL)
     
+    movie_id = None
+    clean_cap = raw_caption.strip()
+    
     if code_match:
         target_id = int(code_match.group(1))
-        clean_cap = code_match.group(2).strip()
+        candidate_cap = code_match.group(2).strip()
         exists = await db_req.movie_exists_db(target_id)
         if not exists:
-            formatted_caption = db_req.clean_and_format_caption(clean_cap)
-            await db_req.add_movie_with_id(target_id, file_id, formatted_caption)
-            await message.answer(
-                f"✅ <b>Kino muvaffaqiyatli qo'shildi!</b>\n\n"
-                f"🎬 <b>Kino kodi:</b> <code>{target_id}</code>\n"
-                f"📝 <b>Tavsif:</b> <i>{clean_cap[:40] if clean_cap else '(Nomsiz)'}</i>",
-                parse_mode="HTML"
-            )
-            await sync_movies_backup_storage(message.bot)
-            return
-
-    await state.update_data(direct_file_id=file_id, direct_caption=raw_caption)
-    await state.set_state(AdminStates.waiting_for_movie_id_for_video)
+            movie_id = target_id
+            clean_cap = candidate_cap
+            
+    if movie_id is None:
+        movie_id = await db_req.get_next_available_movie_id()
+        
+    formatted_caption = db_req.clean_and_format_caption(clean_cap)
+    await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
     
-    next_free = await db_req.get_next_available_movie_id()
+    cap_display = clean_cap[:40] if clean_cap else "(Nomsiz kino)"
     await message.answer(
-        "🎬 <b>Kino video fayli qabul qilindi!</b>\n\n"
-        "🔢 <b>Ushbu kino uchun kod (raqam) kiriting:</b>\n"
-        f"💡 <i>Tavsiya etiladigan bo'sh kod: <code>{next_free}</code></i>",
+        f"✅ <b>Kino muvaffaqiyatli qo'shildi!</b>\n\n"
+        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+        f"📝 <b>Tavsif:</b> <i>{cap_display}</i>",
         parse_mode="HTML"
     )
+    await sync_movies_backup_storage(message.bot)
 
 @router.message(AdminStates.waiting_for_movie_id_for_video, F.text)
 async def admin_save_direct_video_code(message: Message, state: FSMContext):
