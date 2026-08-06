@@ -58,13 +58,14 @@ def get_movie_action_keyboard(movie_id: int, is_fav: bool, avg_rating: float, li
     share_url = f"https://t.me/share/url?url={deep_link}&text={share_text}"
     builder.button(text="Do'stlarga ulashish 🚀", url=share_url)
     
-    # 4. Izohlar
+    # 4. Izohlar va Muhokama guruhi
     builder.button(text="Izohlar 💬", callback_data=f"comments_list_{movie_id}")
+    builder.button(text="💬 Muhokama guruhi", url="https://t.me/+FPb6kIcYVwphNjEy")
     
     # 5. Faylda nuqson borligi haqida shikoyat
     builder.button(text="⚠️ Faylda nuqson bor", callback_data=f"report_movie_{movie_id}")
     
-    builder.adjust(3, 1, 1, 1, 1, 1)
+    builder.adjust(3, 1, 1, 1, 1, 1, 1)
     return builder.as_markup()
 
 def get_comments_keyboard(movie_id: int) -> InlineKeyboardMarkup:

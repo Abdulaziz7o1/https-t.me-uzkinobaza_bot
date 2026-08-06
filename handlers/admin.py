@@ -67,6 +67,8 @@ class AdminStates(StatesGroup):
 
 # --- KEYBOARD BUILDERS ---
 async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: str):
+    """User so'roviga binoan yangi kino joylanganda Telegram homiy kanallarga avto-post yuborish o'chirildi"""
+    return
     target_channel = None
     if config.CHANNELS:
         target_channel = config.CHANNELS[0]
@@ -2300,8 +2302,7 @@ async def bulk_upload_process(message: Message, state: FSMContext):
         movie_id = await db_req.get_next_available_movie_id()
         
     formatted_caption = db_req.clean_and_format_caption(movie_caption)
-    await db_req.add_movie(movie_id, file_id, formatted_caption)
-    await auto_post_movie_to_channel(message.bot, movie_id, file_id, formatted_caption)
+    await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
     
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="Yakunlash ✅ (Done)", callback_data="bulk_upload_finish")

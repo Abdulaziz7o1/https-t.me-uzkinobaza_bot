@@ -477,33 +477,40 @@ async def premium_info(message: Message):
             parse_mode="HTML"
         )
 
-    else:
-        discount_pct = await db_req.get_user_active_discount(user_id)
-        p_1m_base = await db_req.get_premium_price_1m()
-        p_3m_base = await db_req.get_premium_price_3m()
-
+        is_repeat = await db_req.has_user_bought_premium_before(user_id)
+        p_1w_b, p_1m_b, p_3m_b, p_6m_b, p_1y_b = 7000, 20000, 55000, 100000, 180000
+        
         if discount_pct > 0:
-            p_1m = int(p_1m_base * (100 - discount_pct) / 100)
-            p_3m = int(p_3m_base * (100 - discount_pct) / 100)
-            
-            discount_hdr = f" 🔥 (<b>{discount_pct}% SKIDKA QO'LLANILDI!</b>)"
-            txt_1m = f"1️⃣ <b>1 oylik:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>{p_1m:,} UZS</b>"
-            txt_3m = f"2️⃣ <b>3 oylik:</b> <s>{p_3m_base:,} UZS</s> ➔ <b>{p_3m:,} UZS</b>"
-            
-            btn_1m = f"1️⃣ 1 oylik - {p_1m:,} UZS"
-            btn_3m = f"2️⃣ 3 oylik - {p_3m:,} UZS"
+            calc = lambda p: max(1000, (int(p * (100 - discount_pct) / 100) // 1000) * 1000)
+            discount_hdr = f" 🔥 (<b>{discount_pct}% PROMO SKIDKA QO'LLANILDI!</b>)"
+        elif is_repeat:
+            calc = lambda p: max(1000, (int(p * 0.85) // 1000) * 1000)
+            discount_hdr = " 🎉 (<b>15% TAKRORIY CHEGIRMA QO'LLANILDI!</b>)"
         else:
+            calc = lambda p: p
             discount_hdr = ""
-            txt_1m = f"1️⃣ <b>1 oylik - {p_1m_base:,} UZS</b>"
-            txt_3m = f"2️⃣ <b>3 oylik - {p_3m_base:,} UZS</b>"
-            
-            btn_1m = f"1️⃣ 1 oylik - {p_1m_base:,} UZS"
-            btn_3m = f"2️⃣ 3 oylik - {p_3m_base:,} UZS"
+
+        p_1w, p_1m, p_3m, p_6m, p_1y = calc(p_1w_b), calc(p_1m_b), calc(p_3m_b), calc(p_6m_b), calc(p_1y_b)
+
+        txt_plans = (
+            f"1️⃣ <b>1 haftalik (7 kun):</b> {p_1w:,} UZS\n"
+            f"2️⃣ <b>1 oylik (30 kun):</b> {p_1m:,} UZS\n"
+            f"3️⃣ <b>3 oylik (90 kun):</b> {p_3m:,} UZS\n"
+            f"4️⃣ <b>6 oylik (180 kun):</b> {p_6m:,} UZS\n"
+            f"5️⃣ <b>1 yillik (365 kun):</b> {p_1y:,} UZS"
+        )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text=btn_1m, callback_data="premium_monthly"),
-                InlineKeyboardButton(text=btn_3m, callback_data="premium_quarterly")
+                InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {p_1w:,} UZS", callback_data="premium_1w"),
+                InlineKeyboardButton(text=f"2️⃣ 1 oylik - {p_1m:,} UZS", callback_data="premium_monthly")
+            ],
+            [
+                InlineKeyboardButton(text=f"3️⃣ 3 oylik - {p_3m:,} UZS", callback_data="premium_quarterly"),
+                InlineKeyboardButton(text=f"4️⃣ 6 oylik - {p_6m:,} UZS", callback_data="premium_6m")
+            ],
+            [
+                InlineKeyboardButton(text=f"5️⃣ 1 yillik - {p_1y:,} UZS", callback_data="premium_1y")
             ],
             [
                 InlineKeyboardButton(text="🏷️ Promo kod kiritish", callback_data="user_enter_promo"),
@@ -514,8 +521,7 @@ async def premium_info(message: Message):
         await message.answer(
             f"💎 <b>Premium obuna:{discount_hdr}</b>\n\n"
             f"📋 <b>Obuna rejalari:</b>\n\n"
-            f"{txt_1m}\n"
-            f"{txt_3m}\n\n"
+            f"{txt_plans}\n\n"
             f"🎁 <b>Premium imtiyozlari:</b>\n"
             f"• Kunlik limit yo'q\n"
             f"• Cheklovsiz kino ko'rish\n"
