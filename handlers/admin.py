@@ -502,6 +502,35 @@ async def add_movie_caption(message: Message, state: FSMContext):
     await db_req.notify_requesting_users_for_movie(message.bot, movie_id, caption)
 
 # --- KINO O'CHIRISH ---
+@router.message(Command("delete"), StateFilter("*"))
+@router.message(F.text.startswith("/del_"), StateFilter("*"))
+async def direct_delete_command_handler(message: Message, state: FSMContext):
+    if not await db_req.has_permission(message.from_user.id, "delete_movie"):
+        return
+    import re
+    ids = re.findall(r"\d+", message.text)
+    if not ids:
+        await message.answer("⚠️ Iltimos, o'chirmoqchi bo'lgan kino kodini yuboring (masalan: /delete 1)")
+        return
+    for id_str in ids:
+        movie_id = int(id_str)
+        deleted = await db_req.delete_movie(movie_id)
+        if deleted:
+            await message.answer(
+                f"✅ <b>Kino muvaffaqiyatli o'chirildi!</b>\n\n"
+                f"🎬 <b>O'chirilgan Kino kodi:</b> <code>{movie_id}</code>\n"
+                f"🗑️ <i>Shu kino bilan bog'liq barcha statistikalar 0 ga tenglandi!</i>\n"
+                f"☁️ <i>O'chirish SQLite hamda MongoDB Atlas Cloud bazasiga sinxronlandi!</i>",
+                parse_mode="HTML"
+            )
+            await sync_movies_backup_storage(message.bot)
+        else:
+            await message.answer(
+                f"❌ <b>Bunday kodli kino bazada mavjud emas: {movie_id}</b>\n\n"
+                f"<i>Kino ilgari o'chirilgan yoki bazaga qo'shilmadi.</i>",
+                parse_mode="HTML"
+            )
+
 @router.message(F.text.regexp(r"(?i).*(kino o'chirish|delete movie).*"))
 async def delete_movie_start(message: Message, state: FSMContext):
     await state.clear()
