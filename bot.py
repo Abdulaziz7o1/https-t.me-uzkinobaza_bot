@@ -534,9 +534,10 @@ async def main():
     # Delete webhook and start polling cleanly
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-    except Exception as e:
-        logging.warning(f"Delete webhook warning: {e}")
+    except Exception:
+        pass
 
+    await asyncio.sleep(2)
     logging.info("Bot polling ishga tushmoqda...")
     while True:
         try:
