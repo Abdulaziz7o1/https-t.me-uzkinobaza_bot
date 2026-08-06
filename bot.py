@@ -531,25 +531,26 @@ async def main():
     dp.include_router(user.router)
     dp.include_router(payment.router)
     
-    # Botni ishga tushirish (Polling) with retry logic
-    logging.info("Bot ishga tushmoqda...")
-    max_retries = 3
-    retry_delay = 5
-    
+    # Delete webhook and start polling cleanly
     try:
-        for attempt in range(max_retries):
-            try:
-                await dp.start_polling(bot)
-                break
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    logging.error(f"Xato yuz berdi. {retry_delay} soniyadan keyin qayta urinish ({attempt + 1}/{max_retries}): {e}")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2
-                else:
-                    raise
-    finally:
-        await bot.session.close()
+        await bot.delete_webhook(drop_pending_updates=True)
+    except Exception as e:
+        logging.warning(f"Delete webhook warning: {e}")
+
+    logging.info("Bot polling ishga tushmoqda...")
+    while True:
+        try:
+            await dp.start_polling(bot, handle_signals=False)
+            break
+        except Exception as e:
+            if "Conflict" in str(e) or "terminated by other getUpdates" in str(e) or "TelegramConflictError" in type(e).__name__:
+                logging.warning(f"TelegramConflictError (eski jarayon to'xtamoqda). 5 soniyada qayta ulanadi: {e}")
+                await asyncio.sleep(5)
+            else:
+                logging.error(f"Polling xatosi: {e}")
+                await asyncio.sleep(5)
+    
+    await bot.session.close()
 
 if __name__ == "__main__":
     try:
