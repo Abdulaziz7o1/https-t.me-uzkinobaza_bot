@@ -490,10 +490,12 @@ async def import_master_backup_json(json_str: str) -> dict:
         print(f"Master backup tiklashda xato: {e}")
         return {}
 
+DEFAULT_MONGO_URI = "mongodb+srv://abdulaziz10102013abdz_db_user:Abdulaziz1010201300@uzkinobazabot.ychyfp5.mongodb.net/?appName=uzkinobazabot"
+
 async def sync_master_backup_to_mongodb(master_data: dict):
-    """MongoDB Cloud bor bo'lsa (MONGO_URI env kiritilgan bo'lsa), barcha 15 ta jadvalni MongoDB Atlas Bulutli bazaga avtomatik zaxiralash"""
+    """MongoDB Cloud'ga barcha 15 ta jadvalni MongoDB Atlas Bulutli bazaga avtomatik zaxiralash"""
     import os
-    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL")
+    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
     if not mongo_uri:
         return
     try:
@@ -515,7 +517,7 @@ async def sync_master_backup_to_mongodb(master_data: dict):
 async def restore_from_mongodb_cloud() -> bool:
     """MongoDB Cloud'dan eng so'nggi zaxira faylini olib SQLite bazaga 100% tiklash"""
     import os
-    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL")
+    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
     if not mongo_uri:
         return False
     try:
