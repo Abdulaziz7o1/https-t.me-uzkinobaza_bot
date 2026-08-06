@@ -349,7 +349,7 @@ async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool=Fal
     if is_edit and isinstance(event, CallbackQuery):
         await event.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
     elif isinstance(event, Message):
-        await event.answer(text, parse_mode='HTML', reply_markup=keyboard)
+        await event.answer(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
     elif isinstance(event, CallbackQuery):
         await event.message.answer(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
 
@@ -1185,7 +1185,7 @@ async def render_top_movies(event: Message, page: int=1, is_callback: bool=False
         if is_callback:
             await event.edit_text(with_footer(txt), parse_mode='HTML')
         else:
-            await event.answer(txt, parse_mode='HTML')
+            await event.answer(with_footer(txt), parse_mode='HTML')
         return
     per_page = 10
     total_pages = (len(top_movies) + per_page - 1) // per_page
@@ -1211,7 +1211,7 @@ async def render_top_movies(event: Message, page: int=1, is_callback: bool=False
     if is_callback:
         await event.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=combined_builder.as_markup())
     else:
-        await event.answer(txt, parse_mode='HTML', reply_markup=combined_builder.as_markup())
+        await event.answer(with_footer(txt), parse_mode='HTML', reply_markup=combined_builder.as_markup())
 
 @router.message(F.text.regexp("(?i).*(tug'ilgan kun).*"))
 async def user_birthday_start(message: Message, state: FSMContext):
