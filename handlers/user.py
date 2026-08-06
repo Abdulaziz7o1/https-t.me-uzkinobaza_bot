@@ -502,25 +502,32 @@ async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool = F
 
     p_1w, p_1m, p_3m, p_6m, p_1y = calc(p_1w_b), calc(p_1m_b), calc(p_3m_b), calc(p_6m_b), calc(p_1y_b)
 
+    def fmt(n):
+        ming = n // 1000
+        qoldi = n % 1000
+        if qoldi:
+            return f"{ming} ming {qoldi} so'm"
+        return f"{ming} ming so'm"
+
     txt_plans = (
-        f"1️⃣ <b>1 haftalik (7 kun):</b> {p_1w:,} UZS\n"
-        f"2️⃣ <b>1 oylik (30 kun):</b> {p_1m:,} UZS\n"
-        f"3️⃣ <b>3 oylik (90 kun):</b> {p_3m:,} UZS\n"
-        f"4️⃣ <b>6 oylik (180 kun):</b> {p_6m:,} UZS\n"
-        f"5️⃣ <b>1 yillik (365 kun):</b> {p_1y:,} UZS"
+        f"1️⃣ <b>1 haftalik (7 kun):</b> {fmt(p_1w)}\n"
+        f"2️⃣ <b>1 oylik (30 kun):</b> {fmt(p_1m)}\n"
+        f"3️⃣ <b>3 oylik (90 kun):</b> {fmt(p_3m)}\n"
+        f"4️⃣ <b>6 oylik (180 kun):</b> {fmt(p_6m)}\n"
+        f"5️⃣ <b>1 yillik (365 kun):</b> {fmt(p_1y)}"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {p_1w:,} UZS", callback_data="premium_1w"),
-            InlineKeyboardButton(text=f"2️⃣ 1 oylik - {p_1m:,} UZS", callback_data="premium_monthly")
+            InlineKeyboardButton(text=f"1️⃣ 1 haftalik - {fmt(p_1w)}", callback_data="premium_1w"),
+            InlineKeyboardButton(text=f"2️⃣ 1 oylik - {fmt(p_1m)}", callback_data="premium_monthly")
         ],
         [
-            InlineKeyboardButton(text=f"3️⃣ 3 oylik - {p_3m:,} UZS", callback_data="premium_quarterly"),
-            InlineKeyboardButton(text=f"4️⃣ 6 oylik - {p_6m:,} UZS", callback_data="premium_6m")
+            InlineKeyboardButton(text=f"3️⃣ 3 oylik - {fmt(p_3m)}", callback_data="premium_quarterly"),
+            InlineKeyboardButton(text=f"4️⃣ 6 oylik - {fmt(p_6m)}", callback_data="premium_6m")
         ],
         [
-            InlineKeyboardButton(text=f"5️⃣ 1 yillik - {p_1y:,} UZS", callback_data="premium_1y")
+            InlineKeyboardButton(text=f"5️⃣ 1 yillik - {fmt(p_1y)}", callback_data="premium_1y")
         ],
         [
             InlineKeyboardButton(text="🏷️ Promo kod kiritish", callback_data="user_enter_promo"),
@@ -614,15 +621,18 @@ async def user_promo_cmd(message: Message, state: FSMContext):
                 p_3m = int(p_3m_base * (100 - disc_pct) / 100)
                 p_6m = int(p_6m_base * (100 - disc_pct) / 100)
                 p_1y = int(p_1y_base * (100 - disc_pct) / 100)
+                def _fmt(n):
+                    m = n // 1000; r = n % 1000
+                    return f"{m} ming {r} so'm" if r else f"{m} ming so'm"
                 msg = (
                     f"✅ <b>PROMO KOD MUVAFFAQIYATLI ISHLATILDI!</b> 🎉\n\n"
                     f"🏷️ <b>Sizga {disc_pct}% SKIDKA taqdim etildi!</b>\n\n"
                     f"💰 <b>SKIDKADAGI YANGI NARXLARINGIZ:</b>\n"
-                    f"1️⃣ <b>1 haftalik:</b> <s>{p_1w_base:,} UZS</s> ➔ <b>{p_1w:,} UZS</b>\n"
-                    f"2️⃣ <b>1 oylik:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>{p_1m:,} UZS</b>\n"
-                    f"3️⃣ <b>3 oylik:</b> <s>{p_3m_base:,} UZS</s> ➔ <b>{p_3m:,} UZS</b>\n"
-                    f"4️⃣ <b>6 oylik:</b> <s>{p_6m_base:,} UZS</s> ➔ <b>{p_6m:,} UZS</b>\n"
-                    f"5️⃣ <b>1 yillik:</b> <s>{p_1y_base:,} UZS</s> ➔ <b>{p_1y:,} UZS</b>\n\n"
+                    f"1️⃣ <b>1 haftalik:</b> <s>{_fmt(p_1w_base)}</s> ➔ <b>{_fmt(p_1w)}</b>\n"
+                    f"2️⃣ <b>1 oylik:</b> <s>{_fmt(p_1m_base)}</s> ➔ <b>{_fmt(p_1m)}</b>\n"
+                    f"3️⃣ <b>3 oylik:</b> <s>{_fmt(p_3m_base)}</s> ➔ <b>{_fmt(p_3m)}</b>\n"
+                    f"4️⃣ <b>6 oylik:</b> <s>{_fmt(p_6m_base)}</s> ➔ <b>{_fmt(p_6m)}</b>\n"
+                    f"5️⃣ <b>1 yillik:</b> <s>{_fmt(p_1y_base)}</s> ➔ <b>{_fmt(p_1y)}</b>\n\n"
                     f"👉 To'lovni amalga oshirish va obunani faollashtirish uchun /premium buyrug'ini yuboring!"
                 )
             else:
@@ -707,15 +717,19 @@ async def user_promo_input_exec(message: Message, state: FSMContext):
             p_6m = int(p_6m_base * (100 - disc_pct) / 100)
             p_1y = int(p_1y_base * (100 - disc_pct) / 100)
             
+            def _fmt(n):
+                m = n // 1000; r = n % 1000
+                return f"{m} ming {r} so'm" if r else f"{m} ming so'm"
+            
             detail_msg = (
                 f"✅ <b>PROMO KOD QABUL QILINDI!</b> 🎉\n\n"
                 f"🏷️ <b>Sizga to'lov uchun {disc_pct}% SKIDKA taqdim etildi!</b>\n\n"
                 f"💰 <b>SKIDKADAGI YANGI NARXLARINGIZ:</b>\n"
-                f"1️⃣ <b>1 haftalik:</b> <s>{p_1w_base:,} UZS</s> ➔ <b>{p_1w:,} UZS</b>\n"
-                f"2️⃣ <b>1 oylik:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>{p_1m:,} UZS</b>\n"
-                f"3️⃣ <b>3 oylik:</b> <s>{p_3m_base:,} UZS</s> ➔ <b>{p_3m:,} UZS</b>\n"
-                f"4️⃣ <b>6 oylik:</b> <s>{p_6m_base:,} UZS</s> ➔ <b>{p_6m:,} UZS</b>\n"
-                f"5️⃣ <b>1 yillik:</b> <s>{p_1y_base:,} UZS</s> ➔ <b>{p_1y:,} UZS</b>\n\n"
+                f"1️⃣ <b>1 haftalik:</b> <s>{_fmt(p_1w_base)}</s> ➔ <b>{_fmt(p_1w)}</b>\n"
+                f"2️⃣ <b>1 oylik:</b> <s>{_fmt(p_1m_base)}</s> ➔ <b>{_fmt(p_1m)}</b>\n"
+                f"3️⃣ <b>3 oylik:</b> <s>{_fmt(p_3m_base)}</s> ➔ <b>{_fmt(p_3m)}</b>\n"
+                f"4️⃣ <b>6 oylik:</b> <s>{_fmt(p_6m_base)}</s> ➔ <b>{_fmt(p_6m)}</b>\n"
+                f"5️⃣ <b>1 yillik:</b> <s>{_fmt(p_1y_base)}</s> ➔ <b>{_fmt(p_1y)}</b>\n\n"
                 f"📌 <i>Istalgan vaqtda qayta ko'rish uchun /premium buyrug'idan foydalanishingiz mumkin!</i>\n\n"
                 f"👇 To'lov qilish uchun quyidagi obuna planlaridan birini tanlang:"
             )
