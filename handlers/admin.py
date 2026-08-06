@@ -354,13 +354,35 @@ async def admin_direct_video_handler(message: Message, state: FSMContext):
     if not await db_req.has_permission(message.from_user.id, "add_movie"):
         return
     file_id = message.video.file_id if message.video else message.document.file_id
-    caption = message.caption or ""
-    await state.update_data(direct_file_id=file_id, direct_caption=caption)
+    raw_caption = message.caption or ""
+    
+    import re
+    code_match = re.match(r"^(\d+)\s*[-:]?\s*(.*)$", raw_caption.strip(), re.DOTALL)
+    
+    if code_match:
+        target_id = int(code_match.group(1))
+        clean_cap = code_match.group(2).strip()
+        exists = await db_req.movie_exists_db(target_id)
+        if not exists:
+            formatted_caption = db_req.clean_and_format_caption(clean_cap)
+            await db_req.add_movie_with_id(target_id, file_id, formatted_caption)
+            await message.answer(
+                f"✅ <b>Kino muvaffaqiyatli qo'shildi!</b>\n\n"
+                f"🎬 <b>Kino kodi:</b> <code>{target_id}</code>\n"
+                f"📝 <b>Tavsif:</b> <i>{clean_cap[:40] if clean_cap else '(Nomsiz)'}</i>",
+                parse_mode="HTML"
+            )
+            await sync_movies_backup_storage(message.bot)
+            return
+
+    await state.update_data(direct_file_id=file_id, direct_caption=raw_caption)
     await state.set_state(AdminStates.waiting_for_movie_id_for_video)
+    
+    next_free = await db_req.get_next_available_movie_id()
     await message.answer(
         "🎬 <b>Kino video fayli qabul qilindi!</b>\n\n"
         "🔢 <b>Ushbu kino uchun kod (raqam) kiriting:</b>\n"
-        "<i>Eslatma: Kod faqat sonlardan iborat bo'lishi va bazada takrorlanmasligi kerak.</i>",
+        f"💡 <i>Tavsiya etiladigan bo'sh kod: <code>{next_free}</code></i>",
         parse_mode="HTML"
     )
 
@@ -378,26 +400,35 @@ async def admin_save_direct_video_code(message: Message, state: FSMContext):
     movie_id = int(text)
     exists = await db_req.movie_exists_db(movie_id)
     if exists:
-        await message.answer(f"❌ <b>{movie_id}</b> kodli kino allaqachon mavjud!\nIltimos, boshqa kod kiriting:")
+        next_free = await db_req.get_next_available_movie_id()
+        await message.answer(
+            f"⚠️ <b>{movie_id}</b> kodli kino allaqachon mavjud!\n\n"
+            f"💡 Bo'sh bo'lgan navbatdagi kod: <code>{next_free}</code>\n"
+            f"Iltimos, boshqa kod kiriting:",
+            parse_mode="HTML"
+        )
         return
 
     data = await state.get_data()
     file_id = data.get("direct_file_id")
-    caption = data.get("direct_caption", "")
+    raw_caption = data.get("direct_caption", "")
 
     if not file_id:
         await message.answer("⚠️ Video fayli topilmadi. Qaytadan video yuboring.")
         await state.clear()
         return
 
-    await db_req.add_movie_with_id(movie_id, file_id, caption)
+    formatted_caption = db_req.clean_and_format_caption(raw_caption)
+    await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
     await state.clear()
+    
     await message.answer(
         f"✅ <b>Kino muvaffaqiyatli qo'shildi!</b>\n\n"
-        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>",
+        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+        f"📝 <b>Tavsif:</b> <i>{raw_caption[:40] if raw_caption else '(Nomsiz)'}</i>",
         parse_mode="HTML"
     )
-    await auto_post_movie_to_channel(message.bot, movie_id, file_id, caption)
+    await sync_movies_backup_storage(message.bot)
 
 MENU_BUTTONS = [
     "Kino qo'shish ➕", "Kino o'chirish ❌", "Statistika 📊",
