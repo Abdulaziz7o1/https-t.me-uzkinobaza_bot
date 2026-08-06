@@ -41,14 +41,20 @@ class CheckSubMiddleware(BaseMiddleware):
         await add_user(user_id, username, full_name)
         
         # Faollik vaqtini yangilash
-        from database.requests import update_user_activity
+        from database.requests import update_user_activity, get_all_admins, is_user_premium
         await update_user_activity(user_id)
         
-        # Adminlar va Moderatorlar uchun har qanday obuna tekshiruvini 100% aylanib o'tamiz
+        # Adminlar va Moderatorlar tekshiruvi
         user_id_int = int(user_id)
         admin_ids = [int(a) for a in config.ADMINS]
         db_admins = [int(a) for a in await get_all_admins()]
-        if user_id_int in admin_ids or user_id_int in db_admins:
+        is_admin_user = (user_id_int in admin_ids or user_id_int in db_admins)
+        
+        state_obj = data.get("state")
+        curr_state = await state_obj.get_state() if state_obj else None
+        
+        # Adminlar va Moderatorlar har qanday obuna tekshiruvidan 100% ozod qilinadi
+        if is_admin_user:
             return await handler(event, data)
 
         # 1.5. Bot Yangilanmoqda (Maintenance Mode) tekshiruvi
