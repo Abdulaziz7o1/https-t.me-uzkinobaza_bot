@@ -44,18 +44,11 @@ class CheckSubMiddleware(BaseMiddleware):
         from database.requests import update_user_activity
         await update_user_activity(user_id)
         
-        # Adminlar uchun faqat admin paneli buyruqlarida aylanib o'tiladi
-        is_admin_user = (user_id in config.ADMINS)
-        from database.requests import get_all_admins, is_user_premium
-        db_admins = await get_all_admins()
-        if user_id in db_admins:
-            is_admin_user = True
-            
-        state_obj = data.get("state")
-        curr_state = await state_obj.get_state() if state_obj else None
-        if is_admin_user and curr_state and "AdminStates" in str(curr_state):
-            return await handler(event, data)
-        if is_admin_user and event.text and any(cmd in event.text for cmd in ["Kino qo'shish", "Kino o'chirish", "Statistika", "Reklama", "/admin", "/backup", "/promo", "Baza zaxirasi"]):
+        # Adminlar va Moderatorlar uchun har qanday obuna tekshiruvini 100% aylanib o'tamiz
+        user_id_int = int(user_id)
+        admin_ids = [int(a) for a in config.ADMINS]
+        db_admins = [int(a) for a in await get_all_admins()]
+        if user_id_int in admin_ids or user_id_int in db_admins:
             return await handler(event, data)
 
         # 1.5. Bot Yangilanmoqda (Maintenance Mode) tekshiruvi
