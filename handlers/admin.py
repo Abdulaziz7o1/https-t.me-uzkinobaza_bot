@@ -348,7 +348,6 @@ async def add_movie_video(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
 
-# --- DIRECT VIDEO SENDING BY ADMIN (VIDEO FIRST -> CODE SECOND) ---
 @router.message(StateFilter(None), F.video | F.document | F.animation)
 async def admin_direct_video_handler(message: Message, state: FSMContext):
     if not await db_req.has_permission(message.from_user.id, "add_movie"):
@@ -375,15 +374,29 @@ async def admin_direct_video_handler(message: Message, state: FSMContext):
         
     formatted_caption = db_req.clean_and_format_caption(clean_cap)
     await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
-    
-    cap_display = clean_cap[:40] if clean_cap else "(Nomsiz kino)"
-    await message.answer(
-        f"✅ <b>Kino muvaffaqiyatli qo'shildi!</b>\n\n"
-        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
-        f"📝 <b>Tavsif:</b> <i>{cap_display}</i>",
-        parse_mode="HTML"
-    )
     await sync_movies_backup_storage(message.bot)
+    
+    total_movies = await db_req.get_total_movies_count()
+    next_free = await db_req.get_next_available_movie_id()
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f"get_movie_{movie_id}"),
+            InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"edit_movie_start_{movie_id}")
+        ]
+    ])
+    
+    cap_display = clean_cap[:50] if clean_cap else "(Nomsiz video fayl)"
+    await message.answer(
+        f"✅ <b>KINO MUVAFFAQIYATLI SAQLANDI!</b>\n\n"
+        f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
+        f"📝 <b>Tavsif:</b> <i>{cap_display}</i>\n"
+        f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
+        f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
+        f"<i>Kino avtomatik SQLite hamda MongoDB Atlas Cloud bazasiga saqlandi!</i>",
+        parse_mode="HTML",
+        reply_markup=kb
+    )
 
 @router.message(AdminStates.waiting_for_movie_id_for_video, F.text)
 async def admin_save_direct_video_code(message: Message, state: FSMContext):
@@ -420,14 +433,27 @@ async def admin_save_direct_video_code(message: Message, state: FSMContext):
     formatted_caption = db_req.clean_and_format_caption(raw_caption)
     await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
     await state.clear()
+    await sync_movies_backup_storage(message.bot)
+    
+    total_movies = await db_req.get_total_movies_count()
+    next_free = await db_req.get_next_available_movie_id()
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f"get_movie_{movie_id}"),
+            InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"edit_movie_start_{movie_id}")
+        ]
+    ])
     
     await message.answer(
-        f"✅ <b>Kino muvaffaqiyatli qo'shildi!</b>\n\n"
-        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
-        f"📝 <b>Tavsif:</b> <i>{raw_caption[:40] if raw_caption else '(Nomsiz)'}</i>",
-        parse_mode="HTML"
+        f"✅ <b>KINO MUVAFFAQIYATLI SAQLANDI!</b>\n\n"
+        f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
+        f"📝 <b>Tavsif:</b> <i>{raw_caption[:50] if raw_caption else '(Nomsiz)'}</i>\n"
+        f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
+        f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>",
+        parse_mode="HTML",
+        reply_markup=kb
     )
-    await sync_movies_backup_storage(message.bot)
 
 MENU_BUTTONS = [
     "Kino qo'shish ➕", "Kino o'chirish ❌", "Statistika 📊",
@@ -2335,13 +2361,9 @@ async def bulk_upload_finish_callback(callback: CallbackQuery, state: FSMContext
     await callback.message.edit_text("✅ <b>Ommaviy yuklash yakunlandi!</b>", parse_mode="HTML")
     await callback.answer("Ommaviy yuklash yakunlandi ✅")
 
-@router.message(AdminStates.waiting_for_bulk_movies, F.video | F.document)
+@router.message(AdminStates.waiting_for_bulk_movies, F.video | F.document | F.animation)
 async def bulk_upload_process(message: Message, state: FSMContext):
-    if message.video:
-        file_id = message.video.file_id
-    else:
-        file_id = message.document.file_id
-        
+    file_id = message.video.file_id if message.video else (message.document.file_id if message.document else message.animation.file_id)
     raw_caption = (message.caption or "").strip()
     
     import re
@@ -2365,16 +2387,27 @@ async def bulk_upload_process(message: Message, state: FSMContext):
     await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
     await sync_movies_backup_storage(message.bot)
     
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Yakunlash ✅ (Done)", callback_data="bulk_upload_finish")
-    ]])
+    total_movies = await db_req.get_total_movies_count()
+    next_free = await db_req.get_next_available_movie_id()
     
-    cap_display = movie_caption[:40] if movie_caption else "(Nomsiz kino)"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f"get_movie_{movie_id}"),
+            InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"edit_movie_start_{movie_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🏁 Yakunlash ✅ (Done)", callback_data="bulk_upload_finish")
+        ]
+    ])
+    
+    cap_display = movie_caption[:50] if movie_caption else "(Nomsiz video fayl)"
     await message.answer(
-        f"✅ <b>Kino ommaviy yuklandi!</b>\n\n"
-        f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
-        f"📝 <b>Tavsif:</b> <i>{cap_display}</i>\n\n"
-        f"<i>Yana yuborishingiz yoki tugatgach «Yakunlash ✅» tugmasini bosishingiz mumkin.</i>",
+        f"✅ <b>KINO OMMAVIY MUVAFFAQIYATLI YUKLANDI!</b>\n\n"
+        f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
+        f"📝 <b>Tavsif:</b> <i>{cap_display}</i>\n"
+        f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
+        f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
+        f"<i>Yana 1 ta yoki bir nechta videolarni yuborishingiz mumkin. Yakunlash uchun «Yakunlash ✅» tugmasini bosing.</i>",
         parse_mode="HTML",
         reply_markup=kb
     )
