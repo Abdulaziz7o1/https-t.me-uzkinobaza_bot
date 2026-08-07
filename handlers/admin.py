@@ -77,26 +77,33 @@ class AdminStates(StatesGroup):
     waiting_for_prem_price_6m = State()
     waiting_for_prem_price_1y = State()
     waiting_for_kassa_add_amount = State()
+    waiting_for_backup_channel = State()
 
 async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: str):
-    """User so'roviga binoan yangi kino joylanganda Telegram homiy kanallarga avto-post yuborish o'chirildi"""
-    return
-    target_channel = None
-    if config.CHANNELS:
-        target_channel = config.CHANNELS[0]
-    else:
-        db_ch = await db_req.get_sponsor_channels()
-        if db_ch:
-            target_channel = db_ch[0][1]
-    if target_channel:
-        try:
-            await bot.send_video(chat_id=target_channel, video=file_id, caption=with_footer(f"🎬 <b>Yangi kino qo'shildi!</b>\n\n🎬 {caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n\n🤖 {config.BOT_USERNAME}"), parse_mode='HTML')
-        except Exception as e:
-            print(f'Kanalga auto-postda xato: {e}')
+    """Yangi kino joylanganda Zaxira (Backup) kanaliga video hamda kassa/baza ma'lumotlarini avtomatik yuborish"""
+    try:
+        backup_channel = await db_req.get_backup_channel_id()
+        if backup_channel:
+            cap = (
+                f"🎬 <b>KINO ZAXIRA BAZASI</b>\n\n"
+                f"📌 <b>Nomi / Tavsifi:</b> <i>{caption or '(Nomsiz kino)'}</i>\n"
+                f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+                f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n\n"
+                f"🤖 {config.BOT_USERNAME}\n"
+                f"📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
+            )
+            await bot.send_video(
+                chat_id=backup_channel,
+                video=file_id,
+                caption=cap,
+                parse_mode="HTML"
+            )
+    except Exception as e:
+        print(f"Zaxira kanalga video yuborishda xato: {e}")
     await sync_movies_backup_storage(bot)
 
 async def sync_movies_backup_storage(bot):
-    """Har safar kino qo'shilganda yoki o'chirilganda Bosh Admin chatiga #MOVIES_BACKUP zaxira faylini yuboradi (100% tiklash uchun)"""
+    """Har safar kino qo'shilganda yoki o'chirilganda Bosh Admin chatiga va Zaxira Kanaliga #MOVIES_BACKUP zaxira faylini yuboradi"""
     try:
         json_data = await db_req.export_movies_backup_json()
         backup_file_path = 'movies_backup.json'
@@ -110,6 +117,16 @@ async def sync_movies_backup_storage(bot):
                     await db_req.save_telegram_backup_file_id(sent_msg.document.file_id)
             except Exception:
                 pass
+
+        backup_channel = await db_req.get_backup_channel_id()
+        if backup_channel:
+            try:
+                b_file = FSInputFile(backup_file_path)
+                sent_msg = await bot.send_document(chat_id=backup_channel, document=b_file, caption='💾 #MOVIES_BACKUP — Rasmiy Zaxira Kanali uchun avtomatik zaxira fayli.')
+                if sent_msg and sent_msg.document:
+                    await db_req.save_telegram_backup_file_id(sent_msg.document.file_id)
+            except Exception as err:
+                print(f"Zaxira kanalga zaxira fayli yuborishda xato: {err}")
     except Exception as e:
         print(f'Backup sync error: {e}')
 
@@ -2943,11 +2960,77 @@ async def process_prem_price_1y_input(message: Message, state: FSMContext):
     await state.clear()
     await db_req.set_premium_price_1y(new_price)
     await message.answer(with_footer(f"✅ <b>1 yillik Premium narxi muvaffaqiyatli o'zgartirildi!</b>\n\n💵 <b>Yangi narx:</b> <code>{new_price:,} UZS</code>"), parse_mode='HTML')
-    text = message.text.strip().replace(' ', '').replace(',', '')
-    if not text.isdigit() or int(text) <= 0:
-        await message.answer(with_footer('⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 50000):'))
+
+
+# ─── ZAXIRA KANALI SOZLAMALARI (BACKUP CHANNEL) ──────────────────────────────
+@router.message(Command("setbackupchannel"), Command("zaxirakanal"))
+async def start_set_backup_channel(message: Message, state: FSMContext):
+    if message.from_user.id not in config.ADMINS:
+        await message.answer(with_footer("❌ Bu amal faqat Bosh Adminlar uchun ruxsat etilgan."))
         return
-    new_price = int(text)
-    await state.clear()
-    await db_req.set_premium_price_3m(new_price)
-    await message.answer(with_footer(f"✅ <b>3 oylik Premium narxi muvaffaqiyatli o'zgartirildi!</b>\n\n💵 <b>Yangi narx:</b> <code>{new_price:,} UZS</code>"), parse_mode='HTML')
+    await state.set_state(AdminStates.waiting_for_backup_channel)
+    current_ch = await db_req.get_backup_channel_id()
+    disp_ch = current_ch if current_ch else "Hali sozlanmagan ⚠️"
+    await message.answer(
+        with_footer(
+            f"📢 <b>ZAXIRA (BACKUP) KANALI SOZLAMASI</b>\n\n"
+            f"📌 <b>Hozirgi zaxira kanali ID:</b> <code>{disp_ch}</code>\n\n"
+            f"⚙️ <b>Yangi zaxira kanalini biriktirish uchun:</b>\n"
+            f"1. Botni zaxira kanalingizga <b>ADMINISTRATOR</b> qilib qo'shing.\n"
+            f"2. Kanalingizdan istalgan bitta xabarni ushbu botga <b>FORWARD (uzating)</b> yoki kanal ID sini (masalan: <code>-1002237000000</code>) yuboring!"
+        ),
+        parse_mode="HTML"
+    )
+
+@router.message(AdminStates.waiting_for_backup_channel)
+async def process_backup_channel_input(message: Message, state: FSMContext):
+    if message.text in MENU_BUTTONS:
+        await state.clear()
+        return
+        
+    channel_id = None
+    channel_title = "Zaxira kanali"
+    
+    if message.forward_from_chat:
+        channel_id = str(message.forward_from_chat.id)
+        if message.forward_from_chat.title:
+            channel_title = message.forward_from_chat.title
+    elif message.text:
+        txt = message.text.strip()
+        if txt.startswith("-100") or txt.lstrip("-").isdigit() or txt.startswith("@"):
+            channel_id = txt
+
+    if not channel_id:
+        await message.answer(
+            with_footer("⚠️ <b>Kanal aniqlanmadi!</b>\n\nIltimos, zaxira kanalingizdan istalgan xabarni botga FORWARD (uzating) qiling yoki <code>-100...</code> ID sini yuboring:"),
+            parse_mode="HTML"
+        )
+        return
+
+    try:
+        test_msg = await message.bot.send_message(
+            chat_id=channel_id,
+            text=f"⚙️ <b>ZAXIRA KANALI TASDIQLANDI!</b>\n\nUshbu kanal `@uzkinobaza_bot` ning rasmiy Zaxira Bazasi sifatida biriktirildi. 🍿",
+            parse_mode="HTML"
+        )
+        await db_req.set_backup_channel_id(channel_id)
+        await state.clear()
+        await message.answer(
+            with_footer(
+                f"✅ <b>ZAXIRA KANALI MUVAFFAQIYATLI BIRIKTIRILDI!</b> 🚀\n\n"
+                f"📢 <b>Kanal:</b> {channel_title}\n"
+                f"🆔 <b>Kanal ID:</b> <code>{channel_id}</code>\n\n"
+                f"<i>Endi barcha yangi qo'shiladigan kinolar va avtomatik zaxira fayllari ushbu kanalga 100% yetkazib boriladi!</i>"
+            ),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(
+            with_footer(
+                f"❌ <b>Kanalga ulana olmadik!</b>\n\n"
+                f"<b>Sababi:</b> Bot ushbu kanalga xabar yubora olmadi.\n"
+                f"<b>Xato:</b> <code>{e}</code>\n\n"
+                f"💡 <i>Iltimos, botni ushbu kanalga ADMIN (Administrator) qilib qo'shganingizga ishonch hosil qiling va qayta harakat qiling!</i>"
+            ),
+            parse_mode="HTML"
+        )

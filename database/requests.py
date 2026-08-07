@@ -3223,14 +3223,34 @@ async def add_movie_report(movie_id: int, user_id: int) -> bool:
         return True
 
 
+# ─── ZAXIRA KANALI SOZLAMALARI (BACKUP CHANNEL) ──────────────────────────────
+async def get_backup_channel_id() -> str:
+    """Zaxira kanali ID sini olish"""
+    env_id = os.getenv("BACKUP_CHANNEL_ID")
+    if env_id:
+        return env_id
+    async with get_db() as db:
+        async with db.execute("SELECT value FROM bot_settings WHERE key = 'backup_channel_id'") as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row and row[0] else None
 
-
-
-
-
-
-
-
-
-
-
+async def set_backup_channel_id(channel_id: str) -> bool:
+    """Zaxira kanali ID sini saqlash"""
+    async with get_db() as db:
+        await db.execute(
+            "INSERT INTO bot_settings (key, value) VALUES ('backup_channel_id', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            (str(channel_id), str(channel_id))
+        )
+        await db.commit()
+    
+    # MongoDB-ga ham muhrlaymiz
+    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
+    if mongo_uri:
+        try:
+            from motor.motor_asyncio import AsyncIOMotorClient
+            client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=5000, tls=True, tlsAllowInvalidCertificates=True)
+            db_m = client["kino_bot_database"]
+            await db_m["backup_info"].replace_one({"_id": "backup_channel_setting"}, {"_id": "backup_channel_setting", "channel_id": str(channel_id)}, upsert=True)
+        except Exception:
+            pass
+    return True
