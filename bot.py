@@ -400,6 +400,44 @@ async def periodic_mongodb_sync(bot: Bot):
         except Exception as e:
             logging.error(f"Periodic MongoDB sync xatosi: {e}")
 
+async def restore_from_telegram_cloud(bot: Bot) -> bool:
+    """Telegram Cloud Serverlaridan file_id orqali master/movies zaxira faylini yuklab olib 100% tiklash"""
+    try:
+        import os
+        import database.requests as db_req
+        file_id = None
+        mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or db_req.DEFAULT_MONGO_URI
+        if mongo_uri:
+            try:
+                from motor.motor_asyncio import AsyncIOMotorClient
+                client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=5000, tls=True, tlsAllowInvalidCertificates=True)
+                db_m = client["kino_bot_database"]
+                doc = await db_m["backup_info"].find_one({"_id": "telegram_backup"})
+                if doc and "file_id" in doc:
+                    file_id = doc["file_id"]
+            except Exception:
+                pass
+        
+        if not file_id:
+            async with db_req.get_db() as db:
+                async with db.execute("SELECT value FROM bot_settings WHERE key = 'latest_backup_file_id'") as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        file_id = row[0]
+                        
+        if file_id:
+            tg_file = await bot.get_file(file_id)
+            downloaded = await bot.download_file(tg_file.file_path)
+            content = downloaded.read().decode('utf-8')
+            if content.strip():
+                res = await db_req.import_master_backup_json(content)
+                cnt = await db_req.get_total_movies_count()
+                logging.info(f"Telegram Cloud Serveridan {cnt} ta kino va barcha ma'lumotlar 100% tiklandi! ☁️🚀: {res}")
+                return True
+    except Exception as e:
+        logging.warning(f"Telegram Cloud restore error: {e}")
+    return False
+
 async def on_startup(bot: Bot):
     """Bot ishga tushganda bajariladigan amallar"""
     logging.info("Bot ishga tushmoqda...")
@@ -419,12 +457,15 @@ async def on_startup(bot: Bot):
     asyncio.create_task(biyearly_global_unban_scheduler(bot))
     asyncio.create_task(daily_kassa_report_scheduler(bot))
     
-    # MongoDB bulutdan barcha kinolarni tiklash (restart da)
+    # MongoDB hamda Telegram Cloud Bulutidan barcha kinolarni 100% tiklash (restart da)
     try:
         restored = await db_req.restore_from_mongodb_cloud()
+        if not restored:
+            restored = await restore_from_telegram_cloud(bot)
+            
         if restored:
             cnt = await db_req.get_total_movies_count()
-            logging.info(f"MongoDB Cloud'dan {cnt} ta kino tiklandi! ☁️✅")
+            logging.info(f"Bulutli zaxiradan {cnt} ta kino va barcha jadvallar 100% tiklandi! ☁️✅")
         else:
             await db_req.restore_master_backup_on_startup()
     except Exception as e:

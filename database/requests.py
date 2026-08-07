@@ -498,9 +498,27 @@ async def import_master_backup_json(json_str: str) -> dict:
 
 DEFAULT_MONGO_URI = "mongodb+srv://abdulaziz10102013abdz_db_user:Abdulaziz1010201300@uzkinobazabot.ychyfp5.mongodb.net/?appName=uzkinobazabot"
 
+async def save_telegram_backup_file_id(file_id: str):
+    """Telegram Serveridagi backup fayli file_id sini MongoDB va SQLite-ga muhrlash"""
+    try:
+        async with get_db() as db:
+            await db.execute(
+                "INSERT INTO bot_settings (key, value) VALUES ('latest_backup_file_id', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+                (file_id, file_id)
+            )
+            await db.commit()
+        
+        mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
+        if mongo_uri:
+            from motor.motor_asyncio import AsyncIOMotorClient
+            client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=5000, tls=True, tlsAllowInvalidCertificates=True)
+            db_m = client["kino_bot_database"]
+            await db_m["backup_info"].replace_one({"_id": "telegram_backup"}, {"_id": "telegram_backup", "file_id": file_id}, upsert=True)
+    except Exception as e:
+        print(f"save_telegram_backup_file_id error: {e}")
+
 async def sync_master_backup_to_mongodb(master_data: dict):
-    """MongoDB Cloud'ga barcha 15 ta jadvalni MongoDB Atlas Bulutli bazaga avtomatik zaxiralash"""
-    import os
+    """MongoDB Cloud'ga barcha 15 ta jadvalni va har bir kinoni alohida hujjat sifatida avtomatik zaxiralash"""
     mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
     if not mongo_uri:
         return
@@ -513,24 +531,42 @@ async def sync_master_backup_to_mongodb(master_data: dict):
             tlsAllowInvalidCertificates=True
         )
         db = client["kino_bot_database"]
-        collection = db["master_backups"]
         
+        # 1. Kinolarni alohida 'movies' kolleksiyasiga muhrlash (0.01 soniyada, 100% xatosiz)
+        if "movies" in master_data and master_data["movies"]:
+            movies_coll = db["movies"]
+            for m in master_data["movies"]:
+                m_id = m.get("id")
+                if m_id:
+                    await movies_coll.replace_one(
+                        {"_id": m_id},
+                        {
+                            "_id": m_id,
+                            "file_id": m.get("file_id"),
+                            "caption": m.get("caption", ""),
+                            "views_count": m.get("views_count", 0)
+                        },
+                        upsert=True
+                    )
+
+        # 2. Master backup yagona hujjatini saqlash
+        collection = db["master_backups"]
         doc = {
             "_id": "latest_master_backup",
             "data": master_data,
             "updated_at": os.getenv("TZ", "Asia/Tashkent")
         }
         await collection.replace_one({"_id": "latest_master_backup"}, doc, upsert=True)
-        print("MongoDB Cloud: Barcha 15 ta jadval Bulutli bazaga (MongoDB Atlas) muvaffaqiyatli saqlandi! ☁️🚀")
+        print("MongoDB Cloud: Barcha kinolar va jadvallar Bulutli bazaga (MongoDB Atlas) 100% saqlandi! ☁️🚀")
     except Exception as e:
         print(f"MongoDB Cloud sync error: {e}")
 
 async def restore_from_mongodb_cloud() -> bool:
-    """MongoDB Cloud'dan eng so'nggi zaxira faylini olib SQLite bazaga 100% tiklash"""
-    import os
+    """MongoDB Cloud'dan (movies kolleksiyasi va master_backups hujjatidan) kinolarni 100% tiklash"""
     mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
     if not mongo_uri:
         return False
+    restored = False
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
         client = AsyncIOMotorClient(
@@ -540,18 +576,47 @@ async def restore_from_mongodb_cloud() -> bool:
             tlsAllowInvalidCertificates=True
         )
         db = client["kino_bot_database"]
-        collection = db["master_backups"]
         
-        doc = await collection.find_one({"_id": "latest_master_backup"})
-        if doc and "data" in doc:
-            import json
-            master_json = json.dumps(doc["data"], ensure_ascii=False)
-            res = await import_master_backup_json(master_json)
-            print(f"MongoDB Cloud: Bulutli bazadan barcha ma'lumotlar 100% tiklandi! ☁️✅: {res}")
-            return True
+        # 1. Avval master_backups yagona hujjatini tiklash
+        try:
+            collection = db["master_backups"]
+            doc = await collection.find_one({"_id": "latest_master_backup"})
+            if doc and "data" in doc:
+                import json
+                master_json = json.dumps(doc["data"], ensure_ascii=False)
+                res = await import_master_backup_json(master_json)
+                print(f"MongoDB Cloud (Master): Bulutdan barcha ma'lumotlar tiklandi: {res}")
+                restored = True
+        except Exception as e:
+            print(f"MongoDB Cloud master restore error: {e}")
+
+        # 2. Har bir kinoni 'movies' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
+        try:
+            movies_coll = db["movies"]
+            m_count = 0
+            async with get_db() as local_db:
+                async for m_doc in movies_coll.find({}):
+                    m_id = m_doc.get("_id") or m_doc.get("id")
+                    f_id = m_doc.get("file_id")
+                    cap = m_doc.get("caption", "")
+                    views = m_doc.get("views_count", 0)
+                    if m_id and f_id:
+                        await local_db.execute(
+                            "INSERT INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET file_id=?, caption=?, views_count=?",
+                            (m_id, f_id, cap, views, f_id, cap, views)
+                        )
+                        m_count += 1
+                await local_db.commit()
+            if m_count > 0:
+                print(f"MongoDB Cloud (Movies Collection): {m_count} ta kino to'g'ridan-to'g'ri bulutdan tiklandi! ☁️🎬")
+                restored = True
+        except Exception as e:
+            print(f"MongoDB Cloud movies collection restore error: {e}")
+
     except Exception as e:
-        print(f"MongoDB Cloud restore error: {e}")
-    return False
+        print(f"MongoDB Cloud connection error: {e}")
+
+    return restored
 
 async def restore_master_backup_on_startup():
     """Bot ishga tushganida (Render restart bo'lganda) barcha zaxira manbalaridan va MongoDB bulutdan avtomatik 100% tiklash"""

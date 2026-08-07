@@ -105,7 +105,9 @@ async def sync_movies_backup_storage(bot):
         file = FSInputFile(backup_file_path)
         for admin_id in config.ADMINS:
             try:
-                await bot.send_document(chat_id=admin_id, document=file, caption='💾 #MOVIES_BACKUP — Barcha kinolarning avtomatik bulutli zaxira fayli.')
+                sent_msg = await bot.send_document(chat_id=admin_id, document=file, caption='💾 #MOVIES_BACKUP — Barcha kinolarning avtomatik bulutli zaxira fayli.')
+                if sent_msg and sent_msg.document:
+                    await db_req.save_telegram_backup_file_id(sent_msg.document.file_id)
             except Exception:
                 pass
     except Exception as e:
