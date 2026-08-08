@@ -324,8 +324,9 @@ async def process_and_save_movie_with_code(event_obj, state: FSMContext, movie_i
         await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
         await state.clear()
         bot_inst = event_obj.bot
-        # Zaxira kanaliga video va JSON backup yuborish (ASOSIY)
+        # ✅ KANALGA VIDEO VA BACKUP FAYL YUBORISH
         await auto_post_movie_to_channel(bot_inst, movie_id, file_id, formatted_caption)
+        await db_req.notify_requesting_users_for_movie(bot_inst, movie_id, formatted_caption)
         total_movies = await db_req.get_total_movies_count()
         next_free = await db_req.get_next_available_movie_id()
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]])

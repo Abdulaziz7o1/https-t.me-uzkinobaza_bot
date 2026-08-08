@@ -76,24 +76,17 @@ async def cmd_start(message: Message, state: FSMContext):
         if raw_id.isdigit():
             movie_id = int(raw_id)
             user_id = message.from_user.id
-            is_premium = await db_req.is_premium_user(user_id)
-            if not is_premium:
-                daily_count = await db_req.get_daily_movie_count(user_id)
-                bonus_limit = await db_req.get_daily_bonus_limit(user_id)
-                max_allowed = 3 + bonus_limit
-                if daily_count >= max_allowed:
-                    await message.answer(with_footer(f"⚠️ <b>Kunlik limit tugadi!</b>\n\nSiz bugun {max_allowed} ta kino ko'rishingiz mumkin edi.\nPremium obuna olish uchun /premium buyrug'ini yozing.{CONTACT_FOOTER}"), parse_mode='HTML')
-                    return
-            movie = await db_req.get_movie(movie_id)
+            movie = await db_req.get_movie(movie_id, user_id=user_id)
             if movie:
-                if not is_premium:
-                    await db_req.increment_daily_movie_count(user_id)
                 await db_req.add_to_watch_history(user_id, movie_id)
-                file_id, caption = movie
+                file_id, caption, *rest = movie
+                views_count = rest[0] if rest else 1
                 avg_rating, votes = await db_req.get_movie_rating(movie_id)
                 is_fav = await db_req.is_favorite(user_id, movie_id)
                 rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
                 cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿'
+                if views_count:
+                    cap += f'\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
                 if avg_rating > 0:
                     cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
                 cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1'
@@ -165,26 +158,8 @@ async def search_movie_by_code(message: Message):
     user_id = message.from_user.id
     movie_id = int(message.text.lstrip('/'))
     movie = await db_req.get_movie(movie_id, user_id=user_id)
-    is_premium = await db_req.is_premium_user(user_id)
-    is_admin_or_mod = user_id in config.ADMINS or user_id in await db_req.get_all_admins()
-    skip_wait = is_premium or is_admin_or_mod
-    if not skip_wait:
-        daily_count = await db_req.get_daily_movie_count(user_id)
-        bonus_limit = await db_req.get_daily_bonus_limit(user_id)
-        max_allowed = 3 + bonus_limit
-        if daily_count >= max_allowed:
-            await message.answer(with_footer(f"⚠️ <b>Kunlik limit tugadi!</b>\n\nSiz bugun {max_allowed} ta kino ko'rishingiz mumkin edi.\nPremium obuna olish uchun /premium buyrug'ini yozing.{CONTACT_FOOTER}"), parse_mode='HTML')
-            return
     if movie:
-        if not skip_wait:
-            await db_req.increment_daily_movie_count(user_id)
-            cd_msg = await message.answer(with_footer('🎬 <b>Kino yuklanmoqda... (3 soniya)</b> ⏳\n\n💎 <i>Kutishni istamaysizmi? /premium olib, kutish vaqtini <b>0 soniya</b> qiling!</i> 🚀'), parse_mode='HTML')
-            import asyncio
-            await asyncio.sleep(3)
-            try:
-                await cd_msg.delete()
-            except Exception:
-                pass
+        await db_req.add_to_watch_history(user_id, movie_id)
         file_id, caption, *rest = movie
         views_count = rest[0] if rest else 1
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
@@ -565,14 +540,6 @@ async def show_favorites(message: Message, state: FSMContext):
 async def random_movie(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
-    is_premium = await db_req.is_premium_user(user_id)
-    if not is_premium:
-        daily_count = await db_req.get_daily_movie_count(user_id)
-        bonus_limit = await db_req.get_daily_bonus_limit(user_id)
-        max_allowed = 3 + bonus_limit
-        if daily_count >= max_allowed:
-            await message.answer(with_footer(f"⚠️ <b>Kunlik limit tugadi!</b>\n\nSiz bugun {max_allowed} ta kino ko'rishingiz mumkin edi.\nPremium obuna olish uchun /premium buyrug'ini yozing.{CONTACT_FOOTER}"), parse_mode='HTML')
-            return
     from database.connection import get_db
     async with get_db() as db:
         async with db.execute('SELECT id FROM movies') as cursor:
@@ -583,8 +550,6 @@ async def random_movie(message: Message, state: FSMContext):
     random_id = random.choice(all_ids)[0]
     movie = await db_req.get_movie(random_id, user_id=user_id)
     if movie:
-        if not is_premium:
-            await db_req.increment_daily_movie_count(user_id)
         await db_req.add_to_watch_history(user_id, random_id)
         file_id, caption, *rest = movie
         views_count = rest[0] if rest else 1
@@ -1260,23 +1225,14 @@ async def user_birthday_save(message: Message, state: FSMContext):
 async def show_movie_callback(callback: CallbackQuery):
     movie_id = int(callback.data.split('_')[2])
     user_id = callback.from_user.id
-    is_premium = await db_req.is_premium_user(user_id)
-    if not is_premium:
-        daily_count = await db_req.get_daily_movie_count(user_id)
-        bonus_limit = await db_req.get_daily_bonus_limit(user_id)
-        max_allowed = 3 + bonus_limit
-        if daily_count >= max_allowed:
-            await callback.answer(f"⚠️ Kunlik limit tugadi! Bugun {max_allowed} ta kino ko'rishingiz mumkin edi.", show_alert=True)
-            return
-    movie = await db_req.get_movie(movie_id)
+    movie = await db_req.get_movie(movie_id, user_id=user_id)
     if movie:
-        if not is_premium:
-            await db_req.increment_daily_movie_count(user_id)
         await db_req.add_to_watch_history(user_id, movie_id)
-        file_id, caption = movie
+        file_id, caption, *rest = movie
+        views_count = rest[0] if rest else 1
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         is_fav = await db_req.is_favorite(user_id, movie_id)
-        cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿'
+        cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
         if avg_rating > 0:
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1'

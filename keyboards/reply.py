@@ -71,6 +71,9 @@ def get_admin_menu():
             [
                 KeyboardButton(text="Nofaollarga Eslatma 💤"),
                 KeyboardButton(text="Premium Sozlamalar 👑")
+            ],
+            [
+                KeyboardButton(text="➕ Mannual Premium Qo'shish")
             ]
         ],
         resize_keyboard=True

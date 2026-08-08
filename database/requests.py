@@ -2046,6 +2046,38 @@ async def set_user_premium(user_id: int, days: int = 7, plan: str = None) -> boo
         await db.commit()
         return True
 
+async def set_user_premium_custom_dates(user_id: int, start_date: str, end_date: str, plan: str = None) -> bool:
+    """Foydalanuvchiga Premium maqomini belgilangan sanalar bilan berish (start_date va end_date format: YYYY-MM-DD YYYY-MM-DD HH:MM:SS)"""
+    from datetime import datetime
+
+    async with get_db() as db:
+        # users jadvalini yangilash
+        await db.execute(
+            "UPDATE users SET is_premium = 1, premium_until = ? WHERE id = ?",
+            (end_date, user_id)
+        )
+        # premium_subscriptions jadvalini yangilash yoki qo'shish
+        await db.execute(
+            """INSERT INTO premium_subscriptions (user_id, start_date, end_date, plan)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   start_date = excluded.start_date,
+                   end_date = excluded.end_date,
+                   plan = excluded.plan""",
+            (user_id, start_date, end_date, plan or "Premium VIP")
+        )
+        # Premium berilganda foydalanuvchining aktiv promo skidkasini sarf qilib (is_consumed = 1) belgilash
+        try:
+            await db.execute(
+                "UPDATE promo_uses SET is_consumed = 1 WHERE user_id = ? AND COALESCE(is_consumed, 0) = 0",
+                (user_id,)
+            )
+        except Exception:
+            pass
+
+        await db.commit()
+        return True
+
 async def is_user_premium(user_id: int) -> bool:
     """Foydalanuvchi Premium maqomidami tekshirish"""
     from datetime import datetime
