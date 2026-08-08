@@ -33,7 +33,6 @@ def get_admin_menu():
                 KeyboardButton(text="Referal sozlash 👥")
             ],
             [
-                KeyboardButton(text="Kun Kinosi ☀️"),
                 KeyboardButton(text="Ballar 💎")
             ],
             [

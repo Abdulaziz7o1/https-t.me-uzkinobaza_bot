@@ -295,14 +295,6 @@ async def init_db():
         except Exception:
             pass
 
-        # Kun kinosi logi jadvali
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS daily_movie_log (
-                date TEXT PRIMARY KEY,
-                movie_id INTEGER
-            )
-        """)
-
         # Bot sozlamalari jadvali (promo xabar va boshqa global o'zgaruvchilar)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS bot_settings (

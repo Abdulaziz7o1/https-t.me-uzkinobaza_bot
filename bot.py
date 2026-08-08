@@ -100,39 +100,6 @@ async def broadcast_scheduler(bot: Bot):
         except Exception as e:
             logging.error(f"Rejalashtirilgan reklama schedulerida xato: {e}")
 
-async def daily_movie_scheduler(bot: Bot):
-    """Har kuni soat 09:00 (Tashkent vaqti)da avtomatik Kun Kinosini yuboradi"""
-    from datetime import datetime, timedelta, timezone
-    import database.requests as db_req
-    
-    uzb_tz = timezone(timedelta(hours=5))
-    while True:
-        await asyncio.sleep(60)
-        try:
-            now = datetime.now(uzb_tz)
-            if now.hour == 9:
-                today_movie = await db_req.get_today_daily_movie()
-                if not today_movie:
-                    logging.info("Avtomatik Kun Kinosi yuborilmoqda...")
-                    movie = await db_req.get_random_movie()
-                    if movie:
-                        movie_id, file_id, caption = movie
-                        await db_req.set_today_daily_movie(movie_id)
-                        
-                        users = await db_req.get_all_users()
-                        success = 0
-                        for uid in users:
-                            try:
-                                cap = f"☀️ <b>Bugungi Kun Kinosi</b>\n\n{caption or ''}\n\n🎬 Kino kodi: <code>{movie_id}</code>\n🤖 {config.BOT_USERNAME}"
-                                await bot.send_video(uid, file_id, caption=cap, parse_mode="HTML")
-                                success += 1
-                                await asyncio.sleep(0.05) # Rate limit
-                            except Exception:
-                                pass
-                        logging.info(f"Avtomatik Kun Kinosi {success} ta foydalanuvchiga yuborildi.")
-        except Exception as e:
-            logging.error(f"Kun Kinosi schedulerida xato: {e}")
-
 async def biweekly_premium_scheduler(bot: Bot):
     """Har 14 kunda Top 3 ta foydalanuvchiga 1 haftalik Premium taqdim etadi"""
     from datetime import datetime, timedelta
@@ -449,7 +416,6 @@ async def on_startup(bot: Bot):
     # Avtomatik vazifalarni ishga tushirish (Background tasks)
     asyncio.create_task(backup_scheduler(bot))
     asyncio.create_task(broadcast_scheduler(bot))
-    asyncio.create_task(daily_movie_scheduler(bot))
     asyncio.create_task(biweekly_premium_scheduler(bot))
     asyncio.create_task(birthday_scheduler(bot))
     asyncio.create_task(admin_pin_reminder_scheduler(bot))

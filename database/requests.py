@@ -1264,29 +1264,6 @@ async def get_random_movie():
         ) as cursor:
             return await cursor.fetchone()
 
-# --- KUN KINOSI (DAILY MOVIE) ---
-async def get_today_daily_movie():
-    """Bugungi kun kinosini olish"""
-    from datetime import date
-    today = str(date.today())
-    async with get_db() as db:
-        async with db.execute(
-            "SELECT movie_id FROM daily_movie_log WHERE date = ?", (today,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            return row[0] if row else None
-
-async def set_today_daily_movie(movie_id: int):
-    """Bugungi kun kinosini saqlash"""
-    from datetime import date
-    today = str(date.today())
-    async with get_db() as db:
-        await db.execute(
-            "INSERT OR REPLACE INTO daily_movie_log (date, movie_id) VALUES (?, ?)",
-            (today, movie_id)
-        )
-        await db.commit()
-
 async def get_users_detailed_list():
     """Barcha foydalanuvchilar haqida batafsil ma'lumotni olish"""
     async with get_db() as db:

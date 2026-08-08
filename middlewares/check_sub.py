@@ -158,7 +158,7 @@ class StateCancelMiddleware(BaseMiddleware):
                                 "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
                                 "kino qo'shish", "kino o'chirish", "kino tahrirlash", "statistika", "reklama",
                                 "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",
-                                "moderatorlar", "trendlari", "kun kinosi", "shubhali", "keshni", "ommaviy"
+                                "moderatorlar", "trendlari", "shubhali", "keshni", "ommaviy"
                             ]
                             exact_cancel_cmds = ["/start", "/cancel", "/help", "/stop", "start", "cancel"]
                             if text_clean in exact_cancel_cmds or any(kw == text_clean for kw in menu_keywords):

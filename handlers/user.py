@@ -1261,7 +1261,7 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
         await message.answer(with_footer('🔍 Kamida 2 ta belgi kiriting.'))
         return
     text_clean = query.lower().replace('️', '').strip()
-    menu_keywords = ['qidirish', 'saqlanganlar', 'tanlanganlar', 'tasodifiy', "so'rash", 'ballarim', 'bonus', 'reytinglar', 'referal', "so'rovlari", 'sozlamalar', 'profilim', 'top kinolar', "tug'ilgan kun", 'yordam', 'murojaat', "kino qo'shish", "kino o'chirish", 'kino tahrirlash', 'statistika', 'reklama', 'kassa', 'audit', 'tahlili', 'bot rejimi', 'nofaollarga', 'promo', 'zaxira', 'moderatorlar', 'trendlari', 'kun kinosi', 'shubhali', 'keshni', 'ommaviy']
+    menu_keywords = ['qidirish', 'saqlanganlar', 'tanlanganlar', 'tasodifiy', "so'rash", 'ballarim', 'bonus', 'reytinglar', 'referal', "so'rovlari", 'sozlamalar', 'profilim', 'top kinolar', "tug'ilgan kun", 'yordam', 'murojaat', "kino qo'shish", "kino o'chirish", 'kino tahrirlash', 'statistika', 'reklama', 'kassa', 'audit', 'tahlili', 'bot rejimi', 'nofaollarga', 'promo', 'zaxira', 'moderatorlar', 'trendlari', 'shubhali', 'keshni', 'ommaviy']
     if any((kw in text_clean for kw in menu_keywords)):
         return
     import re, urllib.parse as _up
