@@ -78,6 +78,13 @@ class AdminStates(StatesGroup):
     waiting_for_prem_price_1y = State()
     waiting_for_kassa_add_amount = State()
     waiting_for_backup_channel = State()
+    waiting_for_manual_prem_amount = State()
+    waiting_for_manual_prem_username_id = State()
+    waiting_for_manual_prem_payment_amount = State()
+    waiting_for_manual_prem_premium_type = State()
+    waiting_for_manual_prem_period_until = State()
+    waiting_for_manual_prem_expiration_date = State()
+    waiting_for_manual_prem_purchase_date = State()
 
 async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: str):
     """Yangi kino joylanganda Zaxira (Backup) kanaliga video hamda kassa/baza ma'lumotlarini avtomatik yuborish"""
@@ -317,7 +324,8 @@ async def process_and_save_movie_with_code(event_obj, state: FSMContext, movie_i
         await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
         await state.clear()
         bot_inst = event_obj.bot
-        await sync_movies_backup_storage(bot_inst)
+        # Zaxira kanaliga video va JSON backup yuborish (ASOSIY)
+        await auto_post_movie_to_channel(bot_inst, movie_id, file_id, formatted_caption)
         total_movies = await db_req.get_total_movies_count()
         next_free = await db_req.get_next_available_movie_id()
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]])
@@ -385,7 +393,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹']
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish']
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -2839,6 +2847,346 @@ async def mod_perm_toggle_cb(callback: CallbackQuery):
 async def mod_perms_list_back_cb(callback: CallbackQuery):
     await callback.answer()
     await callback.message.delete()
+
+@router.message(F.text == '➕ Mannual Premium Qo\'shish')
+async def manual_premium_start(message: Message, state: FSMContext):
+    """Mannual Premium qo'shish bosganda ketma-ket so'raladigan bosqichlarni ishga tushirish"""
+    await state.clear()
+    user_id = message.from_user.id
+    if user_id not in config.ADMINS and (not await db_req.has_permission(user_id, 'manage_sponsors')):
+        await message.answer(with_footer("❌ Bu amal uchun sizda ruxsat yo'q."))
+        return
+    await state.set_state(AdminStates.waiting_for_manual_prem_amount)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    await message.answer(
+        with_footer(
+            "👑 <b>MANNUAL PREMIUM QO'SHISH REJIMI</b>\n\n"
+            "<b>1-QADAM:</b> 💰 <i>Necha pul? (Plan summasi UZS so'mda)</i>\n\n"
+            "Masalan: <code>180000</code> yoki <code>20000</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+@router.callback_query(F.data == 'mp_cancel')
+async def mp_cancel_cb(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(with_footer('❌ <b>Mannual Premium qo\'shish bekor qilindi.</b>'), parse_mode='HTML')
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_manual_prem_amount, F.text, ~F.text.in_(MENU_BUTTONS))
+async def mp_process_amount(message: Message, state: FSMContext):
+    txt_input = message.text.strip().replace(' ', '').replace(',', '')
+    if not txt_input.isdigit() or int(txt_input) <= 0:
+        await message.answer(with_footer('⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 180000):'))
+        return
+    amount = int(txt_input)
+    await state.update_data(mp_amount=amount)
+    await state.set_state(AdminStates.waiting_for_manual_prem_username_id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    await message.answer(
+        with_footer(
+            f"✅ <b>1-QADAM TUGALLANDI!</b>\n\n"
+            f"💰 <b>Plan summasi:</b> <code>{amount:,} UZS</code>\n\n"
+            f"<b>2-QADAM:</b> 👤 <i>@username va ID raqamini kiriting.</i>\n\n"
+            f"Format: <code>@username ID</code>\n"
+            f"Masalan: <code>@MadridPrimee_reklama 8352596257</code>\n"
+            f"Yoki faqat ID: <code>8352596257</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+@router.message(AdminStates.waiting_for_manual_prem_username_id, F.text, ~F.text.in_(MENU_BUTTONS))
+async def mp_process_username_id(message: Message, state: FSMContext):
+    txt_input = message.text.strip()
+    username = None
+    user_id = None
+
+    import re
+    id_match = re.search(r'(\d{5,})', txt_input)
+    username_match = re.search(r'@([a-zA-Z0-9_]{3,})', txt_input)
+
+    if id_match:
+        user_id = int(id_match.group(1))
+    if username_match:
+        username = '@' + username_match.group(1)
+
+    if not user_id:
+        await message.answer(
+            with_footer(
+                '⚠️ <b>Foydalanuvchi ID raqamini aniqlab bo\'lmadi!</b>\n\n'
+                'Iltimos, to\'g\'ri formatda yuboring:\n'
+                'Masalan: <code>@MadridPrimee_reklama 8352596257</code>\n'
+                'Yoki: <code>8352596257</code>'
+            ),
+            parse_mode='HTML'
+        )
+        return
+
+    await state.update_data(mp_user_id=user_id, mp_username=username)
+    await state.set_state(AdminStates.waiting_for_manual_prem_payment_amount)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    disp_name = f"{username or ''} (ID: <code>{user_id}</code>)"
+    await message.answer(
+        with_footer(
+            f"✅ <b>2-QADAM TUGALLANDI!</b>\n\n"
+            f"👤 <b>Foydalanuvchi:</b> {disp_name}\n\n"
+            f"<b>3-QADAM:</b> 💵 <i>Foydalanuvchi qancha to'lov qildi? (UZS so'mda)</i>\n\n"
+            f"Agar plan summasi bilan to'langan bo'lsa, xuddi shu sonni yozing.\n"
+            f"Masalan: <code>180000</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+@router.message(AdminStates.waiting_for_manual_prem_payment_amount, F.text, ~F.text.in_(MENU_BUTTONS))
+async def mp_process_payment_amount(message: Message, state: FSMContext):
+    txt_input = message.text.strip().replace(' ', '').replace(',', '')
+    if not txt_input.isdigit() or int(txt_input) <= 0:
+        await message.answer(with_footer('⚠️ Iltimos, faqat musbat butun raqam yuboring (masalan: 180000):'))
+        return
+    payment_amount = int(txt_input)
+    await state.update_data(mp_payment_amount=payment_amount)
+    await state.set_state(AdminStates.waiting_for_manual_prem_premium_type)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='1 haftalik Premium', callback_data='mp_ptype_1w')],
+        [InlineKeyboardButton(text='1 oylik Premium', callback_data='mp_ptype_1m')],
+        [InlineKeyboardButton(text='3 oylik Premium', callback_data='mp_ptype_3m')],
+        [InlineKeyboardButton(text='6 oylik Premium', callback_data='mp_ptype_6m')],
+        [InlineKeyboardButton(text='1 yillik Premium', callback_data='mp_ptype_1y')],
+        [InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]
+    ])
+    await message.answer(
+        with_footer(
+            f"✅ <b>3-QADAM TUGALLANDI!</b>\n\n"
+            f"💵 <b>To'langan summa:</b> <code>{payment_amount:,} UZS</code>\n\n"
+            f"<b>4-QADAM:</b> 📋 <i>Qaysi premiumni sotib oldi?</i>\n\n"
+            f"Quyidagi tugmalardan birini tanlang <b>yoki</b> o'zingiz xohlagan nomini yozing:\n"
+            f"Masalan: <code>1 yillik Premium</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+@router.callback_query(F.data.startswith('mp_ptype_'))
+async def mp_ptype_callback(callback: CallbackQuery, state: FSMContext):
+    ptype_map = {
+        '1w': '1 haftalik Premium',
+        '1m': '1 oylik Premium',
+        '3m': '3 oylik Premium',
+        '6m': '6 oylik Premium',
+        '1y': '1 yillik Premium'
+    }
+    ptype_key = callback.data.split('_')[2]
+    premium_type = ptype_map.get(ptype_key, 'Premium')
+    await state.update_data(mp_premium_type=premium_type)
+    await state.set_state(AdminStates.waiting_for_manual_prem_period_until)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    await callback.message.edit_text(
+        with_footer(
+            f"✅ <b>4-QADAM TUGALLANDI!</b>\n\n"
+            f"📋 <b>Premium turi:</b> <b>{premium_type}</b>\n\n"
+            f"<b>5-QADAM:</b> 📅 <i>Qachongacha muddati?</i>\n\n"
+            f"Format: <code>YYYY-MM-DD</code> yoki <code>YYYY-MM-DD HH:MM:SS</code>\n"
+            f"Masalan: <code>2027-08-07</code> yoki <code>2027-08-07 10:41:00</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_manual_prem_premium_type, F.text, ~F.text.in_(MENU_BUTTONS))
+async def mp_process_premium_type(message: Message, state: FSMContext):
+    premium_type = message.text.strip()
+    if not premium_type:
+        await message.answer(with_footer('⚠️ Iltimos, premium turini yozing:'))
+        return
+    await state.update_data(mp_premium_type=premium_type)
+    await state.set_state(AdminStates.waiting_for_manual_prem_period_until)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    await message.answer(
+        with_footer(
+            f"✅ <b>4-QADAM TUGALLANDI!</b>\n\n"
+            f"📋 <b>Premium turi:</b> <b>{premium_type}</b>\n\n"
+            f"<b>5-QADAM:</b> 📅 <i>Qachongacha muddati?</i>\n\n"
+            f"Format: <code>YYYY-MM-DD</code> yoki <code>YYYY-MM-DD HH:MM:SS</code>\n"
+            f"Masalan: <code>2027-08-07</code> yoki <code>2027-08-07 10:41:00</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+def _normalize_datetime_str(raw: str) -> str | None:
+    """Sana vaqt formatini normalizatsiya qilish: YYYY-MM-DD -> YYYY-MM-DD 00:00:00, va YYYY-MM-DD HH:MM -> YYYY-MM-DD HH:MM:00"""
+    import re
+    s = raw.strip()
+    m1 = re.match(r'^(\d{4}-\d{2}-\d{2})$', s)
+    if m1:
+        return f"{m1.group(1)} 00:00:00"
+    m2 = re.match(r'^(\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2})$', s)
+    if m2:
+        return f"{m2.group(1)}:00"
+    m3 = re.match(r'^(\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}:\d{2})$', s)
+    if m3:
+        return m3.group(1)
+    return None
+
+@router.message(AdminStates.waiting_for_manual_prem_period_until, F.text, ~F.text.in_(MENU_BUTTONS))
+async def mp_process_period_until(message: Message, state: FSMContext):
+    normalized = _normalize_datetime_str(message.text)
+    if not normalized:
+        await message.answer(
+            with_footer(
+                '⚠️ <b>Sana formatida xatolik!</b>\n\n'
+                'Iltimos, quyidagi formatlardan birini ishlating:\n'
+                '• <code>2027-08-07</code> (faqat sana)\n'
+                '• <code>2027-08-07 10:41</code> (sana + vaqt)\n'
+                '• <code>2027-08-07 10:41:00</code> (to\'liq)'
+            ),
+            parse_mode='HTML'
+        )
+        return
+    await state.update_data(mp_period_until=normalized)
+    await state.set_state(AdminStates.waiting_for_manual_prem_expiration_date)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔄 Oldingi bilan bir xil', callback_data='mp_exp_same'), InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    await message.answer(
+        with_footer(
+            f"✅ <b>5-QADAM TUGALLANDI!</b>\n\n"
+            f"📅 <i>Qachongacha muddati:</i> <code>{normalized}</code>\n\n"
+            f"<b>6-QADAM:</b> ⏰ <i>Qachon tugaydi?</i>\n\n"
+            f"Agar oldingi bilan bir xil bo'lsa, <b>🔄 Oldingi bilan bir xil</b> tugmasini bosing.\n"
+            f"Yangi yozishingiz mumkin: Format <code>YYYY-MM-DD HH:MM:SS</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+@router.callback_query(F.data == 'mp_exp_same')
+async def mp_exp_same_cb(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    period_until = data.get('mp_period_until', '')
+    await state.update_data(mp_expiration_date=period_until)
+    await state.set_state(AdminStates.waiting_for_manual_prem_purchase_date)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    await callback.message.edit_text(
+        with_footer(
+            f"✅ <b>6-QADAM TUGALLANDI!</b>\n\n"
+            f"⏰ <i>Qachon tugaydi:</i> <code>{period_until}</code>\n\n"
+            f"<b>7-QADAM (OXIRGI):</b> 🛒 <i>Qachon sotib oldi?</i>\n\n"
+            f"Format: <code>YYYY-MM-DD HH:MM:SS</code>\n"
+            f"Masalan: <code>2026-08-07 10:41:00</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_manual_prem_expiration_date, F.text, ~F.text.in_(MENU_BUTTONS))
+async def mp_process_expiration_date(message: Message, state: FSMContext):
+    normalized = _normalize_datetime_str(message.text)
+    if not normalized:
+        await message.answer(
+            with_footer(
+                '⚠️ <b>Sana formatida xatolik!</b>\n\n'
+                'Iltimos, quyidagi formatlardan birini ishlating:\n'
+                '• <code>2027-08-07</code> (faqat sana)\n'
+                '• <code>2027-08-07 10:41</code> (sana + vaqt)\n'
+                '• <code>2027-08-07 10:41:00</code> (to\'liq)'
+            ),
+            parse_mode='HTML'
+        )
+        return
+    await state.update_data(mp_expiration_date=normalized)
+    await state.set_state(AdminStates.waiting_for_manual_prem_purchase_date)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
+    await message.answer(
+        with_footer(
+            f"✅ <b>6-QADAM TUGALLANDI!</b>\n\n"
+            f"⏰ <i>Qachon tugaydi:</i> <code>{normalized}</code>\n\n"
+            f"<b>7-QADAM (OXIRGI):</b> 🛒 <i>Qachon sotib oldi?</i>\n\n"
+            f"Format: <code>YYYY-MM-DD HH:MM:SS</code>\n"
+            f"Masalan: <code>2026-08-07 10:41:00</code>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+@router.message(AdminStates.waiting_for_manual_prem_purchase_date, F.text, ~F.text.in_(MENU_BUTTONS))
+async def mp_process_purchase_date(message: Message, state: FSMContext):
+    normalized = _normalize_datetime_str(message.text)
+    if not normalized:
+        await message.answer(
+            with_footer(
+                '⚠️ <b>Sana formatida xatolik!</b>\n\n'
+                'Iltimos, quyidagi formatlardan birini ishlating:\n'
+                '• <code>2026-08-07</code> (faqat sana)\n'
+                '• <code>2026-08-07 10:41</code> (sana + vaqt)\n'
+                '• <code>2026-08-07 10:41:00</code> (to\'liq)'
+            ),
+            parse_mode='HTML'
+        )
+        return
+
+    data = await state.get_data()
+    amount = data.get('mp_amount', 0)
+    user_id = data.get('mp_user_id', 0)
+    username = data.get('mp_username')
+    payment_amount = data.get('mp_payment_amount', amount)
+    premium_type = data.get('mp_premium_type', 'Premium')
+    period_until = data.get('mp_period_until', normalized)
+    expiration_date = data.get('mp_expiration_date', period_until)
+    purchase_date = normalized
+
+    plan_str_with_amount = f"{premium_type} ({payment_amount:,} UZS)"
+
+    await db_req.set_user_premium_custom_dates(
+        user_id=user_id,
+        start_date=purchase_date,
+        end_date=expiration_date,
+        plan=premium_type
+    )
+
+    new_kassa_total = await db_req.add_payment_record(
+        user_id=user_id,
+        amount=payment_amount,
+        plan=plan_str_with_amount,
+        confirmed_by=message.from_user.id
+    )
+
+    user_disp = f"{username or ''} (ID: <code>{user_id}</code>)" if username else f"ID: <code>{user_id}</code>"
+    time_short = purchase_date[:16] if len(purchase_date) >= 16 else purchase_date
+
+    try:
+        user_ntf = (
+            f"🎉 <b>PREMIUM OBUNA MANNUAL TARZDA YOQILDI!</b>\n\n"
+            f"👑 <b>Obuna turi:</b> {premium_type}\n"
+            f"💰 <b>To'langan summa:</b> {payment_amount:,} UZS\n"
+            f"⏰ <b>Muddati:</b> {expiration_date}\n\n"
+            f"<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin!</i> 🍿"
+        )
+        await message.bot.send_message(with_footer(user_id), user_ntf, parse_mode='HTML')
+    except Exception:
+        pass
+
+    result_text = (
+        f"✅ <b>MANNUAL PREMIUM MUVAFFAQIYATLI QO'SHILDI!</b> 👑\n\n"
+        f"👤 <b>Foydalanuvchi:</b> {user_disp}\n"
+        f"📋 <b>Plan:</b> {plan_str_with_amount}\n"
+        f"🕒 <b>Vaqt:</b> <code>{time_short}</code>\n\n"
+        f"📊 <b>Batafsil ma'lumotlar:</b>\n"
+        f"• 💰 <b>Plan summasi:</b> <code>{amount:,} UZS</code>\n"
+        f"• 💵 <b>To'langan summa:</b> <code>{payment_amount:,} UZS</code>\n"
+        f"• 📋 <b>Premium turi:</b> <b>{premium_type}</b>\n"
+        f"• 📅 <b>Muddat (qachongacha):</b> <code>{period_until}</code>\n"
+        f"• ⏰ <b>Tugash sanasi:</b> <code>{expiration_date}</code>\n"
+        f"• 🛒 <b>Sotib olingan sana:</b> <code>{purchase_date}</code>\n"
+        f"• 💰 <b>Yangi kassa balansi:</b> <code>{new_kassa_total:,} UZS</code>"
+    )
+
+    await state.clear()
+    await message.answer(with_footer(result_text), parse_mode='HTML')
+
 
 @router.message(F.text == 'Premium Sozlamalar 👑')
 async def show_premium_settings_panel(message: Message, state: FSMContext):
