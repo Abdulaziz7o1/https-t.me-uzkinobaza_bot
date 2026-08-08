@@ -751,23 +751,34 @@ async def get_movie_rating(movie_id: int):
             return avg_rating, votes_count
 
 # --- REQUESTS (KINO BUYURTMA QILISH) ---
+async def ensure_requests_table_extended():
+    """Eski requests jadvalini is_premium ustuni bilan kengaytirish"""
+    async with get_db() as db:
+        try:
+            await db.execute("ALTER TABLE requests ADD COLUMN is_premium INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
+
 async def add_request(user_id: int, movie_name: str):
-    """Kino buyurtma qilish"""
+    """Kino buyurtma qilish - premium foydalanuvchini belgilab"""
+    is_prem = 1 if await is_premium_user(user_id) else 0
     async with get_db() as db:
         await db.execute(
-            "INSERT INTO requests (user_id, movie_name) VALUES (?, ?)",
-            (user_id, movie_name)
+            "INSERT INTO requests (user_id, movie_name, is_premium) VALUES (?, ?, ?)",
+            (user_id, movie_name, is_prem)
         )
         await db.commit()
 
 async def get_pending_requests():
-    """Barcha hal qilinmagan buyurtmalarni olish"""
+    """Barcha hal qilinmagan buyurtmalarni olish - PREMIUM⭐ BIRINCHI O'RINDA"""
     async with get_db() as db:
         async with db.execute(
-            """SELECT r.id, r.movie_name, u.username, u.full_name, r.created_at 
+            """SELECT r.id, r.movie_name, u.username, u.full_name, r.created_at, COALESCE(r.is_premium, 0)
                FROM requests r 
                JOIN users u ON r.user_id = u.id 
-               WHERE r.status = 'pending' ORDER BY r.created_at DESC"""
+               WHERE r.status = 'pending' 
+               ORDER BY COALESCE(r.is_premium, 0) DESC, r.created_at DESC"""
         ) as cursor:
             return await cursor.fetchall()
 
@@ -1475,6 +1486,25 @@ async def add_premium_subscription(user_id: int, plan: str, months: int) -> bool
     from datetime import datetime, timedelta
     start_date = datetime.now()
     end_date = start_date + timedelta(days=months * 30)
+
+    async with get_db() as db:
+        try:
+            await db.execute(
+                """INSERT OR REPLACE INTO premium_subscriptions
+                   (user_id, start_date, end_date, plan)
+                   VALUES (?, ?, ?, ?)""",
+                (user_id, start_date, end_date, plan)
+            )
+            await db.commit()
+            return True
+        except Exception:
+            return False
+
+async def add_premium_days(user_id: int, plan: str, days: int) -> bool:
+    """Foydalanuvchiga kun hisobida premium obuna qo'shish"""
+    from datetime import datetime, timedelta
+    start_date = datetime.now()
+    end_date = start_date + timedelta(days=days)
 
     async with get_db() as db:
         try:

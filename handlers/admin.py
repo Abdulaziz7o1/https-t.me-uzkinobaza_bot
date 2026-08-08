@@ -76,6 +76,8 @@ class AdminStates(StatesGroup):
     waiting_for_prem_price_3m = State()
     waiting_for_prem_price_6m = State()
     waiting_for_prem_price_1y = State()
+    waiting_for_kassa_add_user = State()
+    waiting_for_kassa_add_plan = State()
     waiting_for_kassa_add_amount = State()
     waiting_for_backup_channel = State()
     waiting_for_manual_prem_amount = State()
@@ -294,7 +296,7 @@ async def admin_direct_video_handler(message: Message, state: FSMContext):
         if not exists:
             formatted_caption = db_req.clean_and_format_caption(candidate_cap)
             await db_req.add_movie_with_id(target_id, file_id, formatted_caption)
-            await sync_movies_backup_storage(message.bot)
+            await auto_post_movie_to_channel(message.bot, target_id, file_id, formatted_caption)
             total_movies = await db_req.get_total_movies_count()
             next_free = await db_req.get_next_available_movie_id()
             kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{target_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{target_id}')]])
@@ -324,9 +326,7 @@ async def process_and_save_movie_with_code(event_obj, state: FSMContext, movie_i
         await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
         await state.clear()
         bot_inst = event_obj.bot
-        # ✅ KANALGA VIDEO VA BACKUP FAYL YUBORISH
         await auto_post_movie_to_channel(bot_inst, movie_id, file_id, formatted_caption)
-        await db_req.notify_requesting_users_for_movie(bot_inst, movie_id, formatted_caption)
         total_movies = await db_req.get_total_movies_count()
         next_free = await db_req.get_next_available_movie_id()
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]])
@@ -2203,32 +2203,155 @@ async def kassa_add_payment_start_cb(callback: CallbackQuery, state: FSMContext)
     if callback.from_user.id not in config.ADMINS and not await db_req.has_permission(callback.from_user.id, 'manage_sponsors'):
         await callback.answer("❌ Bu amal uchun sizda ruxsat yo'q!", show_alert=True)
         return
-    await state.set_state(AdminStates.waiting_for_kassa_add_amount)
+    await state.set_state(AdminStates.waiting_for_kassa_add_user)
     await callback.message.answer(
-        with_footer("➕ <b>KASSAGA TO'LOV QO'SHISH</b>\n\nKassaga qo'shmoqchi bo'lgan summani so'mda kiriting (masalan: <code>14000</code> yoki <code>50000</code>):"),
+        with_footer(
+            "➕ <b>KASSAGA TO'LOV QO'SHISH (1/3)</b>\n\n"
+            "👤 To'lov qilgan foydalanuvchining <b>Telegram ID</b> raqamini yoki <b>@username</b> manzilini yuboring:\n"
+            "<i>(Masalan: <code>8352596257</code> yoki <code>@MadridPrimee_reklama</code>)</i>"
+        ),
         parse_mode='HTML'
     )
     await callback.answer()
 
+@router.message(AdminStates.waiting_for_kassa_add_user, F.text, ~F.text.in_(MENU_BUTTONS))
+async def process_kassa_add_user(message: Message, state: FSMContext):
+    txt_input = message.text.strip()
+    target_user_id = 0
+    display_name = txt_input
+
+    if txt_input.startswith("@"):
+        clean_uname = txt_input.lstrip("@")
+        user_info = await db_req.get_user_by_username(clean_uname)
+        if user_info:
+            target_user_id = user_info[0]
+            display_name = f"@{user_info[1]}" if user_info[1] else user_info[2]
+        else:
+            display_name = f"@{clean_uname}"
+    elif txt_input.isdigit():
+        target_user_id = int(txt_input)
+        user_info = await db_req.get_user(target_user_id)
+        if user_info:
+            display_name = f"@{user_info[1]}" if user_info[1] else user_info[2] or str(target_user_id)
+        else:
+            display_name = f"ID: {target_user_id}"
+
+    await state.update_data(kassa_target_id=target_user_id, kassa_target_display=display_name)
+    await state.set_state(AdminStates.waiting_for_kassa_add_plan)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="1️⃣ 1 haftalik Premium (7,000 UZS)", callback_data="kassa_plan_1w")],
+        [InlineKeyboardButton(text="2️⃣ 1 oylik Premium (20,000 UZS)", callback_data="kassa_plan_1m")],
+        [InlineKeyboardButton(text="3️⃣ 3 oylik Premium (50,000 UZS)", callback_data="kassa_plan_3m")],
+        [InlineKeyboardButton(text="4️⃣ 6 oylik Premium (100,000 UZS)", callback_data="kassa_plan_6m")],
+        [InlineKeyboardButton(text="5️⃣ 1 yillik Premium (180,000 UZS)", callback_data="kassa_plan_1y")]
+    ])
+    await message.answer(
+        with_footer(
+            f"➕ <b>KASSAGA TO'LOV QO'SHISH (2/3)</b>\n\n"
+            f"👤 <b>Foydalanuvchi:</b> {display_name}\n\n"
+            f"📋 <b>Obuna planini tanlang yoki o'zingiz matn yozing:</b>"
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+
+PLAN_PRESETS = {
+    "kassa_plan_1w": ("1 haftalik Premium (7,000 UZS)", 7000, 7),
+    "kassa_plan_1m": ("1 oylik Premium (20,000 UZS)", 20000, 30),
+    "kassa_plan_3m": ("3 oylik Premium (50,000 UZS)", 50000, 90),
+    "kassa_plan_6m": ("6 oylik Premium (100,000 UZS)", 100000, 180),
+    "kassa_plan_1y": ("1 yillik Premium (180,000 UZS)", 180000, 365)
+}
+
+@router.callback_query(AdminStates.waiting_for_kassa_add_plan, F.data.startswith("kassa_plan_"))
+async def kassa_select_plan_cb(callback: CallbackQuery, state: FSMContext):
+    plan_key = callback.data
+    plan_name, suggested_price, days = PLAN_PRESETS.get(plan_key, ("Premium obuna", 0, 30))
+    await state.update_data(kassa_plan_name=plan_name, kassa_suggested_price=suggested_price, kassa_plan_days=days)
+    await state.set_state(AdminStates.waiting_for_kassa_add_amount)
+    data = await state.get_data()
+    disp_name = data.get("kassa_target_display", "")
+    await callback.message.answer(
+        with_footer(
+            f"➕ <b>KASSAGA TO'LOV QO'SHISH (3/3)</b>\n\n"
+            f"👤 <b>Foydalanuvchi:</b> {disp_name}\n"
+            f"📋 <b>Plan:</b> {plan_name}\n\n"
+            f"💵 <b>To'lov summasini UZS da kiriting (masalan: <code>{suggested_price}</code>):</b>"
+        ),
+        parse_mode='HTML'
+    )
+    await callback.answer()
+
+@router.message(AdminStates.waiting_for_kassa_add_plan, F.text, ~F.text.in_(MENU_BUTTONS))
+async def process_kassa_add_plan_text(message: Message, state: FSMContext):
+    plan_name = message.text.strip()
+    await state.update_data(kassa_plan_name=plan_name, kassa_suggested_price=0, kassa_plan_days=30)
+    await state.set_state(AdminStates.waiting_for_kassa_add_amount)
+    data = await state.get_data()
+    disp_name = data.get("kassa_target_display", "")
+    await message.answer(
+        with_footer(
+            f"➕ <b>KASSAGA TO'LOV QO'SHISH (3/3)</b>\n\n"
+            f"👤 <b>Foydalanuvchi:</b> {disp_name}\n"
+            f"📋 <b>Plan:</b> {plan_name}\n\n"
+            f"💵 <b>To'lov summasini UZS da kiriting (masalan: <code>180000</code>):</b>"
+        ),
+        parse_mode='HTML'
+    )
+
 @router.message(AdminStates.waiting_for_kassa_add_amount, F.text, ~F.text.in_(MENU_BUTTONS))
 async def process_kassa_add_amount(message: Message, state: FSMContext):
-    txt_input = message.text.strip()
+    txt_input = message.text.strip().replace(' ', '').replace(',', '')
     if not txt_input.isdigit() or int(txt_input) <= 0:
-        await message.answer(with_footer("⚠️ Iltimos, faqat musbat son kiriting (masalan: 14000):"))
+        await message.answer(with_footer("⚠️ Iltimos, faqat musbat son kiriting (masalan: 180000):"))
         return
     amount = int(txt_input)
+    data = await state.get_data()
     await state.clear()
+    
     admin_id = message.from_user.id
+    target_user_id = data.get("kassa_target_id", admin_id) or admin_id
+    disp_name = data.get("kassa_target_display", str(target_user_id))
+    plan_name = data.get("kassa_plan_name", "Manual Admin To'lov")
+    plan_days = data.get("kassa_plan_days", 30)
+
+    # 1. Kassa balansini va to'lovlar tarixini yangilash
     new_total = await db_req.add_payment_record(
-        user_id=admin_id,
+        user_id=target_user_id,
         amount=amount,
-        plan="Manual Admin To'lov",
+        plan=plan_name,
         confirmed_by=admin_id
     )
+
+    # 2. Agar foydalanuvchi mavjud bo'lsa, unga Premium aktivlashtirish
+    if target_user_id > 0 and target_user_id != admin_id:
+        await db_req.add_premium_days(target_user_id, plan_name, plan_days)
+        try:
+            await message.bot.send_message(
+                target_user_id,
+                with_footer(
+                    f"🎉 <b>TO'LOVINGIZ TASDIQLANDI VA PREMIUM FAOLLASHTIRILDI!</b>\n\n"
+                    f"📋 <b>Plan:</b> {plan_name}\n"
+                    f"💵 <b>Summa:</b> {amount:,} UZS\n\n"
+                    f"<i>Endi botimizdan cheklovlarsiz va reklamasiz foydalanishingiz mumkin! 🍿</i>"
+                ),
+                parse_mode='HTML'
+            )
+        except Exception:
+            pass
+
+    from datetime import datetime, timedelta, timezone
+    uzb_tz = timezone(timedelta(hours=5))
+    time_str = datetime.now(uzb_tz).strftime("%Y-%m-%d %H:%M")
+
     await message.answer(
         with_footer(
             f"✅ <b>KASSAGA TO'LOV MUVAFFAQIYATLI QO'SHILDI!</b> 💰\n\n"
+            f"👤 <b>Foydalanuvchi:</b> {disp_name} (ID: <code>{target_user_id}</code>)\n"
+            f"📋 <b>Plan:</b> {plan_name}\n"
             f"💵 <b>Qo'shilgan summa:</b> <code>{amount:,} UZS</code>\n"
+            f"🕒 <b>Vaqt:</b> {time_str}\n"
             f"📊 <b>Yangi Kassa Balansi:</b> <code>{new_total:,} UZS</code>"
         ),
         parse_mode='HTML'
@@ -3312,7 +3435,7 @@ async def process_prem_price_1y_input(message: Message, state: FSMContext):
 
 
 # ─── ZAXIRA KANALI SOZLAMALARI (BACKUP CHANNEL) ──────────────────────────────
-@router.message(Command("setbackupchannel"), Command("zaxirakanal"))
+@router.message(Command("setbackupchannel", "zaxirakanal"))
 async def start_set_backup_channel(message: Message, state: FSMContext):
     if message.from_user.id not in config.ADMINS:
         await message.answer(with_footer("❌ Bu amal faqat Bosh Adminlar uchun ruxsat etilgan."))
