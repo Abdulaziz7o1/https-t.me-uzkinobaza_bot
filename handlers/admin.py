@@ -417,7 +417,10 @@ async def add_movie_caption(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(with_footer(f"✅ Kino muvaffaqiyatli qo'shildi!\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>"), parse_mode='HTML')
     await auto_post_movie_to_channel(message.bot, movie_id, file_id, caption)
-    await db_req.notify_requesting_users_for_movie(message.bot, movie_id, caption)
+    try:
+        await db_req.check_and_notify_movie_added(message.bot, movie_id, caption)
+    except Exception:
+        pass
 
 @router.message(Command('delete'), StateFilter('*'))
 @router.message(F.text.startswith('/del_'), StateFilter('*'))
@@ -3027,30 +3030,16 @@ async def mp_process_payment_amount(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith('mp_ptype_'))
 async def mp_ptype_callback(callback: CallbackQuery, state: FSMContext):
-    ptype_map = {
-        '1w': '1 haftalik Premium',
-        '1m': '1 oylik Premium',
-        '3m': '3 oylik Premium',
-        '6m': '6 oylik Premium',
-        '1y': '1 yillik Premium'
+    ptype_days_map = {
+        '1w': ('1 haftalik Premium', 7),
+        '1m': ('1 oylik Premium', 30),
+        '3m': ('3 oylik Premium', 90),
+        '6m': ('6 oylik Premium', 180),
+        '1y': ('1 yillik Premium', 365)
     }
     ptype_key = callback.data.split('_')[2]
-    premium_type = ptype_map.get(ptype_key, 'Premium')
-    await state.update_data(mp_premium_type=premium_type)
-    await state.set_state(AdminStates.waiting_for_manual_prem_period_until)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
-    await callback.message.edit_text(
-        with_footer(
-            f"✅ <b>4-QADAM TUGALLANDI!</b>\n\n"
-            f"📋 <b>Premium turi:</b> <b>{premium_type}</b>\n\n"
-            f"<b>5-QADAM:</b> 📅 <i>Qachongacha muddati?</i>\n\n"
-            f"Format: <code>YYYY-MM-DD</code> yoki <code>YYYY-MM-DD HH:MM:SS</code>\n"
-            f"Masalan: <code>2027-08-07</code> yoki <code>2027-08-07 10:41:00</code>"
-        ),
-        parse_mode='HTML',
-        reply_markup=kb
-    )
-    await callback.answer()
+    premium_type, days = ptype_days_map.get(ptype_key, ('Premium', 30))
+    await _finalize_manual_premium(callback, state, premium_type, days, is_callback=True)
 
 @router.message(AdminStates.waiting_for_manual_prem_premium_type, F.text, ~F.text.in_(MENU_BUTTONS))
 async def mp_process_premium_type(message: Message, state: FSMContext):
@@ -3058,141 +3047,31 @@ async def mp_process_premium_type(message: Message, state: FSMContext):
     if not premium_type:
         await message.answer(with_footer('⚠️ Iltimos, premium turini yozing:'))
         return
-    await state.update_data(mp_premium_type=premium_type)
-    await state.set_state(AdminStates.waiting_for_manual_prem_period_until)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
-    await message.answer(
-        with_footer(
-            f"✅ <b>4-QADAM TUGALLANDI!</b>\n\n"
-            f"📋 <b>Premium turi:</b> <b>{premium_type}</b>\n\n"
-            f"<b>5-QADAM:</b> 📅 <i>Qachongacha muddati?</i>\n\n"
-            f"Format: <code>YYYY-MM-DD</code> yoki <code>YYYY-MM-DD HH:MM:SS</code>\n"
-            f"Masalan: <code>2027-08-07</code> yoki <code>2027-08-07 10:41:00</code>"
-        ),
-        parse_mode='HTML',
-        reply_markup=kb
-    )
+    days = 30
+    if 'hafta' in premium_type.lower() or '7' in premium_type:
+        days = 7
+    elif '3 oy' in premium_type.lower() or '90' in premium_type:
+        days = 90
+    elif '6 oy' in premium_type.lower() or '180' in premium_type:
+        days = 180
+    elif 'yil' in premium_type.lower() or '365' in premium_type:
+        days = 365
+    await _finalize_manual_premium(message, state, premium_type, days, is_callback=False)
 
-def _normalize_datetime_str(raw: str) -> str | None:
-    """Sana vaqt formatini normalizatsiya qilish: YYYY-MM-DD -> YYYY-MM-DD 00:00:00, va YYYY-MM-DD HH:MM -> YYYY-MM-DD HH:MM:00"""
-    import re
-    s = raw.strip()
-    m1 = re.match(r'^(\d{4}-\d{2}-\d{2})$', s)
-    if m1:
-        return f"{m1.group(1)} 00:00:00"
-    m2 = re.match(r'^(\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2})$', s)
-    if m2:
-        return f"{m2.group(1)}:00"
-    m3 = re.match(r'^(\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}:\d{2})$', s)
-    if m3:
-        return m3.group(1)
-    return None
+async def _finalize_manual_premium(event_obj, state: FSMContext, premium_type: str, days: int, is_callback: bool = False):
+    from datetime import datetime, timedelta, timezone
+    uzb_tz = timezone(timedelta(hours=5))
+    now_dt = datetime.now(uzb_tz)
+    end_dt = now_dt + timedelta(days=days)
 
-@router.message(AdminStates.waiting_for_manual_prem_period_until, F.text, ~F.text.in_(MENU_BUTTONS))
-async def mp_process_period_until(message: Message, state: FSMContext):
-    normalized = _normalize_datetime_str(message.text)
-    if not normalized:
-        await message.answer(
-            with_footer(
-                '⚠️ <b>Sana formatida xatolik!</b>\n\n'
-                'Iltimos, quyidagi formatlardan birini ishlating:\n'
-                '• <code>2027-08-07</code> (faqat sana)\n'
-                '• <code>2027-08-07 10:41</code> (sana + vaqt)\n'
-                '• <code>2027-08-07 10:41:00</code> (to\'liq)'
-            ),
-            parse_mode='HTML'
-        )
-        return
-    await state.update_data(mp_period_until=normalized)
-    await state.set_state(AdminStates.waiting_for_manual_prem_expiration_date)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔄 Oldingi bilan bir xil', callback_data='mp_exp_same'), InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
-    await message.answer(
-        with_footer(
-            f"✅ <b>5-QADAM TUGALLANDI!</b>\n\n"
-            f"📅 <i>Qachongacha muddati:</i> <code>{normalized}</code>\n\n"
-            f"<b>6-QADAM:</b> ⏰ <i>Qachon tugaydi?</i>\n\n"
-            f"Agar oldingi bilan bir xil bo'lsa, <b>🔄 Oldingi bilan bir xil</b> tugmasini bosing.\n"
-            f"Yangi yozishingiz mumkin: Format <code>YYYY-MM-DD HH:MM:SS</code>"
-        ),
-        parse_mode='HTML',
-        reply_markup=kb
-    )
-
-@router.callback_query(F.data == 'mp_exp_same')
-async def mp_exp_same_cb(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    period_until = data.get('mp_period_until', '')
-    await state.update_data(mp_expiration_date=period_until)
-    await state.set_state(AdminStates.waiting_for_manual_prem_purchase_date)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
-    await callback.message.edit_text(
-        with_footer(
-            f"✅ <b>6-QADAM TUGALLANDI!</b>\n\n"
-            f"⏰ <i>Qachon tugaydi:</i> <code>{period_until}</code>\n\n"
-            f"<b>7-QADAM (OXIRGI):</b> 🛒 <i>Qachon sotib oldi?</i>\n\n"
-            f"Format: <code>YYYY-MM-DD HH:MM:SS</code>\n"
-            f"Masalan: <code>2026-08-07 10:41:00</code>"
-        ),
-        parse_mode='HTML',
-        reply_markup=kb
-    )
-    await callback.answer()
-
-@router.message(AdminStates.waiting_for_manual_prem_expiration_date, F.text, ~F.text.in_(MENU_BUTTONS))
-async def mp_process_expiration_date(message: Message, state: FSMContext):
-    normalized = _normalize_datetime_str(message.text)
-    if not normalized:
-        await message.answer(
-            with_footer(
-                '⚠️ <b>Sana formatida xatolik!</b>\n\n'
-                'Iltimos, quyidagi formatlardan birini ishlating:\n'
-                '• <code>2027-08-07</code> (faqat sana)\n'
-                '• <code>2027-08-07 10:41</code> (sana + vaqt)\n'
-                '• <code>2027-08-07 10:41:00</code> (to\'liq)'
-            ),
-            parse_mode='HTML'
-        )
-        return
-    await state.update_data(mp_expiration_date=normalized)
-    await state.set_state(AdminStates.waiting_for_manual_prem_purchase_date)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='❌ Bekor qilish', callback_data='mp_cancel')]])
-    await message.answer(
-        with_footer(
-            f"✅ <b>6-QADAM TUGALLANDI!</b>\n\n"
-            f"⏰ <i>Qachon tugaydi:</i> <code>{normalized}</code>\n\n"
-            f"<b>7-QADAM (OXIRGI):</b> 🛒 <i>Qachon sotib oldi?</i>\n\n"
-            f"Format: <code>YYYY-MM-DD HH:MM:SS</code>\n"
-            f"Masalan: <code>2026-08-07 10:41:00</code>"
-        ),
-        parse_mode='HTML',
-        reply_markup=kb
-    )
-
-@router.message(AdminStates.waiting_for_manual_prem_purchase_date, F.text, ~F.text.in_(MENU_BUTTONS))
-async def mp_process_purchase_date(message: Message, state: FSMContext):
-    normalized = _normalize_datetime_str(message.text)
-    if not normalized:
-        await message.answer(
-            with_footer(
-                '⚠️ <b>Sana formatida xatolik!</b>\n\n'
-                'Iltimos, quyidagi formatlardan birini ishlating:\n'
-                '• <code>2026-08-07</code> (faqat sana)\n'
-                '• <code>2026-08-07 10:41</code> (sana + vaqt)\n'
-                '• <code>2026-08-07 10:41:00</code> (to\'liq)'
-            ),
-            parse_mode='HTML'
-        )
-        return
+    purchase_date = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+    expiration_date = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     data = await state.get_data()
     amount = data.get('mp_amount', 0)
     user_id = data.get('mp_user_id', 0)
     username = data.get('mp_username')
     payment_amount = data.get('mp_payment_amount', amount)
-    premium_type = data.get('mp_premium_type', 'Premium')
-    period_until = data.get('mp_period_until', normalized)
-    expiration_date = data.get('mp_expiration_date', period_until)
-    purchase_date = normalized
 
     plan_str_with_amount = f"{premium_type} ({payment_amount:,} UZS)"
 
@@ -3203,25 +3082,27 @@ async def mp_process_purchase_date(message: Message, state: FSMContext):
         plan=premium_type
     )
 
+    admin_id = event_obj.from_user.id
     new_kassa_total = await db_req.add_payment_record(
         user_id=user_id,
         amount=payment_amount,
         plan=plan_str_with_amount,
-        confirmed_by=message.from_user.id
+        confirmed_by=admin_id
     )
 
     user_disp = f"{username or ''} (ID: <code>{user_id}</code>)" if username else f"ID: <code>{user_id}</code>"
-    time_short = purchase_date[:16] if len(purchase_date) >= 16 else purchase_date
+    time_short = purchase_date[:16]
 
+    bot_inst = event_obj.bot
     try:
         user_ntf = (
             f"🎉 <b>PREMIUM OBUNA MANNUAL TARZDA YOQILDI!</b>\n\n"
             f"👑 <b>Obuna turi:</b> {premium_type}\n"
             f"💰 <b>To'langan summa:</b> {payment_amount:,} UZS\n"
-            f"⏰ <b>Muddati:</b> {expiration_date}\n\n"
+            f"⏰ <b>Tugash sanasi:</b> {expiration_date}\n\n"
             f"<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin!</i> 🍿"
         )
-        await message.bot.send_message(with_footer(user_id), user_ntf, parse_mode='HTML')
+        await bot_inst.send_message(with_footer(user_id), user_ntf, parse_mode='HTML')
     except Exception:
         pass
 
@@ -3234,14 +3115,20 @@ async def mp_process_purchase_date(message: Message, state: FSMContext):
         f"• 💰 <b>Plan summasi:</b> <code>{amount:,} UZS</code>\n"
         f"• 💵 <b>To'langan summa:</b> <code>{payment_amount:,} UZS</code>\n"
         f"• 📋 <b>Premium turi:</b> <b>{premium_type}</b>\n"
-        f"• 📅 <b>Muddat (qachongacha):</b> <code>{period_until}</code>\n"
+        f"• 🛒 <b>Sotib olingan sana (boshlanishi):</b> <code>{purchase_date}</code>\n"
         f"• ⏰ <b>Tugash sanasi:</b> <code>{expiration_date}</code>\n"
-        f"• 🛒 <b>Sotib olingan sana:</b> <code>{purchase_date}</code>\n"
         f"• 💰 <b>Yangi kassa balansi:</b> <code>{new_kassa_total:,} UZS</code>"
     )
 
     await state.clear()
-    await message.answer(with_footer(result_text), parse_mode='HTML')
+    if is_callback:
+        try:
+            await event_obj.message.edit_text(with_footer(result_text), parse_mode='HTML')
+        except Exception:
+            await event_obj.message.answer(with_footer(result_text), parse_mode='HTML')
+        await event_obj.answer("Premium muvaffaqiyatli qo'shildi! ✅")
+    else:
+        await event_obj.answer(with_footer(result_text), parse_mode='HTML')
 
 
 @router.message(F.text == 'Premium Sozlamalar 👑')
@@ -3438,3 +3325,307 @@ async def process_backup_channel_input(message: Message, state: FSMContext):
             ),
             parse_mode="HTML"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  📊 A7: FAOLLIK GRAFIGI (7 KUN / 30 KUN) HESOBOTLARI
+# ═══════════════════════════════════════════════════════════════════════════════
+@router.message(F.text == 'Faollik Tahlili 📊')
+async def admin_activity_report_menu(message: Message, state: FSMContext):
+    await state.clear()
+    if not await db_req.has_permission(message.from_user.id, 'view_stats'):
+        return
+    from keyboards.inline import get_admin_activity_report_keyboard
+    txt = (
+        "📊 <b>FAOLLIK TAHLILI PANELI</b>\n\n"
+        "Quyidagi variantlardan birini tanlang:\n"
+        "• 7 kunlik aktivlik grafigi\n"
+        "• 30 kunlik aktivlik grafigi\n\n"
+        "<i>Hisoblar: Yangi foydalanuvchilar, aktivlar, ko'rilgan kinolar, Premium sotuvlari va daromad.</i>"
+    )
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_activity_report_keyboard())
+
+
+def _make_bar(value: int, max_val: int, width: int = 15) -> str:
+    if max_val <= 0:
+        return "▱" * width
+    filled = max(0, min(width, int(round(value * width / max_val))))
+    return "█" * filled + "▱" * (width - filled)
+
+
+@router.callback_query(F.data.startswith('report_activity_'))
+async def cb_admin_activity_report(callback: CallbackQuery):
+    if not await db_req.has_permission(callback.from_user.id, 'view_stats'):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    days_part = callback.data[len('report_activity_'):]
+    try:
+        days = int(days_part)
+    except Exception:
+        days = 7
+    stats = await db_req.get_activity_report_last_days(days=days)
+    if not stats:
+        await callback.answer("⚠️ Hozircha statistika mavjud emas.", show_alert=True)
+        return
+
+    dates = sorted(stats.keys())
+    total_new = sum(stats[d]["new"] for d in dates)
+    total_active = sum(stats[d]["active"] for d in dates)
+    total_watched = sum(stats[d]["watched"] for d in dates)
+    total_premium = sum(stats[d]["premium"] for d in dates)
+    total_revenue = sum(stats[d]["revenue"] for d in dates)
+    max_active = max((stats[d]["active"] for d in dates), default=1)
+    max_watched = max((stats[d]["watched"] for d in dates), default=1)
+
+    txt = f"📊 <b>AKTIVLIK HISOBOTI (OXIRGI {days} KUN)</b>\n\n"
+    txt += f"👥 Yangi userlar: <b>{total_new}</b> | Aktiv: <b>{total_active}</b>\n"
+    txt += f"🎬 Ko'rilgan kinolar: <b>{total_watched}</b> | Premium: <b>{total_premium}</b>\n"
+    txt += f"💰 Jami daromad: <b>{total_revenue:,} UZS</b>\n\n"
+    txt += "━" * 30 + "\n"
+    for d in dates:
+        s = stats[d]
+        bar_active = _make_bar(s["active"], max_active, 10)
+        bar_watch = _make_bar(s["watched"], max_watched, 10)
+        txt += (
+            f"📅 <b>{d}</b>\n"
+            f"  👤 Aktiv: {bar_active} {s['active']}\n"
+            f"  🎬 Ko'rilgan: {bar_watch} {s['watched']}\n"
+            f"  🆕 Yangi: {s['new']} | 👑 Premium: {s['premium']} | 💰 {s['revenue']:,}\n\n"
+        )
+    from keyboards.inline import get_admin_activity_report_keyboard
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_activity_report_keyboard())
+    except Exception:
+        await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_activity_report_keyboard())
+    await callback.answer()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  💎 A11: KUNLIK SOVG'A — ENG FAOL 10 USERGA 75 BALL
+# ═══════════════════════════════════════════════════════════════════════════════
+@router.message(F.text == 'Ballar 💎')
+async def admin_gift_menu(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
+        return
+    from keyboards.inline import get_admin_gift_keyboard
+    txt = (
+        "💎 <b>KUNLIK AKTIVLIK SOVG'ASI PANELI</b>\n\n"
+        "🎯 Bu kuni eng ko'p kino ko'rgan TOP 10 ta foydalanuvchiga "
+        "avtomatik <b>75 ball</b> sovg'a qilinadi.\n\n"
+        "<i>Diqqat: Bir foydalanuvchiga bir kunda 1 marta dan ko'p sovg'a berilmaydi.</i>"
+    )
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_gift_keyboard())
+
+
+@router.callback_query(F.data == 'gift_top_10_75pts')
+async def cb_gift_top_10_75pts(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Faqat Bosh Adminlar amalga oshirishi mumkin!", show_alert=True)
+        return
+    try:
+        awarded = await db_req.give_daily_gift_top_active(points=75, limit=10)
+    except Exception as e:
+        await callback.answer(f"❌ Xato: {e}", show_alert=True)
+        return
+
+    txt = f"🎁 <b>KUNLIK SOVG'A BERILDI (TOP 10 — 75 BALL):</b>\n\n"
+    if awarded:
+        total_pts = 0
+        for idx, (uid, display, pts) in enumerate(awarded, 1):
+            total_pts += pts
+            medals = ["🥇", "🥈", "🥉"] + [f"#{i}" for i in range(4, 11)]
+            medal = medals[idx - 1] if idx <= len(medals) else f"#{idx}"
+            txt += f"{medal} {display} (ID: <code>{uid}</code>) → +{pts} 💎\n"
+            try:
+                await callback.bot.send_message(
+                    uid,
+                    with_footer(
+                        f"🎉 <b>SIZ KUNLIK SOVG'A SO'G'INDIZ!</b>\n\n"
+                        f"🏆 Bugun eng faol foydalanuvchilardan birisiz!\n"
+                        f"💎 <b>+{pts} ball</b> hisobingizga qo'shildi.\n\n"
+                        f"<i>Yana har kuni aktiv qoling va sovg'alarga ega bo'ling!</i> 🍿"
+                    ),
+                    parse_mode='HTML'
+                )
+            except Exception:
+                pass
+        txt += f"\n✅ Jami taqdim etilgan: <b>{len(awarded)} ta foydalanuvchi, {total_pts} ball</b>"
+    else:
+        txt += "⚠️ <i>Bugun hech kimga sovg'a berilmadi. Allaqachon barcha top userlar sovg'alarini olgan yoki aktivlik yetarli emas.</i>"
+
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode='HTML')
+    except Exception:
+        await callback.message.answer(with_footer(txt), parse_mode='HTML')
+    await callback.answer(f"✅ {len(awarded)} ta userga sovg'a berildi!")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  👎 A5: ENG PAST BAHOLI KINOLAR (75+ DISLIKE)
+# ═══════════════════════════════════════════════════════════════════════════════
+@router.message(F.text == 'Izohlar moderatsiyasi 💬')
+async def admin_disliked_menu(message: Message, state: FSMContext):
+    await state.clear()
+    if not await db_req.has_permission(message.from_user.id, 'delete_movie') and message.from_user.id not in config.ADMINS:
+        return
+    from keyboards.inline import get_admin_disliked_keyboard
+    txt = (
+        "👎 <b>ENG PAST BAHOLI KINOLAR PANELI</b>\n\n"
+        "75+ kishi 👎 yoqmadi deb baholagan kinolarni bu yerda ko'rishingiz mumkin.\n"
+        "Bunday kinolarni tahrirlash yoki o'chirish tavsiya etiladi.\n\n"
+        "<i>Anti-abuse: 1 user 1 kinoga 1 marta ovoz bera oladi.</i>"
+    )
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_disliked_keyboard())
+
+
+@router.callback_query(F.data == 'show_bad_movies_75')
+async def cb_show_bad_movies_75(callback: CallbackQuery):
+    if not await db_req.has_permission(callback.from_user.id, 'delete_movie') and callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    try:
+        rows = await db_req.get_movies_with_high_dislikes(threshold=75)
+    except Exception as e:
+        await callback.answer(f"❌ Xato: {e}", show_alert=True)
+        return
+
+    txt = f"👎 <b>75+ DISLIKE OLGAN KINOLAR ({len(rows)} ta):</b>\n\n"
+    builder = InlineKeyboardBuilder()
+    if rows:
+        for idx, (m_id, cap, dislikes, likes) in enumerate(rows, 1):
+            name = (cap or 'Nomsiz').split('\n')[0][:50]
+            diff = (likes or 0) - (dislikes or 0)
+            sign = "+" if diff >= 0 else ""
+            txt += (
+                f"{idx}. 🎬 <b>/{m_id}</b>\n"
+                f"   📝 {name}\n"
+                f"   👍 {likes or 0} | 👎 {dislikes or 0} | Farq: <b>{sign}{diff}</b>\n\n"
+            )
+            builder.button(text=f"✏️ Tahrirlash {m_id}", callback_data=f'edit_movie_start_{m_id}')
+            builder.button(text=f"🗑️ O'chirish {m_id}", callback_data=f'delete_bad_movie_{m_id}')
+    else:
+        txt += "✅ <i>Hozircha 75+ dislike olgan kino yo'q. Hammasi normal!</i>"
+    if rows:
+        builder.adjust(2)
+    from keyboards.inline import get_admin_disliked_keyboard
+    for btn_row in get_admin_disliked_keyboard().inline_keyboard:
+        builder.row(*btn_row)
+    kb = builder.as_markup()
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    except Exception:
+        await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('delete_bad_movie_'))
+async def cb_delete_bad_movie(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Faqat Bosh Admin o'chirishi mumkin!", show_alert=True)
+        return
+    try:
+        movie_id = int(callback.data.split('_')[-1])
+    except Exception:
+        await callback.answer("❌ Kino ID xato.", show_alert=True)
+        return
+    deleted, cap = await db_req.delete_movie(movie_id)
+    if deleted:
+        try:
+            await sync_movies_backup_storage(callback.bot)
+        except Exception:
+            pass
+    msg = f"✅ Kino #{movie_id} o'chirildi!" if deleted else f"❌ Kino #{movie_id} topilmadi."
+    await callback.answer(msg, show_alert=True)
+    await cb_show_bad_movies_75(callback)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  📩 A13: REFERAL OBUNA BO'LMAGANLARGA ESLATMA YUBORISH
+# ═══════════════════════════════════════════════════════════════════════════════
+@router.message(F.text == 'Referal sozlash 👥')
+async def admin_referral_reminder_menu(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS:
+        return
+    from keyboards.inline import get_admin_referral_reminder_keyboard
+    txt = (
+        "📩 <b>REFERAL TUGALLANMAGAN ESLATMA PANELI</b>\n\n"
+        "Referal orqali botga kirgan, lekin homiy kanallarga obuna bo'lmagan "
+        "foydalanuvchilar uchun referal egasiga eslatma yuboriladi.\n\n"
+        "<i>Anti-spam: 1 xabar 1 marta dan ko'p yuborilmaydi.</i>"
+    )
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_referral_reminder_keyboard())
+
+
+@router.callback_query(F.data == 'ref_reminder_send_all')
+async def cb_ref_reminder_send_all(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Faqat Bosh Adminlar!", show_alert=True)
+        return
+    await callback.answer("⏳ Eslatmalar yuborilmoqda...")
+    bot = callback.bot
+
+    async with db_req.get_db() as db:
+        async with db.execute("""
+            SELECT DISTINCT u.referred_by
+            FROM users u
+            WHERE u.referred_by IS NOT NULL
+              AND u.referral_rewarded = 0
+        """) as c:
+            referrer_rows = await c.fetchall()
+
+    sent_count = 0
+    failed = 0
+    for (referrer_id,) in referrer_rows:
+        if not referrer_id:
+            continue
+        pending = await db_req.get_referrals_with_incomplete_sub(referrer_id)
+        if not pending:
+            continue
+        pending_display = []
+        for p in pending[:10]:
+            pid, puname, pfname, t = p
+            d = f"@{puname}" if puname else (pfname or f"User {pid}")
+            pending_display.append(f"• {d}")
+        if not pending_display:
+            continue
+        msg_txt = (
+            "📩 <b>REFERAL ESLATMA!</b>\n\n"
+            f"Sizning {len(pending)} ta referalingiz hali homiy kanallarga obuna bo'lmagan:\n"
+            + "\n".join(pending_display)
+            + "\n\n<i>Ularga eslating: Obuna bo'lsalar, siz darhol sovg'a olishingiz mumkin! 🎁</i>"
+        )
+        try:
+            await bot.send_message(
+                referrer_id,
+                with_footer(msg_txt),
+                parse_mode='HTML'
+            )
+            sent_count += 1
+        except Exception:
+            failed += 1
+
+    txt = (
+        f"✅ <b>REFERAL ESLATMA YUBORISH TUGALLANDI!</b>\n\n"
+        f"📤 Muvaffaqiyatli yuborilgan: <b>{sent_count}</b> ta referal egasiga\n"
+        f"❌ Xatolik bilan: <b>{failed}</b> ta\n\n"
+        f"<i>Keyingi eslatmalar keyingi kunda yuboriladi (spamning oldini olish uchun).</i>"
+    )
+    from keyboards.inline import get_admin_referral_reminder_keyboard
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_referral_reminder_keyboard())
+    except Exception:
+        await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_referral_reminder_keyboard())
+    await callback.answer(f"✅ {sent_count} ta eslatma yuborildi!", show_alert=True)
+
+
+@router.callback_query(F.data == 'admin_menu')
+async def cb_admin_menu(callback: CallbackQuery):
+    from handlers.user import execute_start_logic
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await execute_start_logic(callback.message, None)
+    await callback.answer()

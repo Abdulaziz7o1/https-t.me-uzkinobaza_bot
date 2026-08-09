@@ -63,7 +63,12 @@ async def execute_start_logic(message: Message, state: FSMContext):
     elif user_id in db_admins:
         await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Moderator {name_to_show}!</b>\n\n🛠 <b>Moderator paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_moderator_menu())
     else:
-        await message.answer(with_footer(f'👋 <b>Assalomu alaykum, {name_to_show}!</b>\n\n🍿 <b>Kino botiga xush kelibsiz!</b>\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+        # Premium foydalanuvchi - kanal tekshiruvini o'tkazib yuborish
+        is_prem = await db_req.is_premium_user(user_id)
+        if is_prem:
+            await message.answer(with_footer(f'👑 <b>Assalomu alaykum, {name_to_show}!</b>\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+        else:
+            await message.answer(with_footer(f'👋 <b>Assalomu alaykum, {name_to_show}!</b>\n\n🍿 <b>Kino botiga xush kelibsiz!</b>\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
 
 @router.message(CommandStart(), StateFilter('*'))
 @router.message(Command('start'), StateFilter('*'))
@@ -105,6 +110,11 @@ async def btn_start(message: Message, state: FSMContext):
     db_admins = await db_req.get_all_admins()
     if user_id in config.ADMINS or user_id in db_admins:
         await message.answer(with_footer(f'👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+        return
+    # Premium foydalanuvchi sponsor kanal tekshiruvidan o'tkazilmaydi
+    is_prem = await db_req.is_premium_user(user_id)
+    if is_prem:
+        await message.answer(with_footer(f'👑 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
         return
     db_channels = await db_req.get_sponsor_channels()
     all_channels = list(config.CHANNELS) + [c[1] for c in db_channels]
@@ -171,6 +181,7 @@ async def search_movie_by_code(message: Message):
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1'
         await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires))
+        await _movie_watched_extra(user_id, caption)
     else:
         await message.answer(with_footer(f"❌ <b>Kino topilmadi!</b>\n\nKino kodi <code>{movie_id}</code> bo'yicha kino mavjud emas.\nIltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning.{CONTACT_FOOTER}"), parse_mode='HTML')
         return
@@ -1030,23 +1041,7 @@ async def toggle_comment_like_callback(callback: CallbackQuery):
     comm_id = int(callback.data.split('_')[2])
     liked, count = await db_req.toggle_comment_like(comm_id, callback.from_user.id)
     status_txt = 'Like bosildi! ❤️' if liked else 'Like olib tashlandi 💔'
-    await callback.answer(f'{status_txt} (Jami: {count}){CONTACT_FOOTER}')
-
-@router.message(F.text.regexp('(?i).*(saqlanganlar|tanlanganlar).*'))
-async def user_favorites_list(message: Message, state: FSMContext):
-    await state.clear()
-    favs = await db_req.get_user_favorites(message.from_user.id)
-    if not favs:
-        await message.answer(with_footer("⭐️ <b>Sizda hali saqlangan kinolar yo'q.</b>\n\nKinolar ostidagi <b>«Tanlanganlarga qo'shish ⭐»</b> tugmasini bosib o'zingizga ma'qul kinolarni saqlab qo'yishingiz mumkin."), parse_mode='HTML')
-        return
-    text = f'⭐️ <b>Sizning saqlangan kinolaringiz ({len(favs)} ta):</b>\n\n'
-    builder = InlineKeyboardBuilder()
-    for movie_id, caption, _ in favs[:15]:
-        title = caption[:30] if caption else f'Kino {movie_id}'
-        text += f'🎬 <b>/{movie_id}</b> — {title}\n'
-        builder.button(text=f'🎬 {movie_id}', callback_data=f'show_movie_{movie_id}')
-    builder.adjust(3)
-    await message.answer(with_footer(text), parse_mode='HTML', reply_markup=builder.as_markup())
+    await callback.answer(f'{status_txt} (Jami: {count})')
 
 @router.callback_query(F.data == 'show_favorites_profile')
 async def show_favorites_profile_cb(callback: CallbackQuery):
@@ -1107,24 +1102,38 @@ async def user_profile_card(message: Message, state: FSMContext):
     bday_str = birthday if birthday else 'Kiritilmagan ❌'
     next_info = f'\n🎯 Keyingi daraja (VIP) uchun: <code>{next_limit - pts}</code> ball qoldi.' if next_limit is not None else ''
     txt = f"👑 <b>SHAXSIY PROFILINGIZ:</b>\n\n👤 <b>Foydalanuvchi:</b> {message.from_user.full_name}\n🆔 <b>ID:</b> <code>{user_id}</code>\n🌟 <b>Darajangiz:</b> {level_emoji} <b>{level_name}</b>\n💎 <b>To'plangan Ballar:</b> <code>{pts}</code> 💎{next_info}\n👥 <b>Chaqirgan Referallaringiz:</b> <code>{ref_count}</code> ta\n⭐️ <b>Saqlangan Kinolaringiz:</b> <code>{fav_count}</code> ta\n🎂 <b>Tug'ilgan Kuningiz:</b> <code>{bday_str}</code>\n🛡 <b>Maqomingiz:</b> {status_str}"
-    from keyboards.inline import get_profile_keyboard
-    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_profile_keyboard())
+    from keyboards.inline import get_profile_extended_keyboard
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_profile_extended_keyboard())
 
 @router.callback_query(F.data == 'show_watch_history')
 async def show_watch_history_callback(callback: CallbackQuery):
-    history = await db_req.get_watch_history(callback.from_user.id, limit=10)
+    history = await db_req.get_watch_history(callback.from_user.id, limit=100)
     if not history:
         await callback.answer("Sizda hali ko'rilgan kinolar tarixi yo'q.", show_alert=True)
         return
-    txt = "🕒 <b>Oxirgi ko'rilgan kinolaringiz:</b>\n\n"
+    txt = f"🕒 <b>Ko'rilgan kinolarim tarixi (oxirgi {min(len(history), 100)} ta):</b>\n\n"
     builder = InlineKeyboardBuilder()
-    for m_id, cap, w_at in history:
+    for idx, (m_id, cap, w_at) in enumerate(history, 1):
         title = cap[:25] if cap else f'Kino {m_id}'
-        txt += f'🎬 <b>{m_id}</b> — {title} (<i>{w_at}</i>)\n'
-        builder.button(text=f'🎬 {m_id}', callback_data=f'show_movie_{m_id}')
+        txt += f'{idx}. 🎬 <b>/{m_id}</b> — {title} (<i>{w_at}</i>)\n'
+        if idx <= 30:
+            builder.button(text=f'🎬 {m_id}', callback_data=f'show_movie_{m_id}')
     builder.adjust(3)
+    builder.row(
+        InlineKeyboardButton(text='🧹 Tarixni tozalash', callback_data='clear_watch_history'),
+        InlineKeyboardButton(text='🏠 Bosh menyu', callback_data='home_menu')
+    )
     await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=builder.as_markup())
     await callback.answer()
+
+@router.callback_query(F.data == 'clear_watch_history')
+async def clear_watch_history_callback(callback: CallbackQuery):
+    await db_req.clear_watch_history(callback.from_user.id)
+    await callback.answer("✅ Ko'rilgan kinolar tarixi tozalandi!", show_alert=True)
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
 
 @router.message(Command('top'))
 @router.message(F.text.in_(['🔝 TOP Kinolar', 'TOP Kinolar 🔝', 'TOP Kinolar']))
@@ -1182,12 +1191,14 @@ async def render_top_movies(event: Message, page: int=1, is_callback: bool=False
 async def user_birthday_start(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
+    locked = await db_req.is_birthday_locked(user_id)
     existing_bday = await db_req.get_user_birthday(user_id)
-    if existing_bday:
-        await message.answer(with_footer(f"🎂 <b>Sizning saqlangan tug'ilgan kuningiz:</b> <code>{existing_bday}</code>\n\n⚠️ <i>Eslatma: Tug'ilgan kun ma'lumotlari 1 marta saqlanadi va o'zgartirib bo'lmaydi.\nHar yili ushbu kunda sizga <b>+50 💎 ball</b> va <b>👑 1 kunlik VIP</b> taqdim etiladi!</i>{CONTACT_FOOTER}"), parse_mode='HTML')
+    if locked or existing_bday:
+        display = existing_bday if existing_bday and existing_bday != 'BLOCKED_UNDERAGE' else "❌ Belgilanmagan"
+        await message.answer(with_footer(f"🎂 <b>Sizning saqlangan tug'ilgan kuningiz:</b> <code>{display}</code>\n\n🔒 <b>Diqqat:</b> Tug'ilgan kun ma'lumotlari <b>1 MARTAGINA</b> saqlanadi va keyinchalik o'zgartirib BO'LMAYDI!\n\n🎁 <b>Sovg'a (har yili shu kunda):</b>\n  • � 1 KUNLIK Premium\n  • � 100 ball\n  • 🎂 Maxsus stickerlar xabari\n\n<i>Biz bilan qoling! 🌟</i>{CONTACT_FOOTER}"), parse_mode='HTML')
         return
     await state.set_state(UserStates.waiting_for_birthday)
-    await message.answer(with_footer("🎂 <b>Tug'ilgan kuningizni kiriting!</b>\n\nAgar botimizdan tug'ilgan kuningizda:\n  🎁 <b>+50 💎 ball</b>\n  👑 <b>1 kunlik VIP maqomi</b>\n  🎉 <b>Shaxsiy tabrik xabari</b> olmoqchi bo'lsangiz, quyidagi formatda yuboring:\n\n📅 <b>Format:</b> <code>KK.OO.YYYY</code>\n  <i>Masalan: 10.10.2013 (10-oktyabr 2013-yil)</i>\n\n⚠️ <b>Eslatma:</b>\n  • Yosh 12 yosh va undan yuqori bo'lishi kerak\n  • Tug'ilgan kun 1 marta saqlanadi va qayta kiritib bo'lmaydi\n  • Noto'g'ri ma'lumot kiritilsa bonus berilmaydi va imkoniyat yo'qoladi!"), parse_mode='HTML')
+    await message.answer(with_footer("🎂 <b>Tug'ilgan kuningizni kiriting!</b>\n\nAgar botimizdan tug'ilgan kuningizda <b>MAXSUS SOVG'A</b> olmoqchi bo'lsangiz:\n\n🎁 <b>Sovg'a (har yili):</b>\n  • 👑 1 KUNLIK VIP Premium\n  • 💎 100 ball\n  • � Shaxsiy tabrik + stickerlar\n\n📅 <b>Format:</b> <code>KK.OO.YYYY</code>\n  <i>Masalan: 10.10.2013 (10-oktyabr 2013-yil)</i>\n\n⚠️ <b>JUDDAM AHMIYATLI:</b>\n  • Yosh kamida <b>12 da</b> bo'lishi kerak\n  • <b>1 MARTA</b> saqlanadi — keyin o'zgartirib BO'LMAYDI!\n  • Noto'g'ri ma'lumot → imkoniyat BUTUNLAY yo'qoladi!"), parse_mode='HTML')
 
 @router.message(UserStates.waiting_for_birthday, F.text, ~F.text.in_(USER_MENU_BUTTONS))
 async def user_birthday_save(message: Message, state: FSMContext):
@@ -1195,6 +1206,10 @@ async def user_birthday_save(message: Message, state: FSMContext):
     from datetime import datetime
     text = message.text.strip()
     user_id = message.from_user.id
+    if await db_req.is_birthday_locked(user_id):
+        await state.clear()
+        await message.answer(with_footer("🔒 <b>Kechirasiz, tug'ilgan kun allaqachon 1 marta kiritilgan. O'zgartirib bo'lmaydi.</b>"))
+        return
     if not re.match('^\\d{2}\\.\\d{2}\\.\\d{4}$', text):
         await message.answer(with_footer("⚠️ <b>Noto'g'ri format!</b>\n\nIltimos, <code>KK.OO.YYYY</code> formatida kiriting.\n<i>Masalan: 10.10.2013</i>"), parse_mode='HTML')
         return
@@ -1211,15 +1226,47 @@ async def user_birthday_save(message: Message, state: FSMContext):
     age = now.year - birth_dt.year - ((now.month, now.day) < (birth_dt.month, birth_dt.day))
     if age < 12:
         await db_req.set_user_birthday(user_id, 'BLOCKED_UNDERAGE')
+        await db_req.lock_user_birthday(user_id)
         await state.clear()
-        await message.answer(with_footer(f"❌ <b>Uzr!</b> Botimizdan foydalanish va tug'ilgan kun bonusini olish uchun yoshingiz kamida <b>12 da</b> bo'lishi kerak.\n\nSiz kiritgan sana bo'yicha yoshingiz <b>{age} da</b> bo'lgani sababli tug'ilgan kuningiz saqlanmadi va qayta kiritish imkoniyati berilmaydi.{CONTACT_FOOTER}"), parse_mode='HTML')
+        await message.answer(with_footer(f"❌ <b>Uzr!</b> Botimizdan foydalanish va sovg'alar olish uchun yoshingiz kamida <b>12 da</b> bo'lishi kerak.\n\nSiz kiritgan sana bo'yicha yoshingiz <b>{age} da</b> bo'lgani sababli:\n  • Tug'ilgan kun saqlanmadi\n  • Qayta kiritish IMKONIYATI BERILMAYDI\n\nBu amal <b>1 MARTA</b> bajarildi va o'zgartirib bo'lmaydi.{CONTACT_FOOTER}"), parse_mode='HTML')
         return
     success = await db_req.set_user_birthday(user_id, text)
+    await db_req.lock_user_birthday(user_id)
     await state.clear()
     if success:
-        await message.answer(with_footer(f"🎉 <b>Tabriklaymiz! Tug'ilgan kuningiz ({text}) muvaffaqiyatli saqlandi!</b>\n\nHar yili ushbu kunda botimiz sizga <b>+50 💎 ball</b> va <b>👑 1 kunlik VIP maqomi</b> taqdim etadi!{CONTACT_FOOTER}"), parse_mode='HTML')
+        today_is_birthday = (now.month == b_month and now.day == b_day)
+        extra = ""
+        if today_is_birthday:
+            from database.requests import add_premium_days, add_points_to_user
+            try:
+                await add_premium_days(user_id, "Tug'ilgan kun sovg'asi", 1)
+            except Exception:
+                pass
+            try:
+                await add_points_to_user(user_id, 100)
+            except Exception:
+                pass
+            extra = f"\n\n🎉 <b>Aynan bugun sizning kuningiz!</b>\n  • 👑 1 kunlik Premium: <b>BERILDI ✅</b>\n  • 💎 100 ball: <b>BERILDI ✅</b>\n  • 🎂 Maxsus tabrik: <b>Tayyor! ✅</b>"
+            try:
+                sticker_caps = [
+                    "🎂🎉🎈 HAPPY BIRTHDAY! 🎈🎉🎂",
+                    "🎁✨ Siz uchun maxsus sovg'alar! ✨🎁",
+                    "🎊💝 Bu kunningiz baxtli o'tsin! 💝🎊"
+                ]
+                for sc in sticker_caps:
+                    try:
+                        await message.bot.send_message(
+                            chat_id=user_id,
+                            text=f"<b>{sc}</b>\n\n🎂 <i>Sizni tug'ilgan kuningiz bilan chin dildan tabriklaymiz!\nSiz uchun maxsus sovg'alar tayyorlandi!</i>",
+                            parse_mode='HTML'
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        await message.answer(with_footer(f"🎉 <b>Tabriklaymiz! Tug'ilgan kuningiz ({text}) saqlandi!</b>\n\n🔒 <b>1 MARTAGINA qulflandi</b> — endi o'zgartirib bo'lmaydi.\n\n🎁 <b>Har yili ushbu kunda sizga:</b>\n  • 👑 1 KUNLIK Premium\n  • 💎 100 ball\n  • 🎂 Shaxsiy tabrik xabari{extra}"), parse_mode='HTML')
     else:
-        await message.answer(with_footer("⚠️ Siz allaqachon tug'ilgan kuningizni saqlagansiz!"))
+        await message.answer(with_footer("⚠️ Xatolik yuz berdi."))
 
 @router.callback_query(F.data.startswith('show_movie_'))
 async def show_movie_callback(callback: CallbackQuery):
@@ -1232,11 +1279,14 @@ async def show_movie_callback(callback: CallbackQuery):
         views_count = rest[0] if rest else 1
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         is_fav = await db_req.is_favorite(user_id, movie_id)
+        likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
         cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
         if avg_rating > 0:
-            cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)'
+            rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
+            cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1'
-        await callback.message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating))
+        await callback.message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires))
+        await _movie_watched_extra(user_id, caption)
         await callback.answer()
     else:
         await callback.answer('❌ Kino topilmadi', show_alert=True)
@@ -1363,4 +1413,177 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
                 return
         except Exception:
             pass
-        await message.answer(with_footer(f"❌ <b>'{query}'</b> nomli kino topilmadi.\n\nIltimos, kino nomini to'g'ri yozing yoki <b>Kino so'rash 📥</b> tugmasidan foydalaning."))
+        from keyboards.inline import get_notify_request_keyboard
+        await message.answer(with_footer(f"❌ <b>'{query}'</b> nomli kino topilmadi.\n\nIltimos, kino nomini to'g'ri yozing yoki quyidagi tugmalardan foydalaning:"),
+                             parse_mode='HTML',
+                             reply_markup=get_notify_request_keyboard(query))
+
+
+# ─── 🔔 U10: KINO TOPILMAGANDA ESATMA SO'RASH ──────────────────────────────
+@router.callback_query(F.data.startswith('notify_me_'))
+async def cb_notify_me(callback: CallbackQuery):
+    q = callback.data[len('notify_me_'):]
+    ok = await db_req.add_movie_notify_request(callback.from_user.id, q)
+    if ok:
+        await callback.answer("✅ Saqlandi! Kino qo'shilganda sizga xabar beraman!", show_alert=True)
+    else:
+        await callback.answer("⚠️ Xatolik yuz berdi", show_alert=True)
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+
+# ─── 🏠 BOSH MENYU ───────────────────────────────────────────────────────────
+@router.callback_query(F.data == 'home_menu')
+async def cb_home_menu(callback: CallbackQuery):
+    from keyboards.reply import get_user_menu, get_admin_menu, get_moderator_menu
+    uid = callback.from_user.id
+    user = callback.from_user
+    name = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
+    db_admins = await db_req.get_all_admins()
+    if uid in config.ADMINS:
+        txt = f'👋 <b>Assalomu alaykum, Bosh Admin {name}!</b>\n\n🛠 Boshqaruv paneli'
+        kb = get_admin_menu()
+    elif uid in db_admins:
+        txt = f'👋 <b>Assalomu alaykum, Moderator {name}!</b>\n\n🛠 Moderator paneli'
+        kb = get_moderator_menu()
+    else:
+        txt = f'👋 <b>Assalomu alaykum, {name}!</b>\n\n🍿 Kino botiga xush kelibsiz!'
+        kb = get_user_menu()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer()
+
+
+# ─── 🎯 U1: JANR TAVSIYASI ───────────────────────────────────────────────────
+@router.callback_query(F.data == 'show_recommendation')
+async def cb_show_recommendation(callback: CallbackQuery):
+    uid = callback.from_user.id
+    movies = await db_req.recommend_movies_by_genre(uid, limit=10)
+    if not movies:
+        await callback.answer("❌ Hozircha siz uchun tavsiya yo'q. Ko'proq kino ko'ring! 🍿", show_alert=True)
+        return
+    txt = "🎯 <b>Sizga tavsiya etilgan kinolar:</b>\n\n"
+    for idx, mv in enumerate(movies, 1):
+        m_id, caption, views = mv
+        name = (caption or 'Nomsiz').split('\n')[0][:50]
+        txt += f"{idx}. 🎬 /{m_id} — {name} (👁 {views or 0})\n"
+    txt += "\nKinoni ko'rish uchun kodi ustiga bosing."
+    await callback.message.answer(with_footer(txt), parse_mode='HTML')
+    await callback.answer()
+
+
+# ─── 🔥 U9: HAFTALIK TOP 10 ───────────────────────────────────────────────────
+@router.callback_query(F.data == 'show_weekly_top')
+async def cb_show_weekly_top(callback: CallbackQuery):
+    rows = await db_req.get_weekly_top_movies(limit=10)
+    if not rows:
+        await callback.answer("❌ Bu hafta hali reyting shakllanmagan.", show_alert=True)
+        return
+    txt = "🔥 <b>Bu hafta TOP 10 kinolar:</b>\n\n"
+    medals = ["🥇", "🥈", "🥉"] + [f"#{i}" for i in range(4, 11)]
+    for idx, mv in enumerate(rows):
+        m_id, caption, avg_r, cnt = mv
+        medal = medals[idx] if idx < len(medals) else f"#{idx+1}"
+        name = (caption or 'Nomsiz').split('\n')[0][:45]
+        avg_str = f"{avg_r:.1f}" if avg_r else "0.0"
+        txt += f"{medal} 🎬 /{m_id} — {name} ({avg_str}⭐, {cnt or 0} ovoz)\n"
+    await callback.message.answer(with_footer(txt), parse_mode='HTML')
+    await callback.answer()
+
+
+# ─── 💳 U11: TO'LOVLAR TARIXI ────────────────────────────────────────────────
+@router.callback_query(F.data == 'show_payment_history')
+async def cb_show_payment_history(callback: CallbackQuery):
+    uid = callback.from_user.id
+    rows = await db_req.get_user_payment_history(uid, limit=20)
+    if not rows:
+        await callback.answer("❌ Sizda hali to'lovlar tarixi yo'q.", show_alert=True)
+        return
+    txt = "💳 <b>To'lovlar tarixim (oxirgi 20 ta):</b>\n\n"
+    for idx, p in enumerate(rows, 1):
+        pid, amount, plan, created, conf_by = p
+        txt += f"{idx}. 💰 {amount:,} UZS — <i>{plan or 'Premium'}</i>\n   📅 {created or '?'}\n\n"
+    await callback.message.answer(with_footer(txt), parse_mode='HTML')
+    await callback.answer()
+
+
+# ─── 👥 U13: REFERALLAR BATAFSIL (PAGINATION) ─────────────────────────────────
+@router.callback_query(F.data == 'show_my_referrals_detailed')
+async def cb_show_my_referrals(callback: CallbackQuery):
+    await _render_referrals_page(callback, page=1, is_callback=True)
+
+@router.callback_query(F.data.startswith('refs_page_'))
+async def cb_referrals_page(callback: CallbackQuery):
+    try:
+        page = int(callback.data.split('_')[2])
+    except Exception:
+        page = 1
+    await _render_referrals_page(callback, page=page, is_callback=True)
+
+async def _render_referrals_page(event, page: int = 1, is_callback: bool = False):
+    uid = event.from_user.id if hasattr(event, 'from_user') else event.message.from_user.id
+    rows, total_count, total_pages = await db_req.get_user_referrals_detailed(uid, page=page, per_page=20)
+    pending = await db_req.get_referrals_with_incomplete_sub(uid)
+    page = max(1, min(page, total_pages))
+    txt = f"👥 <b>Mening referallarim (Jami: {total_count} ta)</b>\n<i>Sahifa {page}/{total_pages}</i>\n\n"
+    builder = InlineKeyboardBuilder()
+    if rows:
+        start_idx = (page - 1) * 20 + 1
+        for idx, ref in enumerate(rows, start_idx):
+            if len(ref) >= 9:
+                rid, uname, fname, cat, rcount, pts, role, rewarded, prem = ref
+            else:
+                rid, uname, fname, cat, rcount, pts, role, rewarded = ref
+                prem = None
+            display = f"@{uname}" if uname else (fname or f"User {rid}")
+            mark = "✅" if rewarded else "⏳"
+            prem_mark = "👑" if prem else ""
+            txt += f"{idx}. {display} {prem_mark} {mark}\n   📅 {cat} | 👥 ref: {rcount or 0} | 💎 pts: {pts or 0}\n"
+    else:
+        txt += "Hali referallingiz yo'q. Do'stlaringizni taklif qiling va sovg'alar oling! 🎁\n"
+    if pending:
+        txt += f"\n📩 <b>Obuna bo'lmaganlar ({len(pending)} ta):</b>\n"
+        for p in pending[:5]:
+            pid, puname, pfname, t = p
+            d = f"@{puname}" if puname else (pfname or f"User {pid}")
+            txt += f"  ⏳ {d} — {t}\n"
+    if total_pages > 1:
+        if page > 1:
+            builder.button(text="⬅️ Oldingi", callback_data=f'refs_page_{page-1}')
+        builder.button(text=f"📄 {page}/{total_pages}", callback_data='refs_page_dummy')
+        if page < total_pages:
+            builder.button(text="Keyingi ➡️", callback_data=f'refs_page_{page+1}')
+        builder.adjust(3)
+    builder.row(
+        InlineKeyboardButton(text='🏠 Bosh menyu', callback_data='home_menu')
+    )
+    kb = builder.as_markup()
+    msg_txt = with_footer(txt)
+    target_msg = event.message if is_callback else event
+    if is_callback:
+        try:
+            await target_msg.edit_text(msg_txt, parse_mode='HTML', reply_markup=kb)
+        except Exception:
+            await target_msg.answer(msg_txt, parse_mode='HTML', reply_markup=kb)
+        await event.answer()
+    else:
+        await target_msg.answer(msg_txt, parse_mode='HTML', reply_markup=kb)
+
+
+# ─── 🕒 KO'RILGAN KINOLAR GA JANR TRACK QO'SHISH ────────────────────────────
+async def _movie_watched_extra(user_id: int, caption: str):
+    """Kino ko'rilganda qo'shimcha: janrni track qilish"""
+    try:
+        await db_req.track_watch_genres(user_id, caption or "")
+    except Exception:
+        pass
+
+
+# Yuqoridagi cmd_start va search_movie_by_code da janr track qilish uchun:
+# (bu yerda qo'shimcha integriatsiya: search_movie_by_code da ishlatamiz)
+

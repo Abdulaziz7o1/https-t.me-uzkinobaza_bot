@@ -1549,8 +1549,16 @@ async def get_active_premium_subscribers_list(limit: int = 50) -> list:
                FROM users u
                LEFT JOIN premium_subscriptions s ON u.id = s.user_id
                WHERE u.is_premium = 1 OR u.role = 'vip' OR (s.end_date IS NOT NULL AND s.end_date > datetime('now'))
-               GROUP BY u.id
-               ORDER BY s.end_date ASC LIMIT ?""",
+               
+               UNION
+               
+               SELECT s.user_id, COALESCE(u.username, 'user_' || s.user_id), COALESCE(u.full_name, 'User ' || s.user_id),
+                      s.start_date, s.end_date, COALESCE(s.plan, 'Premium VIP')
+               FROM premium_subscriptions s
+               LEFT JOIN users u ON s.user_id = u.id
+               WHERE s.end_date IS NOT NULL AND s.end_date > datetime('now')
+               
+               LIMIT ?""",
             (limit,)
         ) as cursor:
             return await cursor.fetchall()
@@ -1946,16 +1954,24 @@ async def is_favorite(user_id: int, movie_id: int) -> bool:
             return bool(row)
 
 async def get_user_favorites(user_id: int) -> list:
-    """Foydalanuvchining saqlangan kinolari ro'yxati"""
+    """Foydalanuvchining saqlangan kinolari ro'yxati (3 ta qiymat: movie_id, caption, views_count)
+    Agar saqlangan kino bazadan o'chirilgan bo'lsa, avtomatik favorites dan o'chiriladi."""
     async with get_db() as db:
         async with db.execute(
-            """SELECT m.id, m.caption
+            """SELECT m.id, m.caption, COALESCE(m.views_count, 0)
                FROM favorites f
                JOIN movies m ON f.movie_id = m.id
                WHERE f.user_id = ?""",
             (user_id,)
         ) as cursor:
-            return await cursor.fetchall()
+            existing = await cursor.fetchall()
+        # Saqlangan lekin bazada mavjud bo'lmagan (o'chirilgan) kinolarni tozalash
+        await db.execute("""
+            DELETE FROM favorites
+            WHERE user_id = ? AND movie_id NOT IN (SELECT id FROM movies)
+        """, (user_id,))
+        await db.commit()
+        return existing
 
 # --- IZOHLAR LIKELARI (COMMENT LIKES) ---
 async def toggle_comment_like(comment_id: int, user_id: int) -> tuple[bool, int]:
@@ -2054,16 +2070,25 @@ async def set_user_premium(user_id: int, days: int = 7, plan: str = None) -> boo
         return True
 
 async def set_user_premium_custom_dates(user_id: int, start_date: str, end_date: str, plan: str = None) -> bool:
-    """Foydalanuvchiga Premium maqomini belgilangan sanalar bilan berish (start_date va end_date format: YYYY-MM-DD YYYY-MM-DD HH:MM:SS)"""
+    """Foydalanuvchiga Premium maqomini belgilangan sanalar bilan berish (start_date <= end_date kafolati bilan)"""
     from datetime import datetime
+    try:
+        dt_start = datetime.fromisoformat(start_date.replace(' ', 'T'))
+        dt_end = datetime.fromisoformat(end_date.replace(' ', 'T'))
+        if dt_start > dt_end:
+            start_date, end_date = end_date, start_date
+    except Exception:
+        pass
 
     async with get_db() as db:
-        # users jadvalini yangilash
+        # 1. users jadvalida user mavjud bo'lsa UPDATE, aks holda INSERT
         await db.execute(
-            "UPDATE users SET is_premium = 1, premium_until = ? WHERE id = ?",
-            (end_date, user_id)
+            """INSERT INTO users (id, username, full_name, is_premium, premium_until)
+               VALUES (?, ?, ?, 1, ?)
+               ON CONFLICT(id) DO UPDATE SET is_premium = 1, premium_until = ?""",
+            (user_id, f"user_{user_id}", f"User {user_id}", end_date, end_date)
         )
-        # premium_subscriptions jadvalini yangilash yoki qo'shish
+        # 2. premium_subscriptions jadvalini yangilash yoki qo'shish
         await db.execute(
             """INSERT INTO premium_subscriptions (user_id, start_date, end_date, plan)
                VALUES (?, ?, ?, ?)
@@ -2073,7 +2098,6 @@ async def set_user_premium_custom_dates(user_id: int, start_date: str, end_date:
                    plan = excluded.plan""",
             (user_id, start_date, end_date, plan or "Premium VIP")
         )
-        # Premium berilganda foydalanuvchining aktiv promo skidkasini sarf qilib (is_consumed = 1) belgilash
         try:
             await db.execute(
                 "UPDATE promo_uses SET is_consumed = 1 WHERE user_id = ? AND COALESCE(is_consumed, 0) = 0",
@@ -2446,16 +2470,30 @@ def get_user_level(points: int) -> tuple:
 
 # ─── WATCH HISTORY ────────────────────────────────────────────────────────────
 async def add_to_watch_history(user_id: int, movie_id: int):
-    """Kino ko'rilganlarni yozish"""
+    """Kino ko'rilganlarni yozish + 100 tadan oshganda eski qatorlarni o'chirish"""
     async with get_db() as db:
         await db.execute(
             "INSERT OR REPLACE INTO watch_history (user_id, movie_id, watched_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
             (user_id, movie_id)
         )
         await db.commit()
+        await _trim_watch_history_100(db, user_id)
 
-async def get_watch_history(user_id: int, limit: int = 10) -> list:
-    """Foydalanuvchining oxirgi ko'rgan kinolari"""
+async def _trim_watch_history_100(db, user_id: int):
+    """Watch history ni 100 tada cheklab, eski qatorlarni o'chirish"""
+    await db.execute("""
+        DELETE FROM watch_history
+        WHERE user_id = ? AND rowid NOT IN (
+            SELECT rowid FROM watch_history
+            WHERE user_id = ?
+            ORDER BY watched_at DESC
+            LIMIT 100
+        )
+    """, (user_id, user_id))
+    await db.commit()
+
+async def get_watch_history(user_id: int, limit: int = 100) -> list:
+    """Foydalanuvchining oxirgi ko'rgan kinolari (limit 100)"""
     async with get_db() as db:
         async with db.execute(
             """SELECT wh.movie_id, m.caption, wh.watched_at
@@ -2466,6 +2504,13 @@ async def get_watch_history(user_id: int, limit: int = 10) -> list:
             (user_id, limit)
         ) as cursor:
             return await cursor.fetchall()
+
+async def clear_watch_history(user_id: int) -> bool:
+    """Foydalanuvchi ko'rilgan kinolar tarixini tozalash (shaxsiy ma'lumot)"""
+    async with get_db() as db:
+        await db.execute("DELETE FROM watch_history WHERE user_id = ?", (user_id,))
+        await db.commit()
+    return True
 
 
 # ─── SHUBHALI HARAKAT LOG ─────────────────────────────────────────────────────
@@ -3292,4 +3337,316 @@ async def set_backup_channel_id(channel_id: str) -> bool:
             await db_m["backup_info"].replace_one({"_id": "backup_channel_setting"}, {"_id": "backup_channel_setting", "channel_id": str(channel_id)}, upsert=True)
         except Exception:
             pass
+    return True
+
+
+# ─── A5: 75+ DISLIKE BO'LGAN KINOLARNI TOPISH ─────────────────────────────────
+async def get_movies_with_high_dislikes(threshold: int = 75) -> list:
+    """Eng ko'p dislike (👎) olgan kinolarni topish. Default 75+."""
+    async with get_db() as db:
+        async with db.execute("""
+            SELECT m.id, m.caption,
+                   SUM(CASE WHEN mr.reaction = 'dislike' THEN 1 ELSE 0 END) AS dislikes,
+                   SUM(CASE WHEN mr.reaction = 'like' THEN 1 ELSE 0 END) AS likes
+            FROM movies m
+            LEFT JOIN movie_reactions mr ON m.id = mr.movie_id
+            GROUP BY m.id
+            HAVING dislikes >= ?
+            ORDER BY dislikes DESC
+        """, (threshold,)) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── A7: AKTIVLIK GRAFIGI / HISOBOT (MATN BILAN) ──────────────────────────────
+async def get_activity_report_last_days(days: int = 7) -> dict:
+    """Oxirgi N kun uchun aktivlik statistikasini olish"""
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    stats = {}
+    for i in range(days - 1, -1, -1):
+        d = today - timedelta(days=i)
+        d_str = d.strftime("%Y-%m-%d")
+        async with get_db() as db:
+            new_users = 0
+            async with db.execute("SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?", (d_str,)) as c:
+                r = await c.fetchone()
+                new_users = r[0] if r else 0
+            active_users = 0
+            async with db.execute("SELECT COUNT(*) FROM users WHERE DATE(last_active_at) = ?", (d_str,)) as c:
+                r = await c.fetchone()
+                active_users = r[0] if r else 0
+            movies_watched = 0
+            async with db.execute("SELECT COUNT(*) FROM watch_history WHERE DATE(watched_at) = ?", (d_str,)) as c:
+                r = await c.fetchone()
+                movies_watched = r[0] if r else 0
+            premium_count = 0
+            revenue = 0
+            async with db.execute("SELECT COUNT(*), COALESCE(SUM(amount),0) FROM payment_records WHERE DATE(created_at) = ?", (d_str,)) as c:
+                r = await c.fetchone()
+                premium_count = r[0] if r else 0
+                revenue = r[1] if r and r[1] else 0
+        stats[d_str] = {
+            "new": new_users,
+            "active": active_users,
+            "watched": movies_watched,
+            "premium": premium_count,
+            "revenue": revenue
+        }
+    return stats
+
+
+# ─── A11: KUNLIK ENG FAOL 10 TA USERGA 75 BALL SOVG'A ────────────────────────
+async def give_daily_gift_top_active(points: int = 75, limit: int = 10) -> list:
+    """Kunlik eng faol top N ta userga ball berish. Berilgan userlar ro'yxatini qaytaradi."""
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    # 1) top faollarni topish
+    async with get_db() as db:
+        async with db.execute("""
+            SELECT u.id, u.username, u.full_name, COUNT(w.movie_id) AS cnt
+            FROM users u
+            LEFT JOIN watch_history w ON u.id = w.user_id AND DATE(w.watched_at) = ?
+            GROUP BY u.id
+            ORDER BY cnt DESC
+            LIMIT ?
+        """, (today_str, limit)) as cursor:
+            top_list = await cursor.fetchall()
+
+    awarded = []
+    for row in top_list:
+        user_id = row[0]
+        # bugun allaqachon sovg'a berilganmi?
+        async with get_db() as db:
+            async with db.execute("SELECT last_daily_gift_date FROM users WHERE id = ?", (user_id,)) as c:
+                r = await c.fetchone()
+                if r and r[0] == today_str:
+                    continue
+            await db.execute("UPDATE users SET points = COALESCE(points,0) + ?, last_daily_gift_date = ? WHERE id = ?",
+                             (points, today_str, user_id))
+            await db.commit()
+        awarded.append((user_id, row[1] or row[2] or f"User {user_id}", points))
+    return awarded
+
+
+# ─── A13: REFERAL OBUNA BO'LMAGANLARGA ESLATMA ────────────────────────────────
+async def get_referrals_with_incomplete_sub(user_id: int) -> list:
+    """Men taklif qilgan lekin hali homiy kanallarga obuna bo'lmagan (va Premium bo'lmagan) referallar ro'yxati"""
+    from datetime import datetime, timedelta
+    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    async with get_db() as db:
+        async with db.execute("""
+            SELECT id, username, full_name, created_at
+            FROM users
+            WHERE referred_by = ? AND referral_rewarded = 0 AND created_at >= ?
+            ORDER BY created_at DESC
+        """, (user_id, cutoff)) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── U1: JANR KUZATUV + TAVSIYA ───────────────────────────────────────────────
+GENRE_KEYWORDS = {
+    "Multfilm": ["multfilm", "multik", "cartoon", "animatsiy", "pixar", "дисней", "disney", "dreamworks"],
+    "Komediya": ["komediya", "comed", "qaygʻuli", "kulgili", "yumor", "kulinariya", "comedy", "комеди"],
+    "Triller": ["triller", "thriller", "tension", "триллер", "detektiv", "detective"],
+    "Ujas": ["ujas", "horror", "qoʻrqinchli", "qorqinchli", "scary", "ужас", "xorroр"],
+    "Jangari": ["jangari", "action", "avtomobil", "poyga", "qonli", "боевик", "бойовик"],
+    "Romantika": ["romantika", "romance", "sevgili", "love", "sevgi", "любов", "любовный"],
+    "Drama": ["drama", "hayotiy", "realistik", "drama", "драма"],
+    "Fan-fiction": ["fantastika", "fantasy", "kosmos", "fentezi", "фантаст", "fantastik", "sci-fi", "scifi", "Marvel", "DC"],
+    "Sarguzasht": ["sarguzasht", "adventure", "sayohat", "приключ"],
+    "Tarixiy": ["tarixiy", "historic", "medieval", "osmonov", "war", "urush", "истори"]
+}
+
+def _detect_genres_from_caption(caption: str) -> list:
+    """Caption ichidan janr topish"""
+    if not caption:
+        return []
+    low = caption.lower()
+    found = set()
+    for genre, keywords in GENRE_KEYWORDS.items():
+        for kw in keywords:
+            if kw.lower() in low:
+                found.add(genre)
+                break
+    return list(found)
+
+
+async def track_watch_genres(user_id: int, caption: str):
+    """Kino ko'rilganda janrni user uchun ro'yxatga olish"""
+    genres = _detect_genres_from_caption(caption)
+    if not genres:
+        return
+    async with get_db() as db:
+        for g in genres:
+            await db.execute("""
+                INSERT INTO user_genre_watches (user_id, genre, watch_count)
+                VALUES (?, ?, 1)
+                ON CONFLICT(user_id, genre) DO UPDATE SET watch_count = watch_count + 1
+            """, (user_id, g))
+        await db.commit()
+
+
+async def recommend_movies_by_genre(user_id: int, limit: int = 10) -> list:
+    """Sevimli janr bo'yicha tavsiya berish"""
+    async with get_db() as db:
+        async with db.execute("""
+            SELECT genre FROM user_genre_watches
+            WHERE user_id = ?
+            ORDER BY watch_count DESC
+            LIMIT 3
+        """, (user_id,)) as cursor:
+            top_genres = [r[0] for r in await cursor.fetchall()]
+    if not top_genres:
+        return []
+    # top janrga mos kino captionlarga qidiramiz
+    async with get_db() as db:
+        query_parts = []
+        params = []
+        for g in top_genres:
+            keywords = GENRE_KEYWORDS.get(g, [g])
+            for kw in keywords:
+                query_parts.append("LOWER(COALESCE(caption,'')) LIKE ?")
+                params.append(f"%{kw.lower()}%")
+        if not query_parts:
+            return []
+        final_q = f"""
+            SELECT id, caption, views_count
+            FROM movies
+            WHERE ({' OR '.join(query_parts)})
+              AND id NOT IN (SELECT movie_id FROM watch_history WHERE user_id = ?)
+            ORDER BY views_count DESC
+            LIMIT ?
+        """
+        params.append(user_id)
+        params.append(limit)
+        async with db.execute(final_q, params) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── U9: HAFTALIK TOP 10 KINOLAR (REYTING ASOSIDA) ────────────────────────────
+async def get_weekly_top_movies(limit: int = 10) -> list:
+    """Oxirgi 7 kun ichidagi reyting bo'yicha top kinolar"""
+    from datetime import datetime, timedelta
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    async with get_db() as db:
+        async with db.execute(f"""
+            SELECT m.id, m.caption,
+                   AVG(CAST(r.rating AS FLOAT)) AS avg_r,
+                   COUNT(r.rating) AS vote_count
+            FROM movies m
+            JOIN ratings r ON m.id = r.movie_id
+            WHERE r.created_at >= ?
+            GROUP BY m.id
+            ORDER BY avg_r DESC, vote_count DESC
+            LIMIT ?
+        """, (week_ago, limit)) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── U10: KINO TOPILMAGANDA XABAR SO'RASH ─────────────────────────────────────
+async def add_movie_notify_request(user_id: int, search_query: str) -> bool:
+    """Qidirilgan kino topilmasa, user so'rovini saqlash"""
+    async with get_db() as db:
+        # Avval oldin shu query bo'lganmi tekshir, bo'lmasa qo'sh
+        await db.execute("""
+            INSERT INTO movie_notify_requests (user_id, search_query, is_notified)
+            VALUES (?, ?, 0)
+        """, (user_id, search_query.strip().lower()))
+        await db.commit()
+    return True
+
+
+async def check_and_notify_movie_added(bot, movie_id: int, caption: str):
+    """Yangi kino qo'shilganda, eski so'rovlarni tekshirib xabar berish"""
+    if not caption:
+        return 0
+    cap_low = caption.lower()
+    notified = set()
+    async with get_db() as db:
+        async with db.execute("""
+            SELECT DISTINCT n.id, n.user_id, n.search_query
+            FROM movie_notify_requests n
+            WHERE n.is_notified = 0
+        """) as cursor:
+            rows = await cursor.fetchall()
+        for req_id, user_id, sq in rows:
+            if sq and sq in cap_low:
+                try:
+                    await bot.send_message(user_id,
+                        f"🔔 <b>Siz qidirgan kino qo'shildi!</b>\n\n"
+                        f"Qidirgan: <i>{sq}</i>\n"
+                        f"🎬 Kino kodi: /{movie_id}\n\n"
+                        f"Zavqlanib ko'ring! 🎬🍿\n\n"
+                        f"📩 <b>Murojaat uchun:</b> @Abdulaziz7o1",
+                        parse_mode="HTML")
+                    notified.add(req_id)
+                except Exception:
+                    pass
+        if notified:
+            ids = ",".join(["?"] * len(notified))
+            await db.execute(f"UPDATE movie_notify_requests SET is_notified = 1 WHERE id IN ({ids})", tuple(notified))
+            await db.commit()
+    return len(notified)
+
+
+# ─── U11: TO'LOVLAR TARIXI (USER UCHUN) ───────────────────────────────────────
+async def get_user_payment_history(user_id: int, limit: int = 20) -> list:
+    """Userning barcha to'lovlari tarixi"""
+    async with get_db() as db:
+        async with db.execute("""
+            SELECT id, amount, plan, created_at, confirmed_by
+            FROM payment_records
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+        """, (user_id, limit)) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── U13: REFERALLAR RO'YXATI BATAFSIL ────────────────────────────────────────
+async def get_user_referrals_detailed(user_id: int, limit: int = 50, page: int = 1, per_page: int = 20) -> tuple:
+    """User referallarini batafsil ko'rsatish (pagination bilan).
+    Qaytaradi: (items_list, total_count, total_pages)
+    """
+    offset = (page - 1) * per_page
+    async with get_db() as db:
+        async with db.execute("SELECT COUNT(*) FROM users WHERE referred_by = ?", (user_id,)) as c:
+            total_row = await c.fetchone()
+            total_count = total_row[0] if total_row else 0
+        total_pages = (total_count + per_page - 1) // per_page if per_page > 0 else 1
+        async with db.execute("""
+            SELECT u.id, u.username, u.full_name, u.created_at,
+                   u.referrals_count, u.points, u.role,
+                   u.referral_rewarded, u.is_premium
+            FROM users u
+            WHERE u.referred_by = ?
+            ORDER BY u.created_at DESC
+            LIMIT ? OFFSET ?
+        """, (user_id, per_page, offset)) as cursor:
+            items = await cursor.fetchall()
+    return items, total_count, max(1, total_pages)
+
+
+# ─── U8: TUG'ILGAN KUN LOCK (1 MARTA) ─────────────────────────────────────────
+async def is_birthday_locked(user_id: int) -> bool:
+    """Foydalanuvchi tug'ilgan kunini o'zgartira oladimi?"""
+    async with get_db() as db:
+        async with db.execute("SELECT birthday_is_locked FROM users WHERE id = ?", (user_id,)) as c:
+            r = await c.fetchone()
+            return bool(r and r[0] and r[0] != 0)
+
+
+async def lock_user_birthday(user_id: int) -> bool:
+    """Tug'ilgan kunni 1 marta kiritgandan keyin locklash"""
+    async with get_db() as db:
+        await db.execute("UPDATE users SET birthday_is_locked = 1 WHERE id = ?", (user_id,))
+        await db.commit()
+    return True
+
+
+async def reset_user_birthday_lock(user_id: int) -> bool:
+    """(Admin uchun) Lockni bekor qilish"""
+    async with get_db() as db:
+        await db.execute("UPDATE users SET birthday_is_locked = 0 WHERE id = ?", (user_id,))
+        await db.commit()
     return True
