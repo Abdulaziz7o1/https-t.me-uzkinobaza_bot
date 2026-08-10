@@ -72,6 +72,11 @@ def get_admin_menu():
                 KeyboardButton(text="Premium Sozlamalar 👑")
             ],
             [
+                KeyboardButton(text="📉 Eng past baholi kinolar (75+ 👎)"),
+                KeyboardButton(text="📊 Aktivlik Grafigi")
+            ],
+            [
+                KeyboardButton(text="🎁 Kunlik Aktivlik Sovg'asi"),
                 KeyboardButton(text="➕ Mannual Premium Qo'shish")
             ]
         ],
@@ -145,7 +150,11 @@ def get_user_menu():
                 KeyboardButton(text="🔍 Kino qidirish")
             ],
             [
-                KeyboardButton(text="⭐️ Saqlanganlar"),
+                KeyboardButton(text="🔥 Sizga mos kinolar"),
+                KeyboardButton(text="⭐️ Saqlanganlar")
+            ],
+            [
+                KeyboardButton(text="Tarixim 🕐"),
                 KeyboardButton(text="Tasodifiy Kino 🎲")
             ],
             [
@@ -165,10 +174,11 @@ def get_user_menu():
                 KeyboardButton(text="🔝 TOP Kinolar")
             ],
             [
-                KeyboardButton(text="⚙️ Sozlamalar"),
+                KeyboardButton(text="💳 To'lovlarim"),
                 KeyboardButton(text="🎂 Tug'ilgan Kun")
             ],
             [
+                KeyboardButton(text="⚙️ Sozlamalar"),
                 KeyboardButton(text="🆘 Yordam / Murojaat")
             ]
         ],

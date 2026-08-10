@@ -3330,7 +3330,7 @@ async def process_backup_channel_input(message: Message, state: FSMContext):
 # ═══════════════════════════════════════════════════════════════════════════════
 #  📊 A7: FAOLLIK GRAFIGI (7 KUN / 30 KUN) HESOBOTLARI
 # ═══════════════════════════════════════════════════════════════════════════════
-@router.message(F.text == 'Faollik Tahlili 📊')
+@router.message(F.text.in_(['Faollik Tahlili 📊', '📊 Aktivlik Grafigi']))
 async def admin_activity_report_menu(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'view_stats'):
@@ -3403,7 +3403,7 @@ async def cb_admin_activity_report(callback: CallbackQuery):
 # ═══════════════════════════════════════════════════════════════════════════════
 #  💎 A11: KUNLIK SOVG'A — ENG FAOL 10 USERGA 75 BALL
 # ═══════════════════════════════════════════════════════════════════════════════
-@router.message(F.text == 'Ballar 💎')
+@router.message(F.text.in_(['Ballar 💎', "🎁 Kunlik Aktivlik Sovg'asi"]))
 async def admin_gift_menu(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
@@ -3464,7 +3464,7 @@ async def cb_gift_top_10_75pts(callback: CallbackQuery):
 # ═══════════════════════════════════════════════════════════════════════════════
 #  👎 A5: ENG PAST BAHOLI KINOLAR (75+ DISLIKE)
 # ═══════════════════════════════════════════════════════════════════════════════
-@router.message(F.text == 'Izohlar moderatsiyasi 💬')
+@router.message(F.text.in_(['Izohlar moderatsiyasi 💬', '📉 Eng past baholi kinolar (75+ 👎)']))
 async def admin_disliked_menu(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'delete_movie') and message.from_user.id not in config.ADMINS:

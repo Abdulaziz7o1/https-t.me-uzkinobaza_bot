@@ -1584,6 +1584,60 @@ async def _movie_watched_extra(user_id: int, caption: str):
         pass
 
 
-# Yuqoridagi cmd_start va search_movie_by_code da janr track qilish uchun:
-# (bu yerda qo'shimcha integriatsiya: search_movie_by_code da ishlatamiz)
+@router.message(F.text == '🔥 Sizga mos kinolar')
+async def cmd_user_recommendations(message: Message, state: FSMContext):
+    await state.clear()
+    uid = message.from_user.id
+    movies = await db_req.recommend_movies_by_genre(uid, limit=10)
+    if not movies:
+        await message.answer(with_footer("❌ <b>Hozircha siz uchun mos janrlar aniqlanmadi.</b>\n\nKo'proq kino ko'ring, shunda siz yoqtirgan janrlar bo'yicha saralangan kinolar shu yerda chiqadi! 🍿"), parse_mode='HTML')
+        return
+    txt = "🔥 <b>SIZGA MOS KINOLAR (JANR TAVSIYASI):</b>\n\n"
+    for idx, mv in enumerate(movies, 1):
+        m_id, caption, views = mv
+        name = (caption or 'Nomsiz').split('\n')[0][:50]
+        txt += f"{idx}. 🎬 /{m_id} — {name} (👁 {views or 0})\n"
+    txt += "\n<i>Kinoni tomosha qilish uchun kodi (masalan /101) ustiga bosing.</i>"
+    await message.answer(with_footer(txt), parse_mode='HTML')
+
+
+@router.message(F.text == 'Tarixim 🕐')
+async def cmd_user_watch_history(message: Message, state: FSMContext):
+    await state.clear()
+    uid = message.from_user.id
+    history = await db_req.get_watch_history(uid, limit=100)
+    if not history:
+        await message.answer(with_footer("🕐 <b>Sizda hali ko'rilgan kinolar tarixi mavjud emas.</b>\n\nKinolarni tomosha qilganingiz sari ular avtomatik shu yerda saqlanib boradi! 🍿"), parse_mode='HTML')
+        return
+    txt = f"🕐 <b>OXIRGI KO'RGAN KINOLARINGIZ ({len(history)} ta):</b>\n\n"
+    for idx, (m_id, cap, watched_at) in enumerate(history[:30], 1):
+        name = (cap or 'Nomsiz').split('\n')[0][:45]
+        t_str = str(watched_at)[:16] if watched_at else ''
+        txt += f"{idx}. 🎬 /{m_id} — {name}\n   🕒 <i>{t_str}</i>\n\n"
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🧹 Tarixni tozalash", callback_data="clear_my_watch_history")]])
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+
+
+@router.callback_query(F.data == "clear_my_watch_history")
+async def cb_clear_watch_history(callback: CallbackQuery):
+    uid = callback.from_user.id
+    await db_req.clear_watch_history(uid)
+    await callback.message.edit_text(with_footer("✅ <b>Ko'rilgan kinolar tarixingiz muvaffaqiyatli tozalandi!</b>"), parse_mode='HTML')
+    await callback.answer()
+
+
+@router.message(F.text.in_(['💳 To\'lovlarim', 'To\'lovlarim']))
+async def cmd_user_payment_history(message: Message, state: FSMContext):
+    await state.clear()
+    uid = message.from_user.id
+    rows = await db_req.get_user_payment_history(uid, limit=20)
+    if not rows:
+        await message.answer(with_footer("💳 <b>Sizda hali to'lovlar tarixi yo'q.</b>\n\nPremium obuna sotib olganingizda barcha to'lovlar va muddatlar shu yerda ko'rinadi! 👑"), parse_mode='HTML')
+        return
+    txt = "💳 <b>SIZNING TO'LOVLARINGIZ TARIXI (oxirgi 20 ta):</b>\n\n"
+    for idx, p in enumerate(rows, 1):
+        pid, amount, plan, created, conf_by = p
+        txt += f"{idx}. 💰 <b>{amount:,} UZS</b> — <i>{plan or 'Premium'}</i>\n   📅 {created or '?'}\n\n"
+    await message.answer(with_footer(txt), parse_mode='HTML')
 
