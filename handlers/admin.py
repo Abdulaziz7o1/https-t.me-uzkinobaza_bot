@@ -2129,7 +2129,8 @@ async def show_kassa_panel(message: Message, state: FSMContext):
         txt += "📋 <i>Hali to'lovlar tarixi mavjud emas.</i>"
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ To'lov qo'shish", callback_data='kassa_add_payment_start')],
-        [InlineKeyboardButton(text='♻️ Kassani 0 ga tenglash', callback_data='kassa_reset_confirm')]
+        [InlineKeyboardButton(text='♻️ Kassani 0 ga tenglash', callback_data='kassa_reset_confirm')],
+        [InlineKeyboardButton(text="🧹 Nomlarni (tarixni) tozalash", callback_data='kassa_clear_history_confirm')]
     ])
     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
@@ -2309,6 +2310,34 @@ async def kassa_reset_exec_cb(callback: CallbackQuery):
     await db_req.reset_kassa()
     await callback.message.edit_text(with_footer('✅ <b>Kassa balansi muvaffaqiyatli 0 UZS ga tenglandi!</b>'), parse_mode='HTML')
     await callback.answer('Kassa 0 ga tenglandi ♻️')
+
+@router.callback_query(F.data == 'kassa_clear_history_confirm')
+async def kassa_clear_history_confirm_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer('❌ Bu amal faqat Bosh Adminlar uchun ruxsat etilgan!', show_alert=True)
+        return
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text='Ha, nomlarni tozalash 🧹', callback_data='kassa_clear_history_exec'),
+        InlineKeyboardButton(text='Bekor qilish ❌', callback_data='bc_cancel')
+    ]])
+    await callback.message.edit_text(
+        with_footer(
+            '⚠️ <b>So\'nggi to\'lovlar tarixini (foydalanuvchilar nomlarini) tozalashni tasdiqlaysizmi?</b>\n\n'
+            '<i>Kassa balansi saqlanib qoladi, lekin kassa panelida ko\'rinadigan so\'nggi to\'lovchilar nomlari ro\'yxati tozalanadi.</i>'
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == 'kassa_clear_history_exec')
+async def kassa_clear_history_exec_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await db_req.clear_payment_history()
+    await callback.message.edit_text(with_footer('✅ <b>To\'lovlar tarixi (foydalanuvchilar nomlari ro\'yxati) muvaffaqiyatli tozalandi!</b>'), parse_mode='HTML')
+    await callback.answer('Nomlar tarixi tozalandi 🧹')
 
 @router.message(F.text == 'Promo Kodlar 🎁')
 async def show_promo_codes_panel(message: Message, state: FSMContext):

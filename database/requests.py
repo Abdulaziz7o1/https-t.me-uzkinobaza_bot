@@ -2767,6 +2767,13 @@ async def reset_kassa() -> bool:
         await db.commit()
         return True
 
+async def clear_payment_history() -> bool:
+    """So'nggi to'lovlar tarixi ro'yxatini (payment_records va foydalanuvchilar nomlarini) tozalash"""
+    async with get_db() as db:
+        await db.execute("DELETE FROM payment_records")
+        await db.commit()
+        return True
+
 async def get_recent_payments(limit: int = 10) -> list:
     """So'nggi to'lovlar ro'yxatini olish"""
     async with get_db() as db:
