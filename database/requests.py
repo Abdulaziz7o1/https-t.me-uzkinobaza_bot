@@ -2767,6 +2767,13 @@ async def reset_kassa() -> bool:
         await db.commit()
         return True
 
+async def reset_all_users_points() -> bool:
+    """Barcha foydalanuvchilarning ballarini 0 ga tenglash"""
+    async with get_db() as db:
+        await db.execute("UPDATE users SET points = 0")
+        await db.commit()
+        return True
+
 async def clear_payment_history() -> bool:
     """So'nggi to'lovlar tarixi ro'yxatini (payment_records va foydalanuvchilar nomlarini) tozalash"""
     async with get_db() as db:

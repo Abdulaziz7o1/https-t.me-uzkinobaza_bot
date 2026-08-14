@@ -1439,9 +1439,10 @@ async def admin_ballar(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
         return
+    from keyboards.inline import get_admin_gift_keyboard
     leaderboard = await db_req.get_points_leaderboard(15)
     if not leaderboard:
-        await message.answer(with_footer("💎 <b>Hali hech kim ball to'plamagan.</b>"), parse_mode='HTML')
+        await message.answer(with_footer("💎 <b>Hali hech kim ball to'plamagan.</b>"), parse_mode='HTML', reply_markup=get_admin_gift_keyboard())
         return
     text = "💎 <b>Top 15 Ball Yig'uvchilar:</b>\n\n"
     medals = ['🥇', '🥈', '🥉']
@@ -1449,7 +1450,7 @@ async def admin_ballar(message: Message, state: FSMContext):
         name = f'@{username}' if username else full_name or str(uid)
         icon = medals[idx - 1] if idx <= 3 else f'{idx}.'
         text += f'{icon} {name} — <code>{pts}</code> 💎\n'
-    await message.answer(with_footer(text), parse_mode='HTML')
+    await message.answer(with_footer(text), parse_mode='HTML', reply_markup=get_admin_gift_keyboard())
 
 @router.message(F.text == 'Sozlamalar ⚙️')
 async def show_admin_config_panel(message: Message, state: FSMContext):
@@ -3488,6 +3489,36 @@ async def cb_gift_top_10_75pts(callback: CallbackQuery):
     except Exception:
         await callback.message.answer(with_footer(txt), parse_mode='HTML')
     await callback.answer(f"✅ {len(awarded)} ta userga sovg'a berildi!")
+
+
+@router.callback_query(F.data == 'reset_all_points_confirm')
+async def cb_reset_all_points_confirm(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer('❌ Bu amal faqat Bosh Adminlar uchun ruxsat etilgan!', show_alert=True)
+        return
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text='Ha, 0 ga tenglash ♻️', callback_data='reset_all_points_exec'),
+        InlineKeyboardButton(text='Bekor qilish ❌', callback_data='bc_cancel')
+    ]])
+    await callback.message.edit_text(
+        with_footer(
+            '⚠️ <b>Barcha foydalanuvchilarning ballarini 0 ga tenglashni tasdiqlaysizmi?</b>\n\n'
+            '<i>Barcha a\'zolarning yig\'gan 💎 ballari 0 ga tushadi va bu amalni ortga qaytarib bo\'lmaydi.</i>'
+        ),
+        parse_mode='HTML',
+        reply_markup=kb
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == 'reset_all_points_exec')
+async def cb_reset_all_points_exec(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await db_req.reset_all_users_points()
+    await callback.message.edit_text(with_footer('✅ <b>Barcha foydalanuvchilarning ballari muvaffaqiyatli 0 💎 ga tenglandi!</b>'), parse_mode='HTML')
+    await callback.answer('Barcha ballar 0 ga tenglandi ♻️')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -234,5 +234,66 @@ def get_moderator_perm_matrix_keyboard(target_user_id: int, perms: dict) -> Inli
     return builder.as_markup()
 
 
+def get_notify_request_keyboard(search_query: str) -> InlineKeyboardMarkup:
+    """Kino topilmaganda eslatma so'rash tugmasi"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔔 Qo'shilganda menga xabar ber", callback_data=f"notify_me_{search_query[:60]}")
+    builder.button(text="🏠 Bosh menyu", callback_data="home_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_profile_extended_keyboard() -> InlineKeyboardMarkup:
+    """Kengaytirilgan profil kartasi"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔝 TOP Kinolar", callback_data="show_top_movies_1")
+    builder.button(text="⭐️ Saqlanganlar", callback_data="show_favorites_profile")
+    builder.button(text="🕒 Ko'rilgan Kinolar", callback_data="show_watch_history")
+    builder.button(text="💳 To'lovlar Tarixim", callback_data="show_payment_history")
+    builder.button(text="🔥 Haftalik Top 10", callback_data="show_weekly_top")
+    builder.button(text="🎯 Sizga Tavsiya", callback_data="show_recommendation")
+    builder.button(text="👥 Referallarim Batafsil", callback_data="show_my_referrals_detailed")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_admin_activity_report_keyboard() -> InlineKeyboardMarkup:
+    """Admin aktivlik hisoboti tugmalari"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📅 7 Kunlik Hisobot", callback_data="report_activity_7")
+    builder.button(text="📅 30 Kunlik Hisobot", callback_data="report_activity_30")
+    builder.button(text="🔙 Orqaga", callback_data="admin_menu")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
+def get_admin_gift_keyboard() -> InlineKeyboardMarkup:
+    """Admin sovg'a va ballar boshqaruvi tugmalari"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🎁 Hozir 75 Ball Sovg'a Ber (Top 10)", callback_data="gift_top_10_75pts")
+    builder.button(text="♻️ Barchaning ballarini 0 ga tenglash", callback_data="reset_all_points_confirm")
+    builder.button(text="🔙 Orqaga", callback_data="admin_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_admin_referral_reminder_keyboard() -> InlineKeyboardMarkup:
+    """Referal eslatma tugmalari"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📩 Obuna Bo'lmaganlar Eslatmasini Yuborish", callback_data="ref_reminder_send_all")
+    builder.button(text="🔙 Orqaga", callback_data="admin_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_admin_disliked_keyboard() -> InlineKeyboardMarkup:
+    """75+ dislike olgan kinolar uchun"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👎 75+ Dislike Olgan Kinolarni Ko'rsat", callback_data="show_bad_movies_75")
+    builder.button(text="🔙 Orqaga", callback_data="admin_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 
 
