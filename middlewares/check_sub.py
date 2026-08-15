@@ -74,9 +74,16 @@ class CheckSubMiddleware(BaseMiddleware):
         if curr_state and ("waiting_for_payment" in str(curr_state) or "payment" in str(curr_state).lower()):
             return await handler(event, data)
 
+        # VIP / Premium tariflarini ko'rish va xarid qilish tugmalari kanallarga majburiy obuna talab qilmaydi
+        if event.text:
+            text_low = event.text.lower().replace("\ufe0f", "").strip()
+            if any(p_cmd in text_low for p_cmd in ["/premium", "vip premium", "premium obuna", "/promo", "promo kod"]):
+                return await handler(event, data)
+
         # Premium/VIP foydalanuvchilar obuna tekshiruvidan ozod qilinadi (Whitelist)
         try:
-            if await is_user_premium(user_id):
+            from database.requests import is_premium_user
+            if await is_premium_user(user_id):
                 return await handler(event, data)
         except Exception:
             pass
