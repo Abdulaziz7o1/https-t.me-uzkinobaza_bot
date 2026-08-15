@@ -467,16 +467,25 @@ async def import_master_backup_json(json_str: str) -> dict:
                         pr_cnt += 1
                 stats["payment_records"] = pr_cnt
 
-            # 6. Settings
+            # 6. Settings (bot_settings)
             if "settings" in data:
                 s_cnt = 0
-                for s in data["settings"]:
-                    if s.get("key"):
+                settings_data = data["settings"]
+                if isinstance(settings_data, dict):
+                    for k, v in settings_data.items():
                         await db.execute(
-                            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                            (s["key"], str(s.get("value", "")))
+                            "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)",
+                            (k, str(v))
                         )
                         s_cnt += 1
+                elif isinstance(settings_data, list):
+                    for s in settings_data:
+                        if isinstance(s, dict) and s.get("key"):
+                            await db.execute(
+                                "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)",
+                                (s["key"], str(s.get("value", "")))
+                            )
+                            s_cnt += 1
                 stats["settings"] = s_cnt
 
             # 7. Promo codes
@@ -543,14 +552,52 @@ async def sync_master_backup_to_mongodb(master_data: dict):
                         {"_id": m_id},
                         {
                             "_id": m_id,
+                            "id": m_id,
                             "file_id": m.get("file_id"),
                             "caption": m.get("caption", ""),
-                            "views_count": m.get("views_count", 0)
+                            "views_count": m.get("views_count", 0),
+                            "is_premium_only": m.get("is_premium_only", 0)
                         },
                         upsert=True
                     )
 
-        # 2. Master backup yagona hujjatini saqlash
+        # 2. Homiy kanallarni alohida 'sponsor_channels' kolleksiyasiga muhrlash
+        if "sponsor_channels" in master_data and master_data["sponsor_channels"]:
+            sponsors_coll = db["sponsor_channels"]
+            for s in master_data["sponsor_channels"]:
+                s_id = s.get("id") or str(s.get("channel_id"))
+                if s_id:
+                    await sponsors_coll.replace_one(
+                        {"_id": str(s_id)},
+                        {
+                            "_id": str(s_id),
+                            "channel_id": s.get("channel_id"),
+                            "channel_name": s.get("channel_name", str(s.get("channel_id")))
+                        },
+                        upsert=True
+                    )
+
+        # 3. Karta raqamlari va barcha sozlamalarni 'settings' kolleksiyasiga muhrlash
+        if "settings" in master_data and master_data["settings"]:
+            settings_coll = db["settings"]
+            settings_dict = master_data["settings"]
+            if isinstance(settings_dict, dict):
+                for k, v in settings_dict.items():
+                    await settings_coll.replace_one(
+                        {"_id": str(k)},
+                        {"_id": str(k), "key": str(k), "value": str(v)},
+                        upsert=True
+                    )
+            elif isinstance(settings_dict, list):
+                for s in settings_dict:
+                    if isinstance(s, dict) and s.get("key"):
+                        await settings_coll.replace_one(
+                            {"_id": str(s["key"])},
+                            {"_id": str(s["key"]), "key": str(s["key"]), "value": str(s.get("value", ""))},
+                            upsert=True
+                        )
+
+        # 4. Master backup yagona hujjatini saqlash
         collection = db["master_backups"]
         doc = {
             "_id": "latest_master_backup",
@@ -558,7 +605,7 @@ async def sync_master_backup_to_mongodb(master_data: dict):
             "updated_at": os.getenv("TZ", "Asia/Tashkent")
         }
         await collection.replace_one({"_id": "latest_master_backup"}, doc, upsert=True)
-        print("MongoDB Cloud: Barcha kinolar va jadvallar Bulutli bazaga (MongoDB Atlas) 100% saqlandi! ☁️🚀")
+        print("MongoDB Cloud: Barcha kinolar, homiy kanallar, karta raqamlari va sozlamalar Bulutli bazaga (MongoDB Atlas) 100% saqlandi! ☁️🚀")
     except Exception as e:
         print(f"MongoDB Cloud sync error: {e}")
 
@@ -601,10 +648,11 @@ async def restore_from_mongodb_cloud() -> bool:
                     f_id = m_doc.get("file_id")
                     cap = m_doc.get("caption", "")
                     views = m_doc.get("views_count", 0)
+                    is_prem = m_doc.get("is_premium_only", 0)
                     if m_id and f_id:
                         await local_db.execute(
-                            "INSERT INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET file_id=?, caption=?, views_count=?",
-                            (m_id, f_id, cap, views, f_id, cap, views)
+                            "INSERT INTO movies (id, file_id, caption, views_count, is_premium_only) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET file_id=?, caption=?, views_count=?, is_premium_only=?",
+                            (m_id, f_id, cap, views, is_prem, f_id, cap, views, is_prem)
                         )
                         m_count += 1
                 await local_db.commit()
@@ -613,6 +661,48 @@ async def restore_from_mongodb_cloud() -> bool:
                 restored = True
         except Exception as e:
             print(f"MongoDB Cloud movies collection restore error: {e}")
+
+        # 3. Homiy kanallarni 'sponsor_channels' kolleksiyasidan to'g'ridan-to'g'ri tiklash
+        try:
+            sponsors_coll = db["sponsor_channels"]
+            sp_count = 0
+            async with get_db() as local_db:
+                async for s_doc in sponsors_coll.find({}):
+                    ch_id = s_doc.get("channel_id")
+                    ch_name = s_doc.get("channel_name", str(ch_id))
+                    if ch_id:
+                        await local_db.execute(
+                            "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
+                            (ch_id, ch_name)
+                        )
+                        sp_count += 1
+                await local_db.commit()
+            if sp_count > 0:
+                print(f"MongoDB Cloud (Sponsors Collection): {sp_count} ta homiy kanal tiklandi! 📢")
+                restored = True
+        except Exception as e:
+            print(f"MongoDB Cloud sponsor_channels restore error: {e}")
+
+        # 4. Karta va sozlamalarni 'settings' kolleksiyasidan to'g'ridan-to'g'ri tiklash
+        try:
+            settings_coll = db["settings"]
+            st_count = 0
+            async with get_db() as local_db:
+                async for st_doc in settings_coll.find({}):
+                    k = st_doc.get("key") or st_doc.get("_id")
+                    v = st_doc.get("value", "")
+                    if k:
+                        await local_db.execute(
+                            "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)",
+                            (str(k), str(v))
+                        )
+                        st_count += 1
+                await local_db.commit()
+            if st_count > 0:
+                print(f"MongoDB Cloud (Settings Collection): {st_count} ta sozlama va karta tiklandi! 💳⚙️")
+                restored = True
+        except Exception as e:
+            print(f"MongoDB Cloud settings restore error: {e}")
 
     except Exception as e:
         print(f"MongoDB Cloud connection error: {e}")
@@ -1105,7 +1195,6 @@ async def get_top_referrers():
         ) as cursor:
             return await cursor.fetchall()
 
-# --- BOT SETTINGS (SOZLAMALAR) ---
 async def set_setting(key: str, value: str):
     """Bot sozlamalarini o'rnatish"""
     async with get_db() as db:
@@ -1114,6 +1203,10 @@ async def set_setting(key: str, value: str):
             (key, value)
         )
         await db.commit()
+    try:
+        await export_master_backup_json()
+    except Exception:
+        pass
 
 async def get_setting(key: str) -> str:
     """Bot sozlamasini olish"""
@@ -2561,6 +2654,10 @@ async def delete_admin_card_number():
     async with get_db() as db:
         await db.execute("DELETE FROM bot_settings WHERE key = 'admin_card_number'")
         await db.commit()
+    try:
+        await export_master_backup_json()
+    except Exception:
+        pass
 
 
 # ─── SHUBHALI HARAKATLAR VA KADEMELI OGOHLANTIRISH / BAN TIZIMI ─────────────
