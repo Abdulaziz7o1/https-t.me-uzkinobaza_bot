@@ -1001,10 +1001,10 @@ def contains_profanity(text: str) -> bool:
     return False
 
 async def get_comments(movie_id: int):
-    """Kinoning barcha tasdiqlangan izohlarini olish"""
+    """Kinoning barcha tasdiqlangan izohlarini olish (VIP belgisi bilan)"""
     async with get_db() as db:
         async with db.execute(
-            """SELECT c.comment_text, u.username, u.full_name, c.created_at 
+            """SELECT c.comment_text, u.username, u.full_name, c.created_at, u.premium_until 
                FROM comments c 
                JOIN users u ON c.user_id = u.id 
                WHERE c.movie_id = ? AND (c.status = 'approved' OR c.status IS NULL) 
@@ -3760,3 +3760,59 @@ async def get_flash_sale_status() -> tuple[bool, int, str]:
         except Exception:
             pass
     return False, 0, ""
+
+async def is_maintenance_mode() -> bool:
+    """Texnik ishlar rejimi yoqilganmi tekshirish"""
+    async with get_db() as db:
+        try:
+            async with db.execute("SELECT value FROM bot_settings WHERE key = 'maintenance_mode'") as c:
+                row = await c.fetchone()
+                return bool(row and row[0] == '1')
+        except Exception:
+            return False
+
+async def toggle_maintenance_mode() -> bool:
+    """Texnik ishlar rejimini yoqish/o'chirish"""
+    current = await is_maintenance_mode()
+    new_state = "0" if current else "1"
+    async with get_db() as db:
+        await db.execute(
+            "INSERT INTO bot_settings (key, value) VALUES ('maintenance_mode', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            (new_state, new_state)
+        )
+        await db.commit()
+    return not current
+
+async def get_vip_cashback_percent() -> int:
+    """VIP xarid uchun beriladigan ball keshbek foizi (default 10%)"""
+    async with get_db() as db:
+        try:
+            async with db.execute("SELECT value FROM bot_settings WHERE key = 'vip_cashback_pct'") as c:
+                row = await c.fetchone()
+                return int(row[0]) if row and row[0] else 10
+        except Exception:
+            return 10
+
+async def set_vip_cashback_percent(pct: int):
+    """VIP keshbek foizini sozlash"""
+    async with get_db() as db:
+        await db.execute(
+            "INSERT INTO bot_settings (key, value) VALUES ('vip_cashback_pct', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            (str(pct), str(pct))
+        )
+        await db.commit()
+
+# Ketma-ket bot skanerlashdan himoya (Anti-Scraping / Rapid Requests)
+_USER_SEARCH_TIMESTAMPS = {}
+
+def check_anti_scraping_guard(user_id: int) -> bool:
+    """Agar 1 soniyada 3 tadan ko'p so'rov yuborsa bloklaydi"""
+    import time
+    now = time.time()
+    stamps = _USER_SEARCH_TIMESTAMPS.get(user_id, [])
+    stamps = [s for s in stamps if now - s < 2.0]
+    stamps.append(now)
+    _USER_SEARCH_TIMESTAMPS[user_id] = stamps
+    if len(stamps) > 4:
+        return False
+    return True

@@ -108,6 +108,16 @@ async def execute_start_logic(message: Message, state: FSMContext):
     elif user_id in db_admins:
         await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Moderator {name_to_show}!</b>\n\n🛠 <b>Moderator paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_moderator_menu())
     else:
+        # Texnik ishlar rejimi tekshiruvi (Admin 4)
+        if await db_req.is_maintenance_mode():
+            m_txt = (
+                "🛠 <b>BOTDA TEXNIK YANGILANISH KETMOQDA!</b>\n\n"
+                "Hurmatli foydalanuvchi, ayni daqiqalarda botimiz serverida rejali profilaktika va optimallashtirish ishlari olib borilmoqda. ⚡\n\n"
+                "⏳ <i>Iltimos, 15-20 daqiqadan so'ng qayta urinib ko'ring. Noqulaylik uchun uzr so'raymiz!</i>"
+            )
+            await message.answer(with_footer(m_txt), parse_mode='HTML')
+            return
+
         # Premium foydalanuvchi - kanal tekshiruvini o'tkazib yuborish
         is_prem = await db_req.is_premium_user(user_id)
         if is_prem:
@@ -222,6 +232,17 @@ async def check_subscription_callback(callback: CallbackQuery):
 @router.message(StateFilter(None), F.text.regexp('^/?\\d+$'))
 async def search_movie_by_code(message: Message):
     user_id = message.from_user.id
+    
+    # Texnik ishlar rejimi
+    if user_id not in config.ADMINS and (await db_req.is_maintenance_mode()):
+        await message.answer(with_footer("🛠 <b>Botda texnik ishlar olib borilmoqda. Qisqa vaqtdan so'ng qayta urinib ko'ring!</b>"), parse_mode='HTML')
+        return
+
+    # Anti-Scraping / Ketma-ket soxta bot so'rovlarini to'xtatish (Admin 15)
+    if not db_req.check_anti_scraping_guard(user_id):
+        await message.answer(with_footer("⚠️ <b>Iltimos, biroz sekinroq so'rov yuboring! (Anti-Spam himoyasi)</b>"), parse_mode='HTML')
+        return
+
     movie_id = int(message.text.lstrip('/'))
     movie = await db_req.get_movie(movie_id, user_id=user_id)
     if movie:
@@ -722,11 +743,17 @@ async def stars_successful_payment_handler(message: Message):
         confirmed_by=0
     )
 
+    # VIP Keshbek hisoblash va berish (Admin 14)
+    cb_pct = await db_req.get_vip_cashback_percent()
+    cashback_pts = max(1, int(days * cb_pct / 10))
+    await db_req.add_points(user_id, cashback_pts)
+
     await message.answer(
         with_footer(
             f"🎉 <b>TO'LOV QABUL QILINDI!</b> ⭐️\n\n"
             f"👑 <b>Sizga {days} kunlik VIP Premium obuna muvaffaqiyatli yoqildi!</b>\n\n"
-            f"⭐️ <b>To'langan:</b> <code>{stars_amount} Stars</code>\n\n"
+            f"⭐️ <b>To'langan:</b> <code>{stars_amount} Stars</code>\n"
+            f"🎁 <b>VIP Keshbek:</b> +{cashback_pts} 💎 ball hisobingizga qo'shildi!\n\n"
             f"🍿 <i>Endi botdan barcha filmlarni hech qanday cheklovlarsiz tomosha qilishingiz mumkin!</i>"
         ),
         parse_mode='HTML'
@@ -1138,9 +1165,29 @@ async def show_movie_comments(callback: CallbackQuery):
     if not comments:
         text += "<i>Hozircha hech qanday izoh yo'q. Birinchi bo'lib o'z fikringizni yozib qoldiring!</i>"
     else:
-        for idx, (comment_text, username, full_name, created_at) in enumerate(comments[:15], 1):
-            name = f'@{username}' if username else full_name or 'Foydalanuvchi'
-            text += f'{idx}. <b>{name}</b>:\n└ <i>{comment_text}</i>\n\n'
+        from datetime import datetime, timezone, timedelta
+        uzb_tz = timezone(timedelta(hours=5))
+        now_dt = datetime.now(uzb_tz).replace(tzinfo=None)
+        
+        for idx, row in enumerate(comments[:15], 1):
+            comment_text = row[0]
+            username = row[1]
+            full_name = row[2]
+            created_at = row[3]
+            prem_until = row[4] if len(row) > 4 else None
+            
+            is_vip = False
+            if prem_until:
+                try:
+                    p_dt = datetime.fromisoformat(prem_until.replace(' ', 'T'))
+                    if p_dt > now_dt:
+                        is_vip = True
+                except Exception:
+                    pass
+            
+            badge = " 👑 <b>[VIP]</b>" if is_vip else ""
+            name = f'@{username}' if username else (full_name or 'Foydalanuvchi')
+            text += f'{idx}. <b>{name}</b>{badge}:\n└ <i>{comment_text}</i>\n\n'
     try:
         if callback.message.text is not None:
             await callback.message.edit_text(with_footer(text), reply_markup=get_comments_keyboard(movie_id), parse_mode='HTML')

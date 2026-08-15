@@ -1528,9 +1528,79 @@ async def show_admin_config_panel(message: Message, state: FSMContext):
     cooldown = await db_req.get_config_int('comment_cooldown', 30)
     mod_on = await db_req.get_config_int('comment_moderation', 0)
     mod_status_str = 'Yoqilgan ✅' if mod_on == 1 else "O'chirilgan ❌"
-    text = f"⚙️ <b>Bot Tizim Sozlamalari (Inline Config):</b>\n\n💎 <b>Referal balli:</b> {pts_ref} 💎\n⭐️ <b>Baholash balli:</b> {pts_rat} 💎\n💬 <b>Izoh yozish balli:</b> {pts_com} 💎\n📊 <b>Kunlik ball limiti:</b> {daily_pts} 💎\n⭐ <b>Kunlik baholash limiti:</b> {daily_rat} ta\n⏱ <b>Izoh cooldown vaqti:</b> {cooldown} soniya\n🛡 <b>Izohlar moderatsiyasi:</b> {mod_status_str}\n\n<i>Tugmalarni bosib qiymatlarni o'zgartirishingiz mumkin:</i>"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f'💎 Referal: {pts_ref} ✏️', callback_data='cfg_points_referral'), InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating')], [InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment'), InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit')], [InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit'), InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown')], [InlineKeyboardButton(text=f'🛡 Moderatsiya: {('ON ✅' if mod_on == 1 else 'OFF ❌')}', callback_data='cfg_toggle_moderation')]])
+    
+    is_maint = await db_req.is_maintenance_mode()
+    maint_str = "YOQILGAN 🔴 (Foydalanuvchilar kira olmaydi)" if is_maint else "O'CHIRILGAN 🟢 (Bot ochiq)"
+    cb_pct = await db_req.get_vip_cashback_percent()
+
+    text = (
+        f"⚙️ <b>BOT TIZIM SOZLAMALARI:</b>\n\n"
+        f"🛠 <b>Texnik ishlar rejimi:</b> {maint_str}\n"
+        f"🎁 <b>VIP Xarid Keshbeki:</b> {cb_pct}%\n"
+        f"💎 <b>Referal balli:</b> {pts_ref} 💎\n"
+        f"⭐️ <b>Baholash balli:</b> {pts_rat} 💎\n"
+        f"💬 <b>Izoh yozish balli:</b> {pts_com} 💎\n"
+        f"📊 <b>Kunlik ball limiti:</b> {daily_pts} 💎\n"
+        f"⭐ <b>Kunlik baholash limiti:</b> {daily_rat} ta\n"
+        f"⏱ <b>Izoh cooldown vaqti:</b> {cooldown} soniya\n"
+        f"🛡 <b>Izohlar moderatsiyasi:</b> {mod_status_str}\n\n"
+        f"<i>Tugmalarni bosib sozlamalarni o'zgartirishingiz mumkin:</i>"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🛠 Texnik Rejim: {('🔴 ON' if is_maint else '🟢 OFF')}", callback_data='cfg_toggle_maintenance'), InlineKeyboardButton(text=f'🎁 VIP Keshbek: {cb_pct}% ✏️', callback_data='cfg_vip_cashback_pct')],
+        [InlineKeyboardButton(text=f'💎 Referal: {pts_ref} ✏️', callback_data='cfg_points_referral'), InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating')],
+        [InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment'), InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit')],
+        [InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit'), InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown')],
+        [InlineKeyboardButton(text=f'🛡 Moderatsiya: {("ON ✅" if mod_on == 1 else "OFF ❌")}', callback_data='cfg_toggle_moderation')]
+    ])
     await message.answer(with_footer(text), parse_mode='HTML', reply_markup=kb)
+
+@router.callback_query(F.data == 'cfg_toggle_maintenance')
+async def toggle_maintenance_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    new_state = await db_req.toggle_maintenance_mode()
+    txt = "yoqildi 🔴 (Oddiy a'zolarga profilaktika xabari chiqadi)" if new_state else "o'chirildi 🟢 (Bot barcha a'zolar uchun ochildi)"
+    await callback.answer(f"Texnik ishlar rejimi {txt}!", show_alert=True)
+    
+    pts_ref = await db_req.get_config_int('points_referral', 10)
+    pts_rat = await db_req.get_config_int('points_rating', 2)
+    pts_com = await db_req.get_config_int('points_comment', 3)
+    daily_pts = await db_req.get_config_int('daily_points_limit', 40)
+    daily_rat = await db_req.get_config_int('daily_ratings_limit', 10)
+    cooldown = await db_req.get_config_int('comment_cooldown', 30)
+    mod_on = await db_req.get_config_int('comment_moderation', 0)
+    mod_status_str = 'Yoqilgan ✅' if mod_on == 1 else "O'chirilgan ❌"
+    
+    is_maint = new_state
+    maint_str = "YOQILGAN 🔴 (Foydalanuvchilar kira olmaydi)" if is_maint else "O'CHIRILGAN 🟢 (Bot ochiq)"
+    cb_pct = await db_req.get_vip_cashback_percent()
+
+    text = (
+        f"⚙️ <b>BOT TIZIM SOZLAMALARI:</b>\n\n"
+        f"🛠 <b>Texnik ishlar rejimi:</b> {maint_str}\n"
+        f"🎁 <b>VIP Xarid Keshbeki:</b> {cb_pct}%\n"
+        f"💎 <b>Referal balli:</b> {pts_ref} 💎\n"
+        f"⭐️ <b>Baholash balli:</b> {pts_rat} 💎\n"
+        f"💬 <b>Izoh yozish balli:</b> {pts_com} 💎\n"
+        f"📊 <b>Kunlik ball limiti:</b> {daily_pts} 💎\n"
+        f"⭐ <b>Kunlik baholash limiti:</b> {daily_rat} ta\n"
+        f"⏱ <b>Izoh cooldown vaqti:</b> {cooldown} soniya\n"
+        f"🛡 <b>Izohlar moderatsiyasi:</b> {mod_status_str}\n\n"
+        f"<i>Tugmalarni bosib sozlamalarni o'zgartirishingiz mumkin:</i>"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🛠 Texnik Rejim: {('🔴 ON' if is_maint else '🟢 OFF')}", callback_data='cfg_toggle_maintenance'), InlineKeyboardButton(text=f'🎁 VIP Keshbek: {cb_pct}% ✏️', callback_data='cfg_vip_cashback_pct')],
+        [InlineKeyboardButton(text=f'💎 Referal: {pts_ref} ✏️', callback_data='cfg_points_referral'), InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating')],
+        [InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment'), InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit')],
+        [InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit'), InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown')],
+        [InlineKeyboardButton(text=f'🛡 Moderatsiya: {("ON ✅" if mod_on == 1 else "OFF ❌")}', callback_data='cfg_toggle_moderation')]
+    ])
+    try:
+        await callback.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=kb)
+    except Exception:
+        pass
 
 @router.callback_query(F.data == 'cfg_toggle_moderation')
 async def toggle_moderation_callback(callback: CallbackQuery):
@@ -1562,9 +1632,15 @@ async def config_edit_start(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
         return
     key = callback.data[len('cfg_'):]
-    if key == 'toggle_moderation':
-        return
-    labels = {'points_referral': 'Referal uchun beriladigan ball', 'points_rating': 'Kinoni baholash uchun ball', 'points_comment': 'Izoh yozish uchun ball', 'daily_points_limit': 'Kunlik maksimal ball limiti', 'daily_ratings_limit': 'Kunlik maksimal baholashlar soni', 'comment_cooldown': 'Izohlar orasidagi kutish vaqti (soniyalarda)'}
+    labels = {
+        'points_referral': 'Referal uchun beriladigan ball',
+        'points_rating': 'Kinoni baholash uchun ball',
+        'points_comment': 'Izoh yozish uchun ball',
+        'daily_points_limit': 'Kunlik maksimal ball limiti',
+        'daily_ratings_limit': 'Kunlik maksimal baholashlar soni',
+        'comment_cooldown': 'Izohlar orasidagi kutish vaqti (soniyalarda)',
+        'vip_cashback_pct': 'VIP obuna xarid qilinganda beriladigan ball Keshbek foizi (%)'
+    }
     label = labels.get(key, key)
     await state.set_state(AdminStates.waiting_for_config_value)
     await state.update_data(config_key=key, config_label=label)
@@ -1939,17 +2015,28 @@ async def admin_approve_prem_callback(callback: CallbackQuery):
     period_text = f'{days // 30} oylik' if days % 30 == 0 else f'{days} kunlik'
     plan_str = f'{period_text} Premium'
     await db_req.add_payment_record(u_id, amount, plan_str, confirmed_by=callback.from_user.id)
+    
+    # VIP Keshbek berish (Admin 14)
+    cb_pct = await db_req.get_vip_cashback_percent()
+    cashback_pts = max(1, int(days * cb_pct / 10))
+    await db_req.add_points(u_id, cashback_pts)
+
     try:
-        user_msg = f"🎉 <b>TO'LOV TASDIQLANDI!</b>\n\nHurmatli foydalanuvchi, sizning to'lov chekingiz adminlar tomonidan tasdiqlandi va sizga <b>{period_text} Premium obunasi</b> faollashtirildi! 👑\n\n<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin! Maroqli hordiq chiqaring!</i> 🍿"
+        user_msg = (
+            f"🎉 <b>TO'LOV TASDIQLANDI!</b>\n\n"
+            f"Hurmatli foydalanuvchi, sizning to'lov chekingiz adminlar tomonidan tasdiqlandi va sizga <b>{period_text} Premium obunasi</b> faollashtirildi! 👑\n\n"
+            f"🎁 <b>VIP Keshbek:</b> +{cashback_pts} 💎 ball hisobingizga qo'shildi!\n\n"
+            f"<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin! Maroqli hordiq chiqaring!</i> 🍿"
+        )
         await callback.bot.send_message(with_footer(u_id), user_msg, parse_mode='HTML')
     except Exception:
         pass
-    await callback.answer(f'✅ {period_text} Premium faollashtirildi!', show_alert=True)
+    await callback.answer(f'✅ {period_text} Premium faollashtirildi (+{cashback_pts} ball keshbek)!', show_alert=True)
     try:
         if callback.message.caption:
-            await callback.message.edit_caption(caption=f"{callback.message.caption}\n\n✅ <b>To'lov tasdiqlandi: {period_text} Premium berildi!</b>", parse_mode='HTML')
+            await callback.message.edit_caption(caption=f"{callback.message.caption}\n\n✅ <b>To'lov tasdiqlandi: {period_text} Premium berildi (+{cashback_pts} ball keshbek)!</b>", parse_mode='HTML')
         else:
-            await callback.message.edit_text(text=f"{callback.message.text}\n\n✅ <b>To'lov tasdiqlandi: {period_text} Premium berildi!</b>", parse_mode='HTML')
+            await callback.message.edit_text(text=f"{callback.message.text}\n\n✅ <b>To'lov tasdiqlandi: {period_text} Premium berildi (+{cashback_pts} ball keshbek)!</b>", parse_mode='HTML')
     except Exception:
         pass
 
