@@ -418,10 +418,14 @@ async def premium_info(message: Message):
                 end_str = end_dt.strftime('%d.%m.%Y')
                 diff_sec = (end_dt - config.get_uzb_now()).total_seconds()
                 if diff_sec <= 0:
-                    days_left_str = '0 kun'
+                    days_left_str = 'Muddati tugagan'
+                elif diff_sec < 3600:
+                    mins_left = max(1, int(diff_sec // 60))
+                    days_left_str = f'{mins_left} daqiqa'
                 elif diff_sec < 86400:
-                    hours_left = max(1, int(diff_sec // 3600))
-                    days_left_str = f'{hours_left} soat'
+                    hours_left = int(diff_sec // 3600)
+                    mins_rem = int((diff_sec % 3600) // 60)
+                    days_left_str = f'{hours_left} soat {mins_rem} daqiqa' if mins_rem else f'{hours_left} soat'
                 else:
                     days_cnt = math.ceil(diff_sec / 86400)
                     days_left_str = f'{days_cnt} kun'
@@ -439,10 +443,14 @@ async def premium_info(message: Message):
                     end_str = end_dt.strftime('%d.%m.%Y')
                     diff_sec = (end_dt - config.get_uzb_now()).total_seconds()
                     if diff_sec <= 0:
-                        days_left_str = '0 kun'
+                        days_left_str = 'Muddati tugagan'
+                    elif diff_sec < 3600:
+                        mins_left = max(1, int(diff_sec // 60))
+                        days_left_str = f'{mins_left} daqiqa'
                     elif diff_sec < 86400:
-                        hours_left = max(1, int(diff_sec // 3600))
-                        days_left_str = f'{hours_left} soat'
+                        hours_left = int(diff_sec // 3600)
+                        mins_rem = int((diff_sec % 3600) // 60)
+                        days_left_str = f'{hours_left} soat {mins_rem} daqiqa' if mins_rem else f'{hours_left} soat'
                     else:
                         days_cnt = math.ceil(diff_sec / 86400)
                         days_left_str = f'{days_cnt} kun'
