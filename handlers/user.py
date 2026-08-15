@@ -177,19 +177,11 @@ async def cmd_start(message: Message, state: FSMContext):
 
     if len(args) > 1:
         param = args[1].strip()
-        # 1) movie_1, kino_1, kino1, k1 formatlar
-        if param.startswith('movie_'):
-            raw_id = param[len('movie_'):]
-            if raw_id.isdigit():
-                movie_id_to_send = int(raw_id)
-        elif param.startswith('kino_'):
-            raw_id = param[len('kino_'):]
-            if raw_id.isdigit():
-                movie_id_to_send = int(raw_id)
-        elif param.startswith('kino') and param[4:].isdigit():
-            movie_id_to_send = int(param[4:])
-        elif param.startswith('k') and param[1:].isdigit():
-            movie_id_to_send = int(param[1:])
+        # 1) movie_1, kino_1, kino1, k1, film_1, 1 formatlar
+        import re
+        m = re.match(r'^(?:movie_|kino_|film_|m_|k_|kino|film|k|m)?(\d+)$', param, re.IGNORECASE)
+        if m:
+            movie_id_to_send = int(m.group(1))
 
     # Agar kino kodi orqali kelmagan bo'lsa, oddiy start menyusini chiqaramiz
     await execute_start_logic(message, state)
