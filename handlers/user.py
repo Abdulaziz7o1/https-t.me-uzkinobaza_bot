@@ -73,7 +73,26 @@ def fmt_price(n: int) -> str:
     m = n // 1000
     r = n % 1000
     return f"{m} ming {r} so'm" if r else f"{m} ming so'm"
-USER_MENU_BUTTONS = ['🔍 Kino qidirish', 'Kino qidirish 🔍', 'Kino qidirish', 'Tanlanganlar ⭐️', 'Saqlanganlar ⭐️', '⭐️ Saqlanganlar', 'Tanlanganlar', 'Saqlanganlar', 'Tasodifiy Kino 🎲', 'Tasodifiy Kino', "Kino so'rash 🎬", "Kino so'rash 📥", "Kino so'rash", '💎 Mening Ballarim', 'Mening Ballarim 💎', 'Mening Ballarim', 'Ballar 💎', '🏆 Reytinglar', 'Reytinglar 🏆', 'Reytinglar', '👥 Referal', 'Referal 👥', 'Takliflar (Referal) 👥', 'Referal', "🗳️ Kino so'rovlari", "Kino so'rovlari 📥", "Kino so'rovlari 🗳️", "Kino so'rovlari", '⚙️ Sozlamalar', 'Sozlamalar ⚙️', 'Sozlamalar', '🎁 Kunlik Bonus', 'Kunlik Bonus 🎁', 'Kunlik Bonus', '👑 Profilim', 'Profilim 👑', 'Profilim', '🔝 TOP Kinolar', 'TOP Kinolar 🔝', 'TOP Kinolar', "🎂 Tug'ilgan Kun", "Tug'ilgan Kun 🎂", "Tug'ilgan Kun", '🆘 Yordam / Murojaat', 'Yordam / Murojaat 🆘', 'Yordam / Murojaat', 'Yordam']
+USER_MENU_BUTTONS = [
+    '🔍 Kino qidirish', 'Kino qidirish 🔍', 'Kino qidirish',
+    '💎 VIP Premium', 'VIP Premium 💎', '💎 Premium', 'VIP Premium',
+    '🔥 Sizga mos kinolar', 'Sizga mos kinolar 🔥', 'Sizga mos kinolar',
+    'Tanlanganlar ⭐️', 'Saqlanganlar ⭐️', '⭐️ Saqlanganlar', 'Tanlanganlar', 'Saqlanganlar',
+    'Tarixim 🕐', 'Tarixim 🕒', 'Tarixim',
+    'Tasodifiy Kino 🎲', 'Tasodifiy Kino',
+    "Kino so'rash 🎬", "Kino so'rash 📥", "Kino so'rash",
+    '💎 Mening Ballarim', 'Mening Ballarim 💎', 'Mening Ballarim', 'Ballar 💎',
+    '🏆 Reytinglar', 'Reytinglar 🏆', 'Reytinglar',
+    '👥 Referal', 'Referal 👥', 'Takliflar (Referal) 👥', 'Referal',
+    "🗳️ Kino so'rovlari", "Kino so'rovlari 📥", "Kino so'rovlari 🗳️", "Kino so'rovlari",
+    '👑 Profilim', 'Profilim 👑', 'Profilim',
+    '🔝 TOP Kinolar', 'TOP Kinolar 🔝', 'TOP Kinolar',
+    "💳 To'lovlarim", "To'lovlarim 💳", "To'lovlarim",
+    "🎂 Tug'ilgan Kun", "Tug'ilgan Kun 🎂", "Tug'ilgan Kun",
+    '⚙️ Sozlamalar', 'Sozlamalar ⚙️', 'Sozlamalar',
+    '🎁 Kunlik Bonus', 'Kunlik Bonus 🎁', 'Kunlik Bonus',
+    '🆘 Yordam / Murojaat', 'Yordam / Murojaat 🆘', 'Yordam / Murojaat', 'Yordam'
+]
 
 class UserStates(StatesGroup):
     waiting_for_request_name = State()
@@ -1687,8 +1706,18 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
     if not query or len(query) < 2:
         await message.answer(with_footer('🔍 Kamida 2 ta belgi kiriting.'))
         return
+    if query in USER_MENU_BUTTONS:
+        return
     text_clean = query.lower().replace('️', '').strip()
-    menu_keywords = ['qidirish', 'saqlanganlar', 'tanlanganlar', 'tasodifiy', "so'rash", 'ballarim', 'bonus', 'reytinglar', 'referal', "so'rovlari", 'sozlamalar', 'profilim', 'top kinolar', "tug'ilgan kun", 'yordam', 'murojaat', "kino qo'shish", "kino o'chirish", 'kino tahrirlash', 'statistika', 'reklama', 'kassa', 'audit', 'tahlili', 'bot rejimi', 'nofaollarga', 'promo', 'zaxira', 'moderatorlar', 'trendlari', 'shubhali', 'keshni', 'ommaviy']
+    menu_keywords = [
+        'qidirish', 'saqlanganlar', 'tanlanganlar', 'tasodifiy', "so'rash",
+        'ballarim', 'bonus', 'reytinglar', 'referal', "so'rovlari", 'sozlamalar',
+        'profilim', 'top kinolar', "tug'ilgan kun", 'yordam', 'murojaat',
+        "kino qo'shish", "kino o'chirish", 'kino tahrirlash', 'statistika',
+        'reklama', 'kassa', 'audit', 'tahlili', 'bot rejimi', 'nofaollarga',
+        'promo', 'zaxira', 'moderatorlar', 'trendlari', 'shubhali', 'keshni',
+        'ommaviy', 'sizga mos', 'mos kinolar', 'tarixim', "to'lovlarim", 'tolovlarim'
+    ]
     if any((kw in text_clean for kw in menu_keywords)):
         return
     import re, urllib.parse as _up
