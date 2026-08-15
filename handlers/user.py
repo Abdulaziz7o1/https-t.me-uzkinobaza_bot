@@ -1,7 +1,7 @@
 import random
 from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultCachedVideo, InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, LabeledPrice
-from aiogram.filters import CommandStart, Command, StateFilter
+from aiogram.filters import CommandStart, Command, StateFilter, Filter
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -10,6 +10,29 @@ from database import requests as db_req
 from keyboards.reply import get_admin_menu, get_user_menu, get_moderator_menu
 from keyboards.inline import get_subscription_keyboard, get_movie_action_keyboard, get_rating_keyboard, get_comments_keyboard
 router = Router()
+
+class NotBannedFilter(Filter):
+    async def __call__(self, event: Message | CallbackQuery) -> bool:
+        user_id = event.from_user.id
+        if user_id in config.ADMINS:
+            return True
+        try:
+            is_banned_flag, rem_str = await db_req.is_user_temp_banned(user_id)
+        except Exception:
+            is_banned_flag, rem_str = False, ""
+        if is_banned_flag:
+            if isinstance(event, Message):
+                if rem_str and rem_str != "Doimiy":
+                    await event.answer(f"🚫 <b>Sizning hisobingiz vaqtincha bloklangan!</b>\n\n⏰ <b>Qolgan ban muddati:</b> {rem_str}\n<i>Muddat tugagach botdan qayta foydalanishingiz mumkin.</i>", parse_mode="HTML")
+                else:
+                    await event.answer("🚫 <b>Siz botdan foydalanishdan bloklangansiz!</b>\n\n<i>Murojaat uchun adminga bog'laning.</i>", parse_mode="HTML")
+            elif isinstance(event, CallbackQuery):
+                await event.answer(f"🚫 Hisobingiz bloklangan! ({rem_str or 'Doimiy'})", show_alert=True)
+            return False
+        return True
+
+router.message.filter(NotBannedFilter())
+router.callback_query.filter(NotBannedFilter())
 
 PREMIUM_PLANS = {
     'premium_1w': {

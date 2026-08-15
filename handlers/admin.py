@@ -1197,7 +1197,7 @@ async def warn_user_callback(callback: CallbackQuery):
         user_sent = False
         try:
             ban_msg = f'🚫 <b>HISOBINGIZ VAQTINCHA BLOKLANDI!</b>\n\nSiz 3 marta ogohlantirish oldingiz va hisobingiz <b>{duration_text}</b> muddatga bloklandi.\n\n<i>Muddat tugagach botdan qayta foydalanishingiz mumkin.</i>'
-            await callback.bot.send_message(with_footer(u_id), ban_msg, parse_mode='HTML')
+            await callback.bot.send_message(u_id, with_footer(ban_msg), parse_mode='HTML')
             user_sent = True
         except Exception:
             user_sent = False
@@ -1208,7 +1208,7 @@ async def warn_user_callback(callback: CallbackQuery):
         user_sent = False
         try:
             warn_msg = f"⚠️ <b>OGOHLANTIRISH! ({warn_cnt}/3)</b>\n\nHurmatli foydalanuvchi, siz botda shubhali harakat bajardingiz.\n<b>3 ta ogohlantirishdan so'ng hisobingiz vaqtincha bloklanadi!</b>"
-            await callback.bot.send_message(with_footer(u_id), warn_msg, parse_mode='HTML')
+            await callback.bot.send_message(u_id, with_footer(warn_msg), parse_mode='HTML')
             user_sent = True
         except Exception:
             user_sent = False
@@ -1787,7 +1787,7 @@ async def unban_user_callback(callback: CallbackQuery):
         user_sent = False
         try:
             unban_msg = "🔓 <b>HISOBINGIZ BLOKDAN CHIQARILDI!</b>\n\nHurmatli foydalanuvchi, sizning hisobingiz administrator tomonidan blokdan chiqarildi. Endi botdan qayta to'liq foydalanishingiz mumkin! 🍿"
-            await callback.bot.send_message(with_footer(u_id), unban_msg, parse_mode='HTML')
+            await callback.bot.send_message(u_id, with_footer(unban_msg), parse_mode='HTML')
             user_sent = True
         except Exception:
             user_sent = False
@@ -1807,14 +1807,14 @@ async def warn_user_callback(callback: CallbackQuery):
     is_banned, cnt, dur_txt, stage = await db_req.warn_user_progressive(u_id)
     if is_banned:
         try:
-            await callback.bot.send_message(with_footer(u_id), f'⚠️ <b>Sizga 3 ta ogohlantirish berildi!</b>\n\nHisobingiz <b>{dur_txt}</b> muddatga avtomatik bloklandi.', parse_mode='HTML')
+            await callback.bot.send_message(u_id, with_footer(f'⚠️ <b>Sizga 3 ta ogohlantirish berildi!</b>\n\nHisobingiz <b>{dur_txt}</b> muddatga avtomatik bloklandi.'), parse_mode='HTML')
         except Exception:
             pass
         await callback.message.edit_text(with_footer(f'{callback.message.text}\n\n⚠️ <b>3-ogohlantirish berildi! Foydalanuvchi {dur_txt} ga bloklandi.</b>'), parse_mode='HTML')
         await callback.answer(f'Foydalanuvchiga 3-ogohlantirish berildi ({dur_txt} ban)!', show_alert=True)
     else:
         try:
-            await callback.bot.send_message(with_footer(u_id), f'⚠️ <b>OGOHLANTIRISH!</b>\n\nSiz bot qoidalarini buzdingiz ({cnt}/3). Iltimos, spam bermang va odob saqlang!', parse_mode='HTML')
+            await callback.bot.send_message(u_id, with_footer(f'⚠️ <b>OGOHLANTIRISH!</b>\n\nSiz bot qoidalarini buzdingiz ({cnt}/3). Iltimos, spam bermang va odob saqlang!'), parse_mode='HTML')
         except Exception:
             pass
         await callback.message.edit_text(with_footer(f'{callback.message.text}\n\n⚠️ <b>Ogohlantirish yuborildi ({cnt}/3)!</b>'), parse_mode='HTML')
@@ -1845,7 +1845,7 @@ async def execute_ban_callback(callback: CallbackQuery):
     await db_req.ban_user_custom(u_id, hours=hours)
     try:
         user_msg = f'🚫 <b>HISOBINGIZ BLOKLANDI!</b>\n\n<b>Bloklash muddati:</b> <code>{dur_text}</code>\n<i>Qoidabuzarlik sababli botdan foydalanishingiz cheklandi.</i>'
-        await callback.bot.send_message(with_footer(u_id), user_msg, parse_mode='HTML')
+        await callback.bot.send_message(u_id, with_footer(user_msg), parse_mode='HTML')
     except Exception:
         pass
     await callback.message.edit_text(with_footer(f'🚫 <b>Foydalanuvchi (ID: <code>{u_id}</code>) {dur_text} muddatga muvaffaqiyatli bloklandi!</b>'), parse_mode='HTML')
@@ -1883,7 +1883,7 @@ async def save_ticket_reply(message: Message, state: FSMContext):
     await state.clear()
     if success:
         try:
-            await message.bot.send_message(with_footer(user_id), f'📩 <b>Admin sizning murojaatingizga javob berdi:</b>', parse_mode='HTML')
+            await message.bot.send_message(user_id, with_footer(f'📩 <b>Admin sizning murojaatingizga javob berdi:</b>'), parse_mode='HTML')
             await message.copy_to(chat_id=user_id)
             await message.answer(with_footer(f"✅ <b>Ticket #{ticket_id} bo'yicha javob foydalanuvchiga muvaffaqiyatli yuborildi!</b>"), parse_mode='HTML')
         except Exception as e:
@@ -1971,7 +1971,7 @@ async def admin_unban_callback(callback: CallbackQuery):
     user_sent = False
     try:
         unban_msg = "🔓 <b>HISOBINGIZ BLOKDAN CHIQARILDI!</b>\n\nHurmatli foydalanuvchi, sizning hisobingiz administrator tomonidan blokdan chiqarildi. Endi botdan qayta to'liq foydalanishingiz mumkin! 🍿"
-        await callback.bot.send_message(with_footer(u_id), unban_msg, parse_mode='HTML')
+        await callback.bot.send_message(u_id, with_footer(unban_msg), parse_mode='HTML')
         user_sent = True
     except Exception:
         user_sent = False
@@ -2039,7 +2039,7 @@ async def admin_approve_prem_callback(callback: CallbackQuery):
             f"🎁 <b>VIP Keshbek:</b> +{cashback_pts} 💎 ball hisobingizga qo'shildi!{yearly_gift_extra}\n\n"
             f"<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin! Maroqli hordiq chiqaring!</i> 🍿"
         )
-        await callback.bot.send_message(with_footer(u_id), user_msg, parse_mode='HTML')
+        await callback.bot.send_message(u_id, with_footer(user_msg), parse_mode='HTML')
     except Exception:
         pass
     await callback.answer(f'✅ {period_text} Premium faollashtirildi (+{cashback_pts} ball keshbek)!', show_alert=True)
@@ -2060,7 +2060,7 @@ async def admin_reject_receipt_callback(callback: CallbackQuery):
     u_id = int(callback.data.split('_')[3])
     try:
         user_msg = f"❌ <b>TO'LOV CHEKI QABUL QILINMADI!</b>\n\nHurmatli foydalanuvchi, siz yuborgan to'lov cheki yaroqsiz (xato) yoki hisobimizga pul tushmagan bo'lishi mumkin.\n\n<i>Iltimos, to'lov chekini (skrinshotini) to'g'ri va aniq ko'rinadigan holda qayta yuboring yoki adminlarga murojaat qiling.</i> 📩"
-        await callback.bot.send_message(with_footer(u_id), user_msg, parse_mode='HTML')
+        await callback.bot.send_message(u_id, with_footer(user_msg), parse_mode='HTML')
         user_sent = True
     except Exception:
         user_sent = False
@@ -2087,7 +2087,7 @@ async def admin_warn_receipt_callback(callback: CallbackQuery):
             user_msg = f"🚨 <b>HISOBINGIZ VAQTINCHALIK BLOKLANDI!</b>\n\nSiz <b>3 marta</b> ogohlantirish oldingiz! (Sabab: Soxta/xato to'lov cheki yuborish).\n⏳ <b>Bloklash muddati:</b> <code>{ban_until}</code> gacha.\n\n<i>Iltimos, bot qoidalariga amal qiling!</i>"
         else:
             user_msg = f"⚠️ <b>OGOHLANTIRISH!</b>\n\nHurmatli foydalanuvchi, siz noto'g'ri yoki soxta to'lov chekini yuborganingiz sababli administratorlar tomonidan ogohlantirildingiz!\n\n📊 <b>Sizdagi ogohlantirishlar:</b> {warn_count}/3 ta\n<i>(Eslatma: 3 ta ogohlantirishdan so'ng hisobingiz avtomatik bloklanadi)</i> 🚨"
-        await callback.bot.send_message(with_footer(u_id), user_msg, parse_mode='HTML')
+        await callback.bot.send_message(u_id, with_footer(user_msg), parse_mode='HTML')
         user_sent = True
     except Exception:
         user_sent = False
@@ -2112,7 +2112,7 @@ async def admin_ban_receipt_callback(callback: CallbackQuery):
     await db_req.ban_user(u_id)
     try:
         user_msg = f"🚫 <b>HISOBINGIZ BLOKLANDI!</b>\n\nHurmatli foydalanuvchi, soxta yoki noto'g'ri to'lov chekini yuborganingiz sababli hisobingiz administratorlar tomonidan bloklandi.\n\n<i>Bot qoidalariga rioya qilishingizni so'raymiz!</i> 🛑"
-        await callback.bot.send_message(with_footer(u_id), user_msg, parse_mode='HTML')
+        await callback.bot.send_message(u_id, with_footer(user_msg), parse_mode='HTML')
         user_sent = True
     except Exception:
         user_sent = False
@@ -2262,7 +2262,7 @@ async def process_bonus_limit_value(message: Message, state: FSMContext):
     notify_msg = f"🎁 <b>BUGUN UCHUN BONUS KINO LIMITI!</b>\n\nHurmatli foydalanuvchi, sizga bugungi kun uchun <b>+{bonus_amount} ta</b> qo'shimcha kino ko'rish bonusi berildi! 🎬\n\n<i>Eslatma: Ushbu bonus faqat bugungi kun uchun amal qiladi. Bugun maroqli kino tomosha qiling!</i> 🍿"
     for uid in target_users:
         try:
-            await message.bot.send_message(with_footer(uid), notify_msg, parse_mode='HTML')
+            await message.bot.send_message(uid, with_footer(notify_msg), parse_mode='HTML')
             sent_cnt += 1
             import asyncio
             await asyncio.sleep(0.04)
@@ -2778,7 +2778,7 @@ async def broadcast_2x_event_msg_cb(callback: CallbackQuery):
     sent_cnt = 0
     for uid in users:
         try:
-            await callback.bot.send_message(with_footer(uid), alert_msg, parse_mode='HTML')
+            await callback.bot.send_message(uid, with_footer(alert_msg), parse_mode='HTML')
             sent_cnt += 1
             import asyncio
             await asyncio.sleep(0.04)
@@ -2908,7 +2908,7 @@ async def send_inactive_reminder_exec_cb(callback: CallbackQuery):
         for uid in inactives:
             try:
                 await db_req.add_points(uid, 5)
-                await callback.bot.send_message(with_footer(uid), msg, parse_mode='HTML')
+                await callback.bot.send_message(uid, with_footer(msg), parse_mode='HTML')
                 sent_cnt += 1
                 import asyncio
                 await asyncio.sleep(0.04)
@@ -2956,7 +2956,7 @@ async def admin_gift_points_cmd(message: Message):
     await db_req.add_abuse_log(message.from_user.id, 'GIFT_POINTS', f"Admin {message.from_user.id} user {target_uid} ga +{amount} ball sovg'a qildi.")
     try:
         notify_msg = f"🎁 <b>ADMINDAN SOVG'A BALL!</b> 🎉\n\nAdmin tomonidan hisobingizga <b>+{amount} 💎 ball</b> taqdim etildi!\n\n<i>Balingizni oshirishda va botimizdan foydalanishda davom eting!</i> 🍿"
-        await message.bot.send_message(with_footer(target_uid), notify_msg, parse_mode='HTML')
+        await message.bot.send_message(target_uid, with_footer(notify_msg), parse_mode='HTML')
     except Exception:
         pass
     await message.answer(with_footer(f"✅ <b>BALL MUVAFFAQIYATLI SOVG'A QILINDI!</b>\n\n👤 <b>Foydalanuvchi ID:</b> <code>{target_uid}</code>\n💎 <b>Berilgan ball:</b> <code>+{amount} 💎</code>"), parse_mode='HTML')
@@ -2998,7 +2998,7 @@ async def prem_warn_user_cb(callback: CallbackQuery):
         await db_req.temp_ban_user(target_uid, hours=dur_hours)
         try:
             ban_msg = f"🚨 <b>HISOB VAQTINCHA BLOKLANDI (3/3)</b>\n\nHurmatli foydalanuvchi! Qoidabuzarliklar va rasmiy ogohlantirishlar soni cheklangan limitga (3 marta) yetganligi sababli, hisobingiz xavfsizlik qoidalariga muvofiq <b>{dur_text}</b> muddatga bloklandi.\n\n⚖️ <i>Iltimos, belgilangan cheklov muddati tugagach, bot qoidalariga to'liq rioya qilgan holda foydalanishingizni so'raymiz.</i>"
-            await callback.bot.send_message(with_footer(target_uid), ban_msg, parse_mode='HTML')
+            await callback.bot.send_message(target_uid, with_footer(ban_msg), parse_mode='HTML')
         except Exception:
             pass
         await callback.answer(f"🚨 Foydalanuvchida 3 ta ogohlantirish bo'ldi va {dur_text} ga bloklandi!", show_alert=True)
@@ -3006,7 +3006,7 @@ async def prem_warn_user_cb(callback: CallbackQuery):
     else:
         try:
             warn_msg = f"⚠️ <b>RASMIY OGOHLANTIRISH! ({curr_warn}/3)</b>\n\nHurmatli foydalanuvchi! Botimizdan foydalanish qoidalari va odob-axloq me'yorlariga rioya etilmaganligi sababli sizga admin tomonidan rasmiy ogohlantirish berildi.\n\n📌 <b>Eslatma:</b> Qoidabuzarliklar soni <b>3 taga</b> yetganda, hisobingiz avtomatik ravishda botdan bloklanadi!\n\n⚖️ <i>Iltimos, botimiz qoidalariga hamda qonunchilik me'yorlariga qat'iy rioya qilishingizni so'raymiz.</i>"
-            await callback.bot.send_message(with_footer(target_uid), warn_msg, parse_mode='HTML')
+            await callback.bot.send_message(target_uid, with_footer(warn_msg), parse_mode='HTML')
         except Exception:
             pass
         await callback.answer(f'⚠️ Foydalanuvchiga {curr_warn}-ogohlantirish yuborildi!', show_alert=True)
@@ -3042,7 +3042,7 @@ async def prem_del_confirm_cb(callback: CallbackQuery):
     await db_req.revoke_premium_subscription(target_uid)
     try:
         user_notify = f"❌ <b>PREMIUM VIP OBUNASI BEKOR QILINDI</b>\n\nHurmatli foydalanuvchi! Botimiz xavfsizligi va foydalanish shartlariga hamda rasmiy qoidalarga rioya etilmaganligi sababli, <b>👑 Premium VIP</b> obunangiz admin tomonidan muddatidan oldin bekor qilindi.\n\n📌 <b>Hisob holati:</b> Oddiy foydalanuvchi rejimiga o'tkazildi.\n\n⚖️ <i>Iltimos, botimiz qoidalariga hamda belgilangan me'yorlarga to'liq rioya etishingizni so'raymiz.</i>"
-        await callback.bot.send_message(with_footer(target_uid), user_notify, parse_mode='HTML')
+        await callback.bot.send_message(target_uid, with_footer(user_notify), parse_mode='HTML')
     except Exception:
         pass
     await callback.answer("❌ Premium VIP obunasi muvaffaqiyatli o'chirildi!", show_alert=True)
@@ -3292,7 +3292,7 @@ async def _finalize_manual_premium(event_obj, state: FSMContext, premium_type: s
             f"⏰ <b>Tugash sanasi:</b> {expiration_date}\n\n"
             f"<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin!</i> 🍿"
         )
-        await bot_inst.send_message(with_footer(user_id), user_ntf, parse_mode='HTML')
+        await bot_inst.send_message(user_id, with_footer(user_ntf), parse_mode='HTML')
     except Exception:
         pass
 
