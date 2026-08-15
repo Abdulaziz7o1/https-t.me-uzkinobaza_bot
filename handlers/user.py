@@ -142,12 +142,12 @@ async def cmd_start(message: Message, state: FSMContext):
                 if is_prem_only and not (await db_req.is_premium_user(user_id)):
                     kb = InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
-                        [InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")]
+                        [InlineKeyboardButton(text="⏳ 15 Minutlik Bepul VIP Sinov (20 ta kino)", callback_data="claim_vip_trial_cb")]
                     ])
                     txt = (
                         f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
                         f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
-                        f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>1 soatlik bepul VIP sinov</b>dan foydalanishingiz kerak! 🍿"
+                        f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>15 minutlik bepul VIP sinov (20 ta kino)</b>dan foydalanishingiz kerak! 🍿"
                     )
                     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
                     return
@@ -250,12 +250,26 @@ async def search_movie_by_code(message: Message):
         if is_prem_only and not (await db_req.is_premium_user(user_id)):
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
-                [InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")]
+                [InlineKeyboardButton(text="⏳ 15 Minutlik Bepul VIP Sinov (20 ta kino)", callback_data="claim_vip_trial_cb")]
             ])
             txt = (
                 f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
                 f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
-                f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>1 soatlik bepul VIP sinov</b>dan foydalanishingiz kerak! 🍿"
+                f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>15 minutlik bepul VIP sinov (20 ta kino)</b>dan foydalanishingiz kerak! 🍿"
+            )
+            await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+            return
+
+        # VIP Trial limit tekshiruvi (15 minutlik rejimda 20 ta kino)
+        can_watch, remaining_trial = await db_req.check_and_increment_trial_movie_count(user_id)
+        if not can_watch:
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]
+            ])
+            txt = (
+                f"⚠️ <b>15 MINUTLIK BEPUL VIP SINOV LIMITI (20 TA KINO) TUGADI!</b> 👑\n\n"
+                f"Siz 15 minutlik sinov davrida <b>20 ta kino</b> ko'rish limitidan to'liq foydalandingiz.\n\n"
+                f"Cheklovlarsiz barcha kinolarni tomosha qilish uchun /premium orqali obuna xarid qilishingiz mumkin! 🍿"
             )
             await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
             return
@@ -453,7 +467,7 @@ async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool=Fal
     
     if not trial_claimed:
         kb_rows.append([
-            InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")
+            InlineKeyboardButton(text="⏳ 15 Minutlik Bepul VIP Sinov (20 ta kino)", callback_data="claim_vip_trial_cb")
         ])
         
     kb_rows.append([
@@ -470,10 +484,14 @@ async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool=Fal
         f"• Kunlik limit yo'q\n"
         f"• Cheklovsiz kino ko'rish\n"
         f"• Prioritet qo'llab-quvvatlash\n\n"
-        f"👇 <b>Plan tanlang yoki Promo kod kiriting:</b>"
+        f"<i>Kerakli tarifni tanlang:</i>"
     )
+    
     if is_edit and isinstance(event, CallbackQuery):
-        await event.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
+        try:
+            await event.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
+        except Exception:
+            await event.message.answer(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
     elif isinstance(event, Message):
         await event.answer(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
     elif isinstance(event, CallbackQuery):
@@ -800,7 +818,7 @@ async def claim_vip_trial_cb(callback: CallbackQuery):
             try:
                 await callback.bot.send_message(
                     admin_id,
-                    with_footer(f"⏳ <b>1 SOATLIK BEPUL VIP SINOV OLINDI!</b>\n\n👤 {uname} (ID: <code>{user_id}</code>)"),
+                    with_footer(f"⏳ <b>15 MINUTLIK BEPUL VIP SINOV OLINDI (20 ta kino)!</b>\n\n👤 {uname} (ID: <code>{user_id}</code>)"),
                     parse_mode='HTML'
                 )
             except Exception:
@@ -1608,15 +1626,30 @@ async def show_movie_callback(callback: CallbackQuery):
         if is_prem_only and not (await db_req.is_premium_user(user_id)):
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
-                [InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")]
+                [InlineKeyboardButton(text="⏳ 15 Minutlik Bepul VIP Sinov (20 ta kino)", callback_data="claim_vip_trial_cb")]
             ])
             txt = (
                 f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
                 f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
-                f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>1 soatlik bepul VIP sinov</b>dan foydalanishingiz kerak! 🍿"
+                f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>15 minutlik bepul VIP sinov (20 ta kino)</b>dan foydalanishingiz kerak! 🍿"
             )
             await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
             await callback.answer("🔒 Faqat Premium obunachilar uchun!", show_alert=True)
+            return
+
+        # VIP Trial limit tekshiruvi (15 minutlik rejimda 20 ta kino)
+        can_watch, remaining_trial = await db_req.check_and_increment_trial_movie_count(user_id)
+        if not can_watch:
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]
+            ])
+            txt = (
+                f"⚠️ <b>15 MINUTLIK BEPUL VIP SINOV LIMITI (20 TA KINO) TUGADI!</b> 👑\n\n"
+                f"Siz 15 minutlik sinov davrida <b>20 ta kino</b> ko'rish limitidan to'liq foydalandingiz.\n\n"
+                f"Cheklovlarsiz barcha kinolarni tomosha qilish uchun /premium orqali obuna xarid qilishingiz mumkin! 🍿"
+            )
+            await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+            await callback.answer("⚠️ Sinov limiti tugadi!", show_alert=True)
             return
 
         await db_req.add_to_watch_history(user_id, movie_id)

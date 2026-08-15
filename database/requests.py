@@ -3690,9 +3690,9 @@ async def reset_user_birthday_lock(user_id: int) -> bool:
     return True
 
 
-# ─── ⏳ 1 SOATLIK BEPUL VIP TRIAL (FREE TRIAL) ──────────────────────────────
+# ─── ⏳ 15 MINUTLIK BEPUL VIP TRIAL (MAX 20 TA KINO) ──────────────────────────
 async def has_claimed_vip_trial(user_id: int) -> bool:
-    """Foydalanuvchi 1 soatlik bepul VIP sinovini ishlatganmi?"""
+    """Foydalanuvchi 15 minutlik bepul VIP sinovini ishlatganmi?"""
     async with get_db() as db:
         try:
             async with db.execute("SELECT vip_trial_claimed FROM users WHERE id = ?", (user_id,)) as c:
@@ -3703,29 +3703,30 @@ async def has_claimed_vip_trial(user_id: int) -> bool:
 
 
 async def claim_vip_trial(user_id: int) -> tuple[bool, str]:
-    """1 soatlik bepul VIP sinov rejimini berish (1 marta)"""
+    """15 minutlik bepul VIP sinov rejimini berish (1 marta, max 20 ta kino)"""
     from datetime import datetime, timedelta
     if await has_claimed_vip_trial(user_id):
-        return False, "⚠️ <b>Siz allaqachon 1 soatlik bepul VIP sinov imkoniyatidan foydalangansiz!</b>\n\nVIP imtiyozlarini davom ettirish uchun /premium orqali obuna xarid qilishingiz mumkin."
+        return False, "⚠️ <b>Siz allaqachon 15 minutlik bepul VIP sinov imkoniyatidan foydalangansiz!</b>\n\nVIP imtiyozlarini davom ettirish uchun /premium orqali obuna xarid qilishingiz mumkin."
 
     now = datetime.now()
-    end_time = now + timedelta(hours=1)
+    end_time = now + timedelta(minutes=15)
     end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
     start_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
     async with get_db() as db:
         await db.execute(
-            """INSERT INTO users (id, is_premium, premium_until, vip_trial_claimed)
-               VALUES (?, 1, ?, 1)
+            """INSERT INTO users (id, is_premium, premium_until, vip_trial_claimed, vip_trial_movies_count)
+               VALUES (?, 1, ?, 1, 0)
                ON CONFLICT(id) DO UPDATE SET
                    is_premium = 1,
                    premium_until = ?,
-                   vip_trial_claimed = 1""",
+                   vip_trial_claimed = 1,
+                   vip_trial_movies_count = 0""",
             (user_id, end_str, end_str)
         )
         await db.execute(
             """INSERT INTO premium_subscriptions (user_id, start_date, end_date, plan)
-               VALUES (?, ?, ?, '1 soatlik VIP Sinov')
+               VALUES (?, ?, ?, '15 minutlik VIP Sinov')
                ON CONFLICT(user_id) DO UPDATE SET
                    start_date = excluded.start_date,
                    end_date = excluded.end_date,
@@ -3734,7 +3735,41 @@ async def claim_vip_trial(user_id: int) -> tuple[bool, str]:
         )
         await db.commit()
 
-    return True, f"🎉 <b>TABRIKLAYMIZ! 1 SOATLIK BEPUL VIP SINOV YOQILDI!</b> 👑\n\n⏰ <b>Amal qilish muddati:</b> 1 soat (<code>{end_str[:16]}</code> gacha)\n\n🍿 <i>Endi 1 soat davomida botdan barcha kinolarni hech qanday cheklovlarsiz tomosha qilishingiz mumkin!</i>"
+    return True, (
+        f"🎉 <b>TABRIKLAYMIZ! 15 MINUTLIK BEPUL VIP SINOV YOQILDI!</b> 👑\n\n"
+        f"⏰ <b>Amal qilish muddati:</b> 15 minut (<code>{end_str[:16]}</code> gacha)\n"
+        f"🎬 <b>Kino ko'rish limiti:</b> 20 ta kino\n\n"
+        f"🍿 <i>Endi 15 minut davomida botdan 20 tagacha kinoni VIP imtiyozlari bilan tomosha qilishingiz mumkin!</i>"
+    )
+
+
+async def check_and_increment_trial_movie_count(user_id: int) -> tuple[bool, int]:
+    """
+    VIP trial foydalanuvchisi uchun kino so'rovini hisoblash.
+    Agar 20 tadan oshsa: (False, 20) qaytaradi va VIP ni to'xtatadi.
+    Agar trial bo'lmasa yoki chegarada bo'lsa: (True, qolgan_soni)
+    """
+    sub = await get_premium_subscription(user_id)
+    plan_name = str(sub[3]) if sub and len(sub) > 3 else ""
+    if "VIP Sinov" not in plan_name and "Trial" not in plan_name:
+        return True, 999  # To'laqonli VIP obunachi
+
+    async with get_db() as db:
+        async with db.execute("SELECT vip_trial_movies_count FROM users WHERE id = ?", (user_id,)) as c:
+            row = await c.fetchone()
+            cnt = row[0] if row and row[0] is not None else 0
+
+        if cnt >= 20:
+            # 20 ta kino limiti to'lgan, trialni yakunlaymiz
+            await db.execute("UPDATE users SET is_premium = 0 WHERE id = ?", (user_id,))
+            await db.execute("DELETE FROM premium_subscriptions WHERE user_id = ?", (user_id,))
+            await db.commit()
+            return False, 0
+
+        new_cnt = cnt + 1
+        await db.execute("UPDATE users SET vip_trial_movies_count = ? WHERE id = ?", (new_cnt, user_id))
+        await db.commit()
+        return True, (20 - new_cnt)
 
 
 # ─── ⚡ 1 SOATLIK FLASH SALE (50% CHEGIRMA) ──────────────────────────────────

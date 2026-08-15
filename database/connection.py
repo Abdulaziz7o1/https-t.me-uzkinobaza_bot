@@ -645,6 +645,12 @@ async def init_db():
         except Exception:
             pass
 
+        # VIP Trial kinolar ko'rish limiti hisoblagichi (15 minutlik rejimda max 20 ta kino)
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN vip_trial_movies_count INTEGER DEFAULT 0")
+        except Exception:
+            pass
+
         await db.commit()
 
 
