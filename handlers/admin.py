@@ -186,8 +186,8 @@ def get_mod_perms_keyboard(user_id: int, perms: dict):
 @router.message(Command('start'), StateFilter('*'))
 async def admin_start_handler(message: Message, state: FSMContext):
     await state.clear()
-    from handlers.user import execute_start_logic
-    await execute_start_logic(message, state)
+    from handlers.user import cmd_start
+    await cmd_start(message, state)
 
 @router.message(F.document, F.document.file_name.endswith('.json'))
 async def admin_restore_json_backup(message: Message):
