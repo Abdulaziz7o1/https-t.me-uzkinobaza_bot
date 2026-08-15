@@ -172,41 +172,60 @@ async def execute_start_logic(message: Message, state: FSMContext):
 @router.message(Command('start'), StateFilter('*'))
 async def cmd_start(message: Message, state: FSMContext):
     """Start komandasi - umumiy start logikasini chaqirish"""
-    await execute_start_logic(message, state)
     args = message.text.split(maxsplit=1)
-    if len(args) > 1 and args[1].startswith('movie_'):
-        raw_id = args[1][len('movie_'):]
-        if raw_id.isdigit():
-            movie_id = int(raw_id)
-            user_id = message.from_user.id
-            movie = await db_req.get_movie(movie_id, user_id=user_id)
-            if movie:
-                file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
-                if is_prem_only and not (await db_req.is_premium_user(user_id)):
-                    kb = InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
-                        [InlineKeyboardButton(text="⏳ 15 Minutlik Bepul VIP Sinov (20 ta kino)", callback_data="claim_vip_trial_cb")]
-                    ])
-                    txt = (
-                        f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
-                        f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
-                        f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>15 minutlik bepul VIP sinov (20 ta kino)</b>dan foydalanishingiz kerak! 🍿"
-                    )
-                    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
-                    return
-                await db_req.add_to_watch_history(user_id, movie_id)
-                avg_rating, votes = await db_req.get_movie_rating(movie_id)
-                is_fav = await db_req.is_favorite(user_id, movie_id)
-                rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
-                cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
-                if views_count:
-                    cap += f'\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
-                if avg_rating > 0:
-                    cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
-                cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
-                await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating))
-            else:
-                await message.answer(with_footer(f'❌ <b>{movie_id}</b> kodli kino topilmadi.'), parse_mode='HTML')
+    movie_id_to_send = None
+
+    if len(args) > 1:
+        param = args[1].strip()
+        # 1) movie_1, kino_1, kino1, k1 formatlar
+        if param.startswith('movie_'):
+            raw_id = param[len('movie_'):]
+            if raw_id.isdigit():
+                movie_id_to_send = int(raw_id)
+        elif param.startswith('kino_'):
+            raw_id = param[len('kino_'):]
+            if raw_id.isdigit():
+                movie_id_to_send = int(raw_id)
+        elif param.startswith('kino') and param[4:].isdigit():
+            movie_id_to_send = int(param[4:])
+        elif param.startswith('k') and param[1:].isdigit():
+            movie_id_to_send = int(param[1:])
+
+    # Agar kino kodi orqali kelmagan bo'lsa, oddiy start menyusini chiqaramiz
+    await execute_start_logic(message, state)
+
+    # Agar kino deep-linki bo'lsa, kinoni yuboramiz
+    if movie_id_to_send is not None:
+        movie_id = movie_id_to_send
+        user_id = message.from_user.id
+        movie = await db_req.get_movie(movie_id, user_id=user_id)
+        if movie:
+            file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
+            if is_prem_only and not (await db_req.is_premium_user(user_id)):
+                kb = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
+                    [InlineKeyboardButton(text="⏳ 15 Minutlik Bepul VIP Sinov (20 ta kino)", callback_data="claim_vip_trial_cb")]
+                ])
+                txt = (
+                    f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
+                    f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
+                    f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>15 minutlik bepul VIP sinov (20 ta kino)</b>dan foydalanishingiz kerak! 🍿"
+                )
+                await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+                return
+            await db_req.add_to_watch_history(user_id, movie_id)
+            avg_rating, votes = await db_req.get_movie_rating(movie_id)
+            is_fav = await db_req.is_favorite(user_id, movie_id)
+            rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
+            cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+            if views_count:
+                cap += f'\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
+            if avg_rating > 0:
+                cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
+            cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
+            await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating))
+        else:
+            await message.answer(with_footer(f'❌ <b>{movie_id}</b> kodli kino topilmadi.'), parse_mode='HTML')
 
 @router.message(F.text == '🚀 Boshlash')
 async def btn_start(message: Message, state: FSMContext):
