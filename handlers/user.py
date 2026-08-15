@@ -258,13 +258,18 @@ async def check_subscription_callback(callback: CallbackQuery):
             parts = ch_target.split('t.me/')[1].strip('/')
             if not parts.startswith('+') and (not parts.startswith('joinchat/')) and (not parts.startswith('c/')):
                 ch_target = '@' + parts.split('/')[0]
+        target_id = int(ch_target) if (ch_target.startswith("-") and ch_target.lstrip("-").isdigit()) else ch_target
         try:
-            member = await bot.get_chat_member(chat_id=ch_target, user_id=user_id)
+            member = await bot.get_chat_member(chat_id=target_id, user_id=user_id)
             if member.status not in ['creator', 'administrator', 'member']:
                 not_subscribed.append(ch_tuple)
         except Exception as e:
-            print(f'Kanal tekshirishda xato ({ch_target}): {e}')
-            not_subscribed.append(ch_tuple)
+            print(f'Kanal tekshirishda xato ({target_id}): {e}')
+            err_str = str(e).lower()
+            if "chat not found" in err_str or "bot is not a member" in err_str or "not enough rights" in err_str:
+                pass
+            else:
+                not_subscribed.append(ch_tuple)
     if not_subscribed:
         await callback.answer("❌ Hali barcha homiy kanallarga a'zo bo'lmadingiz! Iltimos, a'zo bo'lib qayta bosing.", show_alert=True)
         return

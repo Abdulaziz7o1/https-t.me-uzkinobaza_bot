@@ -583,10 +583,27 @@ async def add_channel_name(message: Message, state: FSMContext):
         await message.answer(with_footer("⚠️ Qayta urinib ko'ring. Iltimos, «Yangi kanal qo'shish ➕» tugmasini qayta bosing."))
         await state.clear()
         return
-    success = await db_req.add_sponsor_channel(channel_id, channel_name)
+
+    # Agar raqamli ID (-100...) kiritilgan bo'lsa va bot kanalda admin bo'lsa, havolasini olamiz
+    channel_to_save = channel_id
+    if channel_id.startswith("-") and channel_id.lstrip("-").isdigit():
+        try:
+            target_chat_id = int(channel_id)
+            chat = await message.bot.get_chat(target_chat_id)
+            if chat.username:
+                channel_to_save = f"@{chat.username}"
+            elif chat.invite_link:
+                channel_to_save = chat.invite_link
+            else:
+                invite = await message.bot.create_chat_invite_link(target_chat_id)
+                channel_to_save = invite.invite_link
+        except Exception as e:
+            print(f"Kanal linkini olishda ogohlantirish: {e}")
+
+    success = await db_req.add_sponsor_channel(channel_to_save, channel_name)
     await state.clear()
     if success:
-        await message.answer(with_footer(f"✅ Hamkor kanal muvaffaqiyatli qo'shildi: <b>{channel_name}</b>"), parse_mode='HTML')
+        await message.answer(with_footer(f"✅ Hamkor kanal muvaffaqiyatli qo'shildi: <b>{channel_name}</b>\n🔗 Manzil: <code>{channel_to_save}</code>"), parse_mode='HTML')
     else:
         await message.answer(with_footer("❌ Kanal qo'shishda xatolik yuz berdi. Ehtimol, bu kanal allaqachon mavjud."))
 

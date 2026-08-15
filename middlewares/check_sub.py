@@ -113,13 +113,22 @@ class CheckSubMiddleware(BaseMiddleware):
                 if not parts.startswith("+") and not parts.startswith("joinchat/") and not parts.startswith("c/"):
                     ch_target = "@" + parts.split("/")[0]
 
+            # Agar raqamli ID bo'lsa (-100...), int formatiga o'tkazamiz
+            target_id = int(ch_target) if (ch_target.startswith("-") and ch_target.lstrip("-").isdigit()) else ch_target
+
             try:
-                member = await bot.get_chat_member(chat_id=ch_target, user_id=user_id)
+                member = await bot.get_chat_member(chat_id=target_id, user_id=user_id)
                 if member.status not in ["creator", "administrator", "member"]:
                     not_subscribed_channels.append(ch_tuple)
             except Exception as e:
-                print(f"Kanal tekshirishda xato ({ch_target}): {e}")
-                not_subscribed_channels.append(ch_tuple)
+                # Agar bot kanal admini bo'lmasa yoki kanal topilmasa, tekshirishdan o'tkazib yuborish (bloklanib qolmasligi uchun)
+                print(f"Kanal tekshirishda xato ({target_id}): {e}")
+                # Agar bot kanalda admin bo'lmasa (ChatNotFound, MemberNotFound va h.k.), userlarni asossiz to'xtatmaymiz
+                err_str = str(e).lower()
+                if "chat not found" in err_str or "bot is not a member" in err_str or "not enough rights" in err_str:
+                    pass
+                else:
+                    not_subscribed_channels.append(ch_tuple)
 
         if not_subscribed_channels:
             try:
