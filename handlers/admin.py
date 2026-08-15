@@ -2021,11 +2021,22 @@ async def admin_approve_prem_callback(callback: CallbackQuery):
     cashback_pts = max(1, int(days * cb_pct / 10))
     await db_req.add_points(u_id, cashback_pts)
 
+    # 1 Yillik VIP olganga do'sti uchun 1 oylik bepul VIP promo kod sovg'asi (User 15)
+    yearly_gift_extra = ""
+    if days >= 365:
+        gift_promo = await db_req.generate_yearly_vip_gift_promocode(u_id)
+        yearly_gift_extra = (
+            f"\n\n🎁 <b>MAXSUS YILLIK VIP SOVG'ASI!</b> 🎉\n"
+            f"Siz 1 yillik VIP xarid qilganingiz uchun sizga do'stingizga sovg'a qilish uchun <b>1 oylik (30 kunlik) bepul VIP promo kodi</b> taqdim etiladi:\n\n"
+            f"🎟 <b>Sizning promo kodingiz:</b> <code>{gift_promo}</code>\n"
+            f"<i>(Ushbu kodni do'stingizga yuboring, u botga kirib promo kodni terishi bilan 1 oy VIP ga ega bo'ladi!)</i> 🍿"
+        )
+
     try:
         user_msg = (
             f"🎉 <b>TO'LOV TASDIQLANDI!</b>\n\n"
             f"Hurmatli foydalanuvchi, sizning to'lov chekingiz adminlar tomonidan tasdiqlandi va sizga <b>{period_text} Premium obunasi</b> faollashtirildi! 👑\n\n"
-            f"🎁 <b>VIP Keshbek:</b> +{cashback_pts} 💎 ball hisobingizga qo'shildi!\n\n"
+            f"🎁 <b>VIP Keshbek:</b> +{cashback_pts} 💎 ball hisobingizga qo'shildi!{yearly_gift_extra}\n\n"
             f"<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin! Maroqli hordiq chiqaring!</i> 🍿"
         )
         await callback.bot.send_message(with_footer(u_id), user_msg, parse_mode='HTML')

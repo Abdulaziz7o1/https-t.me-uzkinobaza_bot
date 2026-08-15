@@ -620,11 +620,16 @@ async def select_plan_payment_method(callback: CallbackQuery, state: FSMContext)
 
     stars_price = plan_info['stars']
 
+    bonus_badge = ""
+    if plan_info['days'] >= 365:
+        bonus_badge = "\n🎁 <b>SUPER BONUS:</b> 1 Yillik VIP xaridi uchun do'stingizga sovg'a qilish uchun <b>1 oylik (30 kunlik) bepul VIP promo kodi</b> sovg'a qilinadi! 🎉\n"
+
     txt = (
         f"👑 <b>{plan_info['name'].upper()} ({plan_info['days']} KUN)</b>\n\n"
         f"Iltimos, qulay to'lov usulini tanlang:\n\n"
         f"💳 <b>Karta (Click / Payme / Uzum):</b> <code>{card_label}</code>\n"
-        f"⭐️ <b>Telegram Stars:</b> <code>{stars_price} Stars</code>\n\n"
+        f"⭐️ <b>Telegram Stars:</b> <code>{stars_price} Stars</code>\n"
+        f"{bonus_badge}\n"
         f"<i>Eslatma: Telegram Stars orqali to'lov amalga oshirilganda VIP obuna 1 soniyada avtomatik faollashadi! ⚡</i>"
     )
 
@@ -748,12 +753,23 @@ async def stars_successful_payment_handler(message: Message):
     cashback_pts = max(1, int(days * cb_pct / 10))
     await db_req.add_points(user_id, cashback_pts)
 
+    # 1 Yillik VIP olganga do'sti uchun 1 oylik bepul VIP promo kod sovg'asi (User 15)
+    yearly_gift_extra = ""
+    if days >= 365:
+        gift_promo = await db_req.generate_yearly_vip_gift_promocode(user_id)
+        yearly_gift_extra = (
+            f"\n\n🎁 <b>MAXSUS YILLIK VIP SOVG'ASI!</b> 🎉\n"
+            f"Siz 1 yillik VIP xarid qilganingiz uchun sizga do'stingizga sovg'a qilish uchun <b>1 oylik (30 kunlik) bepul VIP promo kodi</b> taqdim etiladi:\n\n"
+            f"🎟 <b>Sizning promo kodingiz:</b> <code>{gift_promo}</code>\n"
+            f"<i>(Ushbu kodni do'stingizga yuboring, u botga kirib promo kodni terishi bilan 1 oy VIP ga ega bo'ladi!)</i> 🍿"
+        )
+
     await message.answer(
         with_footer(
             f"🎉 <b>TO'LOV QABUL QILINDI!</b> ⭐️\n\n"
             f"👑 <b>Sizga {days} kunlik VIP Premium obuna muvaffaqiyatli yoqildi!</b>\n\n"
             f"⭐️ <b>To'langan:</b> <code>{stars_amount} Stars</code>\n"
-            f"🎁 <b>VIP Keshbek:</b> +{cashback_pts} 💎 ball hisobingizga qo'shildi!\n\n"
+            f"🎁 <b>VIP Keshbek:</b> +{cashback_pts} 💎 ball hisobingizga qo'shildi!{yearly_gift_extra}\n\n"
             f"🍿 <i>Endi botdan barcha filmlarni hech qanday cheklovlarsiz tomosha qilishingiz mumkin!</i>"
         ),
         parse_mode='HTML'

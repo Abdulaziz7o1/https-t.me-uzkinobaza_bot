@@ -2826,6 +2826,22 @@ async def create_promo_code(code: str, reward_type: str, reward_value: int, max_
         except Exception:
             return False
 
+async def generate_yearly_vip_gift_promocode(user_id: int) -> str:
+    """1 yillik VIP xarid qilgan foydalanuvchiga do'sti uchun 1 oylik (30 kunlik) bepul VIP promo kod generatsiya qilish"""
+    import random, string
+    rand_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    promo_code = f"GIFT1M-{rand_suffix}"
+    
+    await create_promo_code(
+        code=promo_code,
+        reward_type="premium",
+        reward_value=30,
+        max_uses=1,
+        expires_in_days=30,
+        created_by=user_id
+    )
+    return promo_code
+
 async def use_promo_code(user_id: int, code: str) -> tuple:
     """Foydalanuvchi promo kodni ishlatishi. Limit to'lganda promo kod avtomatik o'chiriladi.
     Returns: (success: bool, msg: str, auto_deleted_info: dict|None, discount_pct: int)
