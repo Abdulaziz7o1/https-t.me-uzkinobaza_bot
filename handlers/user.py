@@ -386,8 +386,11 @@ async def search_movie_by_name(message: Message, state: FSMContext):
     if movies:
         response = f'🔍 <b>Qidirish natijalari: "{query}"</b>\n\n'
         for movie_id, caption in movies:
-            movie_name = caption.split('\n')[0] if caption else 'Nomsiz'
-            response += f'🎬 /{movie_id} — {movie_name}\n'
+            first_line = caption.split('\n')[0] if caption else 'Nomsiz'
+            name_clean = first_line.replace('@uzkinobaza_bot', '').replace('—', '').replace('-', '').strip()
+            name_to_show = name_clean if name_clean else 'Kino'
+            response += f'🎬 <b>/{movie_id}</b> — {name_to_show} 🍿\n'
+        response += "\n<i>Kinoni tomosha qilish uchun uning kodi (masalan /1) ustiga bosing!</i>"
         await message.answer(with_footer(response), parse_mode='HTML')
     else:
         await message.answer(with_footer(f'''❌ "{query}" bo'yicha kino topilmadi.'''), parse_mode='HTML')
@@ -1857,12 +1860,15 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
         return
     results = await db_req.search_movies_by_name(query)
     if results:
-        text = f"🔍 <b>'{query}' bo'yicha topilganlar:</b>\n\n"
+        text = f"🔍 <b>Qidirish natijalari: \"{query}\"</b>\n\n"
         for movie_id, caption in results:
-            name = caption[:40] if caption else '(nomsiz)'
-            text += f'🎬 /{movie_id} — {name}\n'
-        text += '\nKinoni olish uchun uning kodini ustiga bosing.'
-        await message.answer(with_footer(text))
+            first_line = caption.split('\n')[0] if caption else 'Nomsiz'
+            # Matndagi kanal/bot reklamalarini tozalash
+            name_clean = first_line.replace('@uzkinobaza_bot', '').replace('—', '').replace('-', '').strip()
+            name_to_show = name_clean if name_clean else 'Kino'
+            text += f"🎬 <b>/{movie_id}</b> — {name_to_show} 🍿\n"
+        text += "\n<i>Kinoni tomosha qilish uchun uning kodi (masalan /1) ustiga bosing!</i>"
+        await message.answer(with_footer(text), parse_mode='HTML')
     else:
         try:
             all_movies = await db_req.get_all_movie_titles()
