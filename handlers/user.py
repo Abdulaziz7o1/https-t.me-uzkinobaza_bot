@@ -1,6 +1,6 @@
 import random
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultCachedVideo, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Router, F, types
+from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultCachedVideo, InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, LabeledPrice
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -10,6 +10,51 @@ from database import requests as db_req
 from keyboards.reply import get_admin_menu, get_user_menu, get_moderator_menu
 from keyboards.inline import get_subscription_keyboard, get_movie_action_keyboard, get_rating_keyboard, get_comments_keyboard
 router = Router()
+
+PREMIUM_PLANS = {
+    'premium_1w': {
+        'name': '1 haftalik Premium',
+        'label': '1 haftalik',
+        'days': 7,
+        'stars': 25,
+        'card_base': 7000
+    },
+    'premium_monthly': {
+        'name': '1 oylik Premium',
+        'label': '1 oylik',
+        'days': 30,
+        'stars': 80,
+        'card_base': 20000
+    },
+    'premium_quarterly': {
+        'name': '3 oylik Premium',
+        'label': '3 oylik',
+        'days': 90,
+        'stars': 200,
+        'card_base': 50000
+    },
+    'premium_6m': {
+        'name': '6 oylik Premium',
+        'label': '6 oylik',
+        'days': 180,
+        'stars': 430,
+        'card_base': 100000
+    },
+    'premium_1y': {
+        'name': '1 yillik Premium',
+        'label': '1 yillik',
+        'days': 365,
+        'stars': 800,
+        'card_base': 180000
+    },
+    'premium_yearly': {
+        'name': '1 yillik Premium',
+        'label': '1 yillik',
+        'days': 365,
+        'stars': 800,
+        'card_base': 180000
+    }
+}
 
 CONTACT_FOOTER = "\n\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1"
 
@@ -312,15 +357,22 @@ async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool=Fal
     p_3m_b = await db_req.get_premium_price_3m()
     p_6m_b = await db_req.get_premium_price_6m()
     p_1y_b = await db_req.get_premium_price_1y()
-    if discount_pct > 0:
+    
+    flash_active, flash_disc, flash_until = await db_req.get_flash_sale_status()
+    
+    if flash_active:
+        calc = lambda p: max(1000, int(p * (100 - flash_disc) / 100) // 1000 * 1000)
+        discount_hdr = f"\n\n⚡ <b>1 SOATLIK FLASH SALE — {flash_disc}% CHEGIRMA!</b> <i>({flash_until[:16]} gacha)</i>"
+    elif discount_pct > 0:
         calc = lambda p: max(1000, int(p * (100 - discount_pct) / 100) // 1000 * 1000)
-        discount_hdr = f" 🔥 (<b>{discount_pct}% PROMO SKIDKA QO'LLANILDI!</b>)"
+        discount_hdr = f"\n\n🔥 (<b>{discount_pct}% PROMO SKIDKA QO'LLANILDI!</b>)"
     elif is_repeat:
         calc = lambda p: max(1000, int(p * 0.85) // 1000 * 1000)
-        discount_hdr = " 🎉 (<b>15% TAKRORIY CHEGIRMA QO'LLANILDI!</b>)"
+        discount_hdr = "\n\n🎉 (<b>15% TAKRORIY CHEGIRMA QO'LLANILDI!</b>)"
     else:
         calc = lambda p: p
         discount_hdr = ''
+        
     p_1w, p_1m, p_3m, p_6m, p_1y = (calc(p_1w_b), calc(p_1m_b), calc(p_3m_b), calc(p_6m_b), calc(p_1y_b))
 
     def fmt(n):
@@ -329,9 +381,52 @@ async def send_or_edit_premium_plans_menu(event, user_id: int, is_edit: bool=Fal
         if qoldi:
             return f"{ming} ming {qoldi} so'm"
         return f"{ming} ming so'm"
-    txt_plans = f'1️⃣ <b>1 haftalik (7 kun):</b> {fmt(p_1w)}\n2️⃣ <b>1 oylik (30 kun):</b> {fmt(p_1m)}\n3️⃣ <b>3 oylik (90 kun):</b> {fmt(p_3m)}\n4️⃣ <b>6 oylik (180 kun):</b> {fmt(p_6m)}\n5️⃣ <b>1 yillik (365 kun):</b> {fmt(p_1y)}'
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f'1️⃣ 1 haftalik - {fmt(p_1w)}', callback_data='premium_1w'), InlineKeyboardButton(text=f'2️⃣ 1 oylik - {fmt(p_1m)}', callback_data='premium_monthly')], [InlineKeyboardButton(text=f'3️⃣ 3 oylik - {fmt(p_3m)}', callback_data='premium_quarterly'), InlineKeyboardButton(text=f'4️⃣ 6 oylik - {fmt(p_6m)}', callback_data='premium_6m')], [InlineKeyboardButton(text=f'5️⃣ 1 yillik - {fmt(p_1y)}', callback_data='premium_1y')], [InlineKeyboardButton(text='🏷️ Promo kod kiritish', callback_data='user_enter_promo'), InlineKeyboardButton(text="📞 Manual to'lov", callback_data='premium_manual')]])
-    text = f"💎 <b>Premium obuna:{discount_hdr}</b>\n\n📋 <b>Obuna rejalari:</b>\n\n{txt_plans}\n\n🎁 <b>Premium imtiyozlari:</b>\n• Kunlik limit yo'q\n• Cheklovsiz kino ko'rish\n• Prioritet qo'llab-quvvatlash\n\n👇 <b>Plan tanlang yoki Promo kod kiriting:</b>"
+
+    txt_plans = (
+        f"1️⃣ <b>1 haftalik (7 kun):</b> {fmt(p_1w)} (⭐️ 25 Stars)\n"
+        f"2️⃣ <b>1 oylik (30 kun):</b> {fmt(p_1m)} (⭐️ 80 Stars)\n"
+        f"3️⃣ <b>3 oylik (90 kun):</b> {fmt(p_3m)} (⭐️ 200 Stars)\n"
+        f"4️⃣ <b>6 oylik (180 kun):</b> {fmt(p_6m)} (⭐️ 430 Stars)\n"
+        f"5️⃣ <b>1 yillik (365 kun):</b> {fmt(p_1y)} (⭐️ 800 Stars)"
+    )
+    
+    trial_claimed = await db_req.has_claimed_vip_trial(user_id)
+    
+    kb_rows = [
+        [
+            InlineKeyboardButton(text=f'1️⃣ 1 haftalik - {fmt(p_1w)}', callback_data='premium_1w'),
+            InlineKeyboardButton(text=f'2️⃣ 1 oylik - {fmt(p_1m)}', callback_data='premium_monthly')
+        ],
+        [
+            InlineKeyboardButton(text=f'3️⃣ 3 oylik - {fmt(p_3m)}', callback_data='premium_quarterly'),
+            InlineKeyboardButton(text=f'4️⃣ 6 oylik - {fmt(p_6m)}', callback_data='premium_6m')
+        ],
+        [
+            InlineKeyboardButton(text=f'5️⃣ 1 yillik - {fmt(p_1y)}', callback_data='premium_1y')
+        ]
+    ]
+    
+    if not trial_claimed:
+        kb_rows.append([
+            InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")
+        ])
+        
+    kb_rows.append([
+        InlineKeyboardButton(text='🏷️ Promo kod kiritish', callback_data='user_enter_promo'),
+        InlineKeyboardButton(text="📞 Manual to'lov", callback_data='premium_manual')
+    ])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+    text = (
+        f"💎 <b>Premium obuna:</b>{discount_hdr}\n\n"
+        f"📋 <b>Obuna rejalari:</b>\n\n"
+        f"{txt_plans}\n\n"
+        f"🎁 <b>Premium imtiyozlari:</b>\n"
+        f"• Kunlik limit yo'q\n"
+        f"• Cheklovsiz kino ko'rish\n"
+        f"• Prioritet qo'llab-quvvatlash\n\n"
+        f"👇 <b>Plan tanlang yoki Promo kod kiriting:</b>"
+    )
     if is_edit and isinstance(event, CallbackQuery):
         await event.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
     elif isinstance(event, Message):
@@ -446,59 +541,207 @@ async def user_promo_input_exec(message: Message, state: FSMContext):
     else:
         await message.answer(with_footer(f"{msg}\n\n<i>Qayta urinib ko'rish uchun /premium yoki promo kodni qayta kiriting.</i>"), parse_mode='HTML')
 
-@router.callback_query(F.data.startswith('premium_'))
-async def process_premium_payment_cb(callback: CallbackQuery, state: FSMContext):
-    action = callback.data
+@router.callback_query(F.data.in_(['premium_1w', 'premium_monthly', 'premium_quarterly', 'premium_6m', 'premium_1y', 'premium_yearly']))
+async def select_plan_payment_method(callback: CallbackQuery, state: FSMContext):
+    plan_key = callback.data
     user_id = callback.from_user.id
+    plan_info = PREMIUM_PLANS.get(plan_key)
+    if not plan_info:
+        return
+
     discount_pct = await db_req.get_user_active_discount(user_id)
+    is_repeat = await db_req.has_user_bought_premium_before(user_id)
+    
+    if plan_key == 'premium_1w':
+        base_price = await db_req.get_premium_price_1w()
+    elif plan_key == 'premium_monthly':
+        base_price = await db_req.get_premium_price_1m()
+    elif plan_key == 'premium_quarterly':
+        base_price = await db_req.get_premium_price_3m()
+    elif plan_key == 'premium_6m':
+        base_price = await db_req.get_premium_price_6m()
+    else:
+        base_price = await db_req.get_premium_price_1y()
+
+    if discount_pct > 0:
+        card_price = max(1000, int(base_price * (100 - discount_pct) / 100) // 1000 * 1000)
+        card_label = f"{card_price:,} UZS ({discount_pct}% skidka)"
+    elif is_repeat:
+        card_price = max(1000, int(base_price * 0.85) // 1000 * 1000)
+        card_label = f"{card_price:,} UZS (15% chegirma)"
+    else:
+        card_price = base_price
+        card_label = f"{card_price:,} UZS"
+
+    stars_price = plan_info['stars']
+
+    txt = (
+        f"👑 <b>{plan_info['name'].upper()} ({plan_info['days']} KUN)</b>\n\n"
+        f"Iltimos, qulay to'lov usulini tanlang:\n\n"
+        f"💳 <b>Karta (Click / Payme / Uzum):</b> <code>{card_label}</code>\n"
+        f"⭐️ <b>Telegram Stars:</b> <code>{stars_price} Stars</code>\n\n"
+        f"<i>Eslatma: Telegram Stars orqali to'lov amalga oshirilganda VIP obuna 1 soniyada avtomatik faollashadi! ⚡</i>"
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"💳 Karta orqali to'lash ({card_label})", callback_data=f"pay_card_{plan_key}")],
+        [InlineKeyboardButton(text=f"⭐️ Telegram Stars ({stars_price} ⭐️)", callback_data=f"pay_stars_{plan_key}")],
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data="back_to_premium")]
+    ])
+
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('pay_card_'))
+async def process_card_payment_cb(callback: CallbackQuery, state: FSMContext):
+    plan_key = callback.data.replace('pay_card_', '')
+    plan_info = PREMIUM_PLANS.get(plan_key, PREMIUM_PLANS['premium_monthly'])
+    user_id = callback.from_user.id
+
+    discount_pct = await db_req.get_user_active_discount(user_id)
+    is_repeat = await db_req.has_user_bought_premium_before(user_id)
     card_text = await db_req.get_admin_card_number()
     card_display = db_req.format_user_card_display(card_text)
-    if action == 'premium_1w':
-        plan_name = '1 haftalik Premium'
+
+    if plan_key == 'premium_1w':
         base_price = await db_req.get_premium_price_1w()
-        days = 7
-        plan_label = '1 haftalik'
-    elif action == 'premium_monthly':
-        plan_name = '1 oylik Premium'
+    elif plan_key == 'premium_monthly':
         base_price = await db_req.get_premium_price_1m()
-        days = 30
-        plan_label = '1 oylik'
-    elif action == 'premium_quarterly':
-        plan_name = '3 oylik Premium'
+    elif plan_key == 'premium_quarterly':
         base_price = await db_req.get_premium_price_3m()
-        days = 90
-        plan_label = '3 oylik'
-    elif action == 'premium_6m':
-        plan_name = '6 oylik Premium'
+    elif plan_key == 'premium_6m':
         base_price = await db_req.get_premium_price_6m()
-        days = 180
-        plan_label = '6 oylik'
-    elif action == 'premium_1y':
-        plan_name = '1 yillik Premium'
-        base_price = await db_req.get_premium_price_1y()
-        days = 365
-        plan_label = '1 yillik'
     else:
-        plan_name = 'Premium Obuna'
-        base_price = await db_req.get_premium_price_1m()
-        days = 30
-        plan_label = '1 oylik'
-    is_repeat = await db_req.has_user_bought_premium_before(user_id)
-    if discount_pct > 0 and action != 'premium_manual':
+        base_price = await db_req.get_premium_price_1y()
+
+    days = plan_info['days']
+    plan_name = plan_info['name']
+    plan_label = plan_info['label']
+
+    if discount_pct > 0:
         final_price = max(1000, int(base_price * (100 - discount_pct) / 100) // 1000 * 1000)
         amount = f"{final_price:,} UZS ({discount_pct}% PROMO SKIDKA QO'LLANDI!)"
-    elif is_repeat and action != 'premium_manual':
+    elif is_repeat:
         final_price = max(1000, int(base_price * 0.85) // 1000 * 1000)
         amount = f"{final_price:,} UZS (🎉 15% TAKRORIY CHEGIRMA QO'LLANDI!)"
     else:
         final_price = base_price
-        amount = f'{final_price:,} UZS' if action != 'premium_manual' else 'Kelishilgan summa'
+        amount = f"{final_price:,} UZS"
+
     await state.set_state(UserStates.waiting_for_payment_receipt)
     await state.update_data(payment_plan=plan_name, payment_amount=amount, payment_raw_amount=final_price, payment_days=days, payment_label=plan_label)
-    msg = f"💳 <b>TO'LOV MA'LUMOTLARI ({plan_name}):</b>\n\nTo'lovni amalga oshirish uchun quyidagi kartaga to'lov qiling:\n\n{card_display}\n\n💵 <b>To'lov summasi:</b> <code>{amount}</code>\n\n📌 <b>To'lov qilgach:</b> To'lov chekini (skrinshotini) shu yerning o'zida yuboring! To'lov tasdiqlangach Premium faollashtiriladi!"
+
+    msg = (
+        f"💳 <b>TO'LOV MA'LUMOTLARI ({plan_name}):</b>\n\n"
+        f"To'lovni amalga oshirish uchun quyidagi kartaga to'lov qiling:\n\n"
+        f"{card_display}\n\n"
+        f"💵 <b>To'lov summasi:</b> <code>{amount}</code>\n\n"
+        f"📌 <b>To'lov qilgach:</b> To'lov chekini (skrinshotini) shu yerning o'zida yuboring! To'lov tasdiqlangach Premium faollashtiriladi!"
+    )
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔙 Orqaga', callback_data='back_to_premium')]])
     await callback.message.edit_text(with_footer(msg), parse_mode='HTML', reply_markup=kb)
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith('pay_stars_'))
+async def process_stars_payment_cb(callback: CallbackQuery):
+    plan_key = callback.data.replace('pay_stars_', '')
+    plan_info = PREMIUM_PLANS.get(plan_key, PREMIUM_PLANS['premium_monthly'])
+    user_id = callback.from_user.id
+
+    stars_amount = plan_info['stars']
+    days = plan_info['days']
+    plan_name = plan_info['name']
+
+    prices = [LabeledPrice(label=f"👑 VIP ({days} kun)", amount=stars_amount)]
+
+    try:
+        await callback.message.answer_invoice(
+            title=f"👑 VIP Premium — {plan_name}",
+            description=f"Botdan barcha kinolarni cheklovlarsiz tomosha qilish uchun {days} kunlik VIP Premium obuna",
+            payload=f"stars_vip_{days}_{stars_amount}_{user_id}",
+            currency="XTR",
+            prices=prices
+        )
+    except Exception as e:
+        await callback.message.answer(with_footer(f"❌ Xatolik yuz berdi: {e}"), parse_mode='HTML')
+    await callback.answer()
+
+
+@router.pre_checkout_query()
+async def stars_pre_checkout_handler(pre_checkout_query: PreCheckoutQuery):
+    await pre_checkout_query.answer(ok=True)
+
+
+@router.message(F.successful_payment)
+async def stars_successful_payment_handler(message: Message):
+    sp = message.successful_payment
+    payload = sp.invoice_payload or ""
+    parts = payload.split('_')
+    if len(parts) >= 4 and parts[0] == 'stars' and parts[1] == 'vip':
+        days = int(parts[2])
+        stars_amount = int(parts[3])
+    else:
+        days = 30
+        stars_amount = sp.total_amount
+
+    user_id = message.from_user.id
+    uname = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
+
+    await db_req.set_user_premium(user_id, days=days, plan=f"{days} kunlik VIP (Stars ⭐️)")
+
+    await db_req.add_payment_record(
+        user_id=user_id,
+        amount=stars_amount,
+        plan=f"⭐️ {stars_amount} Stars ({days} kun)",
+        confirmed_by=0
+    )
+
+    await message.answer(
+        with_footer(
+            f"🎉 <b>TO'LOV QABUL QILINDI!</b> ⭐️\n\n"
+            f"👑 <b>Sizga {days} kunlik VIP Premium obuna muvaffaqiyatli yoqildi!</b>\n\n"
+            f"⭐️ <b>To'langan:</b> <code>{stars_amount} Stars</code>\n\n"
+            f"🍿 <i>Endi botdan barcha filmlarni hech qanday cheklovlarsiz tomosha qilishingiz mumkin!</i>"
+        ),
+        parse_mode='HTML'
+    )
+
+    admin_alert = (
+        f"⭐️ <b>YANGI TELEGRAM STARS TO'LOVI!</b>\n\n"
+        f"👤 <b>Foydalanuvchi:</b> {uname} (ID: <code>{user_id}</code>)\n"
+        f"⭐️ <b>To'lov:</b> {stars_amount} Stars\n"
+        f"👑 <b>Berilgan muddat:</b> {days} kun VIP\n"
+        f"⚡ <i>Avtomatik faollashtirildi!</i>"
+    )
+    for admin_id in config.ADMINS:
+        try:
+            await message.bot.send_message(admin_id, with_footer(admin_alert), parse_mode='HTML')
+        except Exception:
+            pass
+
+
+@router.callback_query(F.data == 'claim_vip_trial_cb')
+async def claim_vip_trial_cb(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    success, msg = await db_req.claim_vip_trial(user_id)
+    if success:
+        await callback.message.edit_text(with_footer(msg), parse_mode='HTML')
+        uname = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
+        for admin_id in config.ADMINS:
+            try:
+                await callback.bot.send_message(
+                    admin_id,
+                    with_footer(f"⏳ <b>1 SOATLIK BEPUL VIP SINOV OLINDI!</b>\n\n👤 {uname} (ID: <code>{user_id}</code>)"),
+                    parse_mode='HTML'
+                )
+            except Exception:
+                pass
+    else:
+        await callback.answer(msg, show_alert=True)
+    await callback.answer()
+
 
 @router.callback_query(F.data == 'back_to_premium')
 async def back_to_premium_cb(callback: CallbackQuery, state: FSMContext):

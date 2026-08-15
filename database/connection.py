@@ -78,7 +78,8 @@ async def init_db():
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
             "premium_until TIMESTAMP",
             "daily_movie_count INTEGER DEFAULT 0",
-            "daily_movie_date TEXT"
+            "daily_movie_date TEXT",
+            "vip_trial_claimed INTEGER DEFAULT 0"
         ]
         for col_def in user_columns_to_ensure:
             try:
@@ -586,6 +587,58 @@ async def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
+
+        # Kino uchun eslatma (qo'shilganda xabar berish) jadvali (U10)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS movie_notify_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                search_query TEXT NOT NULL,
+                requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_notified INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Foydalanuvchi kunlik faollik statistikasi (A7)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_activity_daily (
+                date TEXT PRIMARY KEY,
+                new_users INTEGER DEFAULT 0,
+                active_users INTEGER DEFAULT 0,
+                movies_watched INTEGER DEFAULT 0,
+                premium_purchases INTEGER DEFAULT 0,
+                total_revenue INTEGER DEFAULT 0
+            )
+        """)
+
+        # Foydalanuvchi sevimli janrlari (U1 - tavsiya)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_genre_watches (
+                user_id INTEGER NOT NULL,
+                genre TEXT NOT NULL,
+                watch_count INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, genre)
+            )
+        """)
+
+        # Kunlik sovg'a qayerdan berilganligi (A11)
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN last_daily_gift_date TEXT")
+        except Exception:
+            pass
+
+        # Tug'ilgan kunni 1 marta o'zgartirish cheklovi (U8)
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN birthday_is_locked INTEGER DEFAULT 0")
+        except Exception:
+            pass
+
+        # Haftalik reyting ovozlari jadvali (U9 - ratingsni ishlatamiz)
+        try:
+            await db.execute("ALTER TABLE ratings ADD COLUMN week_key TEXT DEFAULT ''")
+        except Exception:
+            pass
 
         await db.commit()
 

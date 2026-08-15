@@ -3173,8 +3173,13 @@ async def show_premium_settings_panel(message: Message, state: FSMContext):
     p_3m = await db_req.get_premium_price_3m()
     p_6m = await db_req.get_premium_price_6m()
     p_1y = await db_req.get_premium_price_1y()
-    txt = f"👑 <b>PREMIUM OBUNA SOZLAMALARI (5 TA PLAN):</b>\n\n1️⃣ <b>1 haftalik (7 kun):</b> <code>{p_1w:,} UZS</code>\n2️⃣ <b>1 oylik (30 kun):</b> <code>{p_1m:,} UZS</code>\n3️⃣ <b>3 oylik (90 kun):</b> <code>{p_3m:,} UZS</code>\n4️⃣ <b>6 oylik (180 kun):</b> <code>{p_6m:,} UZS</code>\n5️⃣ <b>1 yillik (365 kun):</b> <code>{p_1y:,} UZS</code>\n\n<i>Narxlarni o'zgartirish uchun quyidagi tugmalardan birini tanlang:</i>"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f'✏️ 1 haftalik ({p_1w:,} UZS)', callback_data='set_prem_price_1w_start'), InlineKeyboardButton(text=f'✏️ 1 oylik ({p_1m:,} UZS)', callback_data='set_prem_price_1m_start')], [InlineKeyboardButton(text=f'✏️ 3 oylik ({p_3m:,} UZS)', callback_data='set_prem_price_3m_start'), InlineKeyboardButton(text=f'✏️ 6 oylik ({p_6m:,} UZS)', callback_data='set_prem_price_6m_start')], [InlineKeyboardButton(text=f'✏️ 1 yillik ({p_1y:,} UZS)', callback_data='set_prem_price_1y_start')]])
+    txt = f"👑 <b>PREMIUM OBUNA SOZLAMALARI (5 TA PLAN):</b>\n\n1️⃣ <b>1 haftalik (7 kun):</b> <code>{p_1w:,} UZS</code> (25 ⭐️)\n2️⃣ <b>1 oylik (30 kun):</b> <code>{p_1m:,} UZS</code> (80 ⭐️)\n3️⃣ <b>3 oylik (90 kun):</b> <code>{p_3m:,} UZS</code> (200 ⭐️)\n4️⃣ <b>6 oylik (180 kun):</b> <code>{p_6m:,} UZS</code> (430 ⭐️)\n5️⃣ <b>1 yillik (365 kun):</b> <code>{p_1y:,} UZS</code> (800 ⭐️)\n\n<i>Narxlarni o'zgartirish yoki 1 soatlik Flash Sale yoqish uchun quyidagi tugmalardan foydalaning:</i>"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f'✏️ 1 haftalik ({p_1w:,} UZS)', callback_data='set_prem_price_1w_start'), InlineKeyboardButton(text=f'✏️ 1 oylik ({p_1m:,} UZS)', callback_data='set_prem_price_1m_start')],
+        [InlineKeyboardButton(text=f'✏️ 3 oylik ({p_3m:,} UZS)', callback_data='set_prem_price_3m_start'), InlineKeyboardButton(text=f'✏️ 6 oylik ({p_6m:,} UZS)', callback_data='set_prem_price_6m_start')],
+        [InlineKeyboardButton(text=f'✏️ 1 yillik ({p_1y:,} UZS)', callback_data='set_prem_price_1y_start')],
+        [InlineKeyboardButton(text="⚡ 1 Soatlik Flash Sale (50% Chegirma)", callback_data="admin_flash_sale_start")]
+    ])
     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
 @router.callback_query(F.data == 'set_prem_price_1w_start')
@@ -3678,6 +3683,55 @@ async def cb_ref_reminder_send_all(callback: CallbackQuery):
     except Exception:
         await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_referral_reminder_keyboard())
     await callback.answer(f"✅ {sent_count} ta eslatma yuborildi!", show_alert=True)
+
+
+@router.callback_query(F.data == 'admin_flash_sale_start')
+async def admin_flash_sale_start_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    until_str = await db_req.activate_flash_sale(hours=1, discount_pct=50)
+    txt = (
+        f"⚡ <b>1 SOATLIK FLASH SALE AKSIYASI YOQILDI!</b> 🎉\n\n"
+        f"🏷️ <b>Chegirma miqdori:</b> 50%\n"
+        f"⏳ <b>Amal qilish muddati:</b> 1 soat (<code>{until_str[:16]}</code> gacha)\n\n"
+        f"<i>Hozirdan boshlab 1 soat davomida barcha foydalanuvchilar VIP obunani 50% chegirmada xarid qila oladilar! (Telegram Stars narxi o'zgarmaydi)</i>\n\n"
+        f"Foydalanuvchilarga shoshilinch e'lon yuborishni xohlaysizmi?"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Barcha a'zolarga e'lon yuborish", callback_data="admin_flash_sale_broadcast")],
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data="admin_menu")]
+    ])
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer("⚡ 1 Soatlik Flash Sale faollashtirildi!")
+
+
+@router.callback_query(F.data == 'admin_flash_sale_broadcast')
+async def admin_flash_sale_broadcast_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await callback.answer("📢 E'lon yuborilmoqda...", show_alert=False)
+
+    users = await db_req.get_all_users()
+    broadcast_txt = (
+        "⚡ <b>SHOSHILING! SUPER FLASH SALE (50% CHEGIRMA)!</b> 🔥\n\n"
+        "👑 Aynan hozirdan boshlab <b>1 SOAT DAVOMIDA</b> barcha VIP Premium obuna rejalari <b>50% SUPER CHEGIRMA</b> bilan taqdim etiladi! 🚀\n\n"
+        "💎 /premium buyrug'ini bosing va 50% chegirmali narxlarda VIP obunani qo'lga kiriting! 🍿"
+    )
+    sent_cnt = 0
+    for uid in users:
+        try:
+            await callback.bot.send_message(uid, with_footer(broadcast_txt), parse_mode='HTML')
+            sent_cnt += 1
+            await asyncio.sleep(0.04)
+        except Exception:
+            pass
+
+    await callback.message.edit_text(
+        with_footer(f"✅ <b>1 SOATLIK FLASH SALE E'LONI YUBORILDI!</b>\n\n📩 Yetkazildi: <b>{sent_cnt}</b> ta foydalanuvchi."),
+        parse_mode='HTML'
+    )
 
 
 @router.callback_query(F.data == 'admin_menu')

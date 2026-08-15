@@ -2975,7 +2975,9 @@ async def get_user_active_discount(user_id: int) -> int:
     """
     Foydalanuvchining aktiv skidka foizini olish (masalan: 20 -> 20%).
     Skidka faqat 1 marta ishlatilishi mumkin (is_consumed = 0) va kiritilgandan so'ng 24 soat (1 kun) davomida amal qiladi.
+    Agar 1 soatlik Flash Sale aksiyasi faol bo'lsa, undagi chegirma foizi avtomatik qo'llaniladi.
     """
+    promo_disc = 0
     async with get_db() as db:
         try:
             async with db.execute(
@@ -2989,9 +2991,14 @@ async def get_user_active_discount(user_id: int) -> int:
                 (user_id,)
             ) as cursor:
                 row = await cursor.fetchone()
-                return int(row[0]) if row and row[0] else 0
+                promo_disc = int(row[0]) if row and row[0] else 0
         except Exception:
-            return 0
+            promo_disc = 0
+
+    flash_active, flash_disc, _ = await get_flash_sale_status()
+    if flash_active:
+        return max(promo_disc, flash_disc)
+    return promo_disc
 
 async def check_promo_code_availability(code: str) -> tuple[bool, str]:
     """
@@ -3664,3 +3671,91 @@ async def reset_user_birthday_lock(user_id: int) -> bool:
         await db.execute("UPDATE users SET birthday_is_locked = 0 WHERE id = ?", (user_id,))
         await db.commit()
     return True
+
+
+# ─── ⏳ 1 SOATLIK BEPUL VIP TRIAL (FREE TRIAL) ──────────────────────────────
+async def has_claimed_vip_trial(user_id: int) -> bool:
+    """Foydalanuvchi 1 soatlik bepul VIP sinovini ishlatganmi?"""
+    async with get_db() as db:
+        try:
+            async with db.execute("SELECT vip_trial_claimed FROM users WHERE id = ?", (user_id,)) as c:
+                r = await c.fetchone()
+                return bool(r and r[0] and r[0] != 0)
+        except Exception:
+            return False
+
+
+async def claim_vip_trial(user_id: int) -> tuple[bool, str]:
+    """1 soatlik bepul VIP sinov rejimini berish (1 marta)"""
+    from datetime import datetime, timedelta
+    if await has_claimed_vip_trial(user_id):
+        return False, "⚠️ <b>Siz allaqachon 1 soatlik bepul VIP sinov imkoniyatidan foydalangansiz!</b>\n\nVIP imtiyozlarini davom ettirish uchun /premium orqali obuna xarid qilishingiz mumkin."
+
+    now = datetime.now()
+    end_time = now + timedelta(hours=1)
+    end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+    start_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    async with get_db() as db:
+        await db.execute(
+            """INSERT INTO users (id, is_premium, premium_until, vip_trial_claimed)
+               VALUES (?, 1, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET
+                   is_premium = 1,
+                   premium_until = ?,
+                   vip_trial_claimed = 1""",
+            (user_id, end_str, end_str)
+        )
+        await db.execute(
+            """INSERT INTO premium_subscriptions (user_id, start_date, end_date, plan)
+               VALUES (?, ?, ?, '1 soatlik VIP Sinov')
+               ON CONFLICT(user_id) DO UPDATE SET
+                   start_date = excluded.start_date,
+                   end_date = excluded.end_date,
+                   plan = excluded.plan""",
+            (user_id, start_str, end_str)
+        )
+        await db.commit()
+
+    return True, f"🎉 <b>TABRIKLAYMIZ! 1 SOATLIK BEPUL VIP SINOV YOQILDI!</b> 👑\n\n⏰ <b>Amal qilish muddati:</b> 1 soat (<code>{end_str[:16]}</code> gacha)\n\n🍿 <i>Endi 1 soat davomida botdan barcha kinolarni hech qanday cheklovlarsiz tomosha qilishingiz mumkin!</i>"
+
+
+# ─── ⚡ 1 SOATLIK FLASH SALE (50% CHEGIRMA) ──────────────────────────────────
+async def activate_flash_sale(hours: int = 1, discount_pct: int = 50) -> str:
+    """1 soatlik Flash Sale 50% chegirma eventini yoqish"""
+    from datetime import datetime, timedelta, timezone
+    uzb_tz = timezone(timedelta(hours=5))
+    until_dt = datetime.now(uzb_tz) + timedelta(hours=hours)
+    until_str = until_dt.strftime("%Y-%m-%d %H:%M:%S")
+    async with get_db() as db:
+        await db.execute(
+            "INSERT INTO bot_settings (key, value) VALUES ('flash_sale_until', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            (until_str, until_str)
+        )
+        await db.execute(
+            "INSERT INTO bot_settings (key, value) VALUES ('flash_sale_discount', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            (str(discount_pct), str(discount_pct))
+        )
+        await db.commit()
+    return until_str
+
+
+async def get_flash_sale_status() -> tuple[bool, int, str]:
+    """Flash Sale faolmi tekshirish (is_active, discount_pct, until_str)"""
+    from datetime import datetime, timedelta, timezone
+    uzb_tz = timezone(timedelta(hours=5))
+    async with get_db() as db:
+        try:
+            async with db.execute("SELECT value FROM bot_settings WHERE key = 'flash_sale_until'") as c:
+                r1 = await c.fetchone()
+            async with db.execute("SELECT value FROM bot_settings WHERE key = 'flash_sale_discount'") as c:
+                r2 = await c.fetchone()
+            if r1 and r1[0]:
+                until_str = r1[0]
+                disc_pct = int(r2[0]) if r2 and r2[0] else 50
+                dt_until = datetime.fromisoformat(until_str.replace(' ', 'T'))
+                if datetime.now(uzb_tz).replace(tzinfo=None) < dt_until:
+                    return True, disc_pct, until_str
+        except Exception:
+            pass
+    return False, 0, ""
