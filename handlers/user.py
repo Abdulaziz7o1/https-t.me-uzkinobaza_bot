@@ -56,7 +56,7 @@ PREMIUM_PLANS = {
     }
 }
 
-CONTACT_FOOTER = '\n\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+CONTACT_FOOTER = '\n\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
 
 def with_footer(text):
     if text is None:
@@ -160,7 +160,7 @@ async def cmd_start(message: Message, state: FSMContext):
                     cap += f'\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
                 if avg_rating > 0:
                     cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
-                cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+                cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
                 await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating))
             else:
                 await message.answer(with_footer(f'❌ <b>{movie_id}</b> kodli kino topilmadi.'), parse_mode='HTML')
@@ -283,7 +283,7 @@ async def search_movie_by_code(message: Message):
         cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
-        cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+        cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
         await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires))
         await _movie_watched_extra(user_id, caption)
     else:
@@ -897,7 +897,7 @@ async def random_movie(message: Message, state: FSMContext):
         cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{random_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
         if avg_rating > 0:
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)'
-        cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+        cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
         await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(random_id, is_fav, avg_rating))
     else:
         await message.answer(with_footer(f'❌ Kino topilmadi (ID: {random_id})'))
@@ -1159,7 +1159,7 @@ async def back_to_movie_menu(callback: CallbackQuery):
     cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>'
     if avg_rating > 0:
         cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
-    cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+    cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
     try:
         if callback.message.text is not None:
             await callback.message.edit_text(with_footer(cap), reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating), parse_mode='HTML')
@@ -1338,7 +1338,7 @@ async def inline_query_handler(inline_query: InlineQuery):
         file_id, movie_caption = movie
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         rating_text = f' | ⭐ {avg_rating:.1f} ({votes} ta ovoz)' if avg_rating > 0 else ''
-        shared_caption = f'{movie_caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+        shared_caption = f'{movie_caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
         inline_results.append(InlineQueryResultCachedVideo(id=str(movie_id), video_file_id=file_id, title=f'Kino kodi: {movie_id}', description=f'{(caption[:100] if caption else 'Tavsifsiz')}{rating_text}', caption=shared_caption, parse_mode='HTML'))
     await inline_query.answer(with_footer(inline_results), cache_time=10, is_personal=True)
 
@@ -1661,7 +1661,7 @@ async def show_movie_callback(callback: CallbackQuery):
         if avg_rating > 0:
             rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
-        cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+        cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
         await callback.message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires))
         await _movie_watched_extra(user_id, caption)
         await callback.answer()
@@ -1733,7 +1733,7 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
             cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿'
             if avg_rating > 0:
                 cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
-            cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+            cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
             await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating))
         else:
             await message.answer(with_footer(f'❌ <b>{movie_id}</b> kodli kino topilmadi.'))

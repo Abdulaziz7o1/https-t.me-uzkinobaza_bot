@@ -11,7 +11,7 @@ from database import requests as db_req
 from keyboards import inline
 router = Router()
 
-CONTACT_FOOTER = '\n\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+CONTACT_FOOTER = '\n\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
 
 def with_footer(text):
     if text is None:
@@ -100,7 +100,7 @@ async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: 
                 f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
                 f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n\n"
                 f"🤖 {config.BOT_USERNAME}\n"
-                f'📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">ABDULAZIZ</a>'
+                f'📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
             )
             await bot.send_video(
                 chat_id=backup_channel,
