@@ -37,6 +37,7 @@ class AdminStates(StatesGroup):
     waiting_for_movie_video = State()
     waiting_for_movie_caption = State()
     waiting_for_movie_id_for_video = State()
+    waiting_for_movie_audience = State()
     waiting_for_movie_delete = State()
     waiting_for_broadcast_msg = State()
     waiting_for_channel_id = State()
@@ -295,13 +296,17 @@ async def admin_direct_video_handler(message: Message, state: FSMContext):
         exists = await db_req.movie_exists_db(target_id)
         if not exists:
             formatted_caption = db_req.clean_and_format_caption(candidate_cap)
-            await db_req.add_movie_with_id(target_id, file_id, formatted_caption)
-            await auto_post_movie_to_channel(message.bot, target_id, file_id, formatted_caption)
-            total_movies = await db_req.get_total_movies_count()
-            next_free = await db_req.get_next_available_movie_id()
-            kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{target_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{target_id}')]])
-            await message.answer(with_footer(f"✅ <b>KINO MUVAFFAQIYATLI SAQLANDI!</b>\n\n📌 <b>Nomi / Tavsifi:</b> <i>{(candidate_cap[:50] if candidate_cap else '(Nomsiz)')}</i>\n🎬 <b>Biriktirilgan Kod:</b> <code>{target_id}</code>\n📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>"), parse_mode='HTML', reply_markup=kb)
-            await state.clear()
+            await state.update_data(target_id=target_id, direct_file_id=file_id, formatted_caption=formatted_caption, candidate_cap=candidate_cap)
+            await state.set_state(AdminStates.waiting_for_movie_audience)
+            kb_aud = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👥 Barcha foydalanuvchilar uchun", callback_data=f"set_audience_all_{target_id}")],
+                [InlineKeyboardButton(text="👑 Faqat Premium (VIP) uchun", callback_data=f"set_audience_prem_{target_id}")]
+            ])
+            await message.answer(
+                with_footer(f"🎬 <b>KINO AUDITORIYASINI TANLANG:</b>\n\n📌 <b>Kino:</b> <i>{candidate_cap[:50] or '(Nomsiz)'}</i>\n🔢 <b>Kodi:</b> <code>{target_id}</code>\n\n💡 <i>Ushbu kinoni kimlar ko'ra olsin?</i>"),
+                parse_mode='HTML',
+                reply_markup=kb_aud
+            )
             return
     recommended_code = await db_req.get_next_available_movie_id()
     await state.update_data(direct_file_id=file_id, direct_caption=raw_caption, recommended_code=recommended_code)
@@ -323,23 +328,27 @@ async def process_and_save_movie_with_code(event_obj, state: FSMContext, movie_i
                 await event_obj.answer(with_footer(msg_txt), parse_mode='HTML')
             return False
         formatted_caption = db_req.clean_and_format_caption(raw_caption)
-        await db_req.add_movie_with_id(movie_id, file_id, formatted_caption)
-        await state.clear()
-        bot_inst = event_obj.bot
-        await auto_post_movie_to_channel(bot_inst, movie_id, file_id, formatted_caption)
-        total_movies = await db_req.get_total_movies_count()
-        next_free = await db_req.get_next_available_movie_id()
-        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]])
+        await state.update_data(target_id=movie_id, direct_file_id=file_id, formatted_caption=formatted_caption, candidate_cap=raw_caption)
+        await state.set_state(AdminStates.waiting_for_movie_audience)
+        kb_aud = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="👥 Barcha foydalanuvchilar uchun", callback_data=f"set_audience_all_{movie_id}")],
+            [InlineKeyboardButton(text="👑 Faqat Premium (VIP) uchun", callback_data=f"set_audience_prem_{movie_id}")]
+        ])
         cap_display = raw_caption[:50] if raw_caption else '(Nomsiz video fayl)'
-        confirm_txt = f"✅ <b>KINO BAZAGA MUVAFFAQIYATLI QO'SHILDI!</b>\n\n📌 <b>Kino nomi / tavsifi:</b> <i>{cap_display}</i>\n🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n☁️ <i>Kino SQLite hamda MongoDB Atlas Cloud bulutingizga 100% saqlandi!</i>"
+        msg_aud = (
+            f"🎬 <b>KINO AUDITORIYASINI TANLANG:</b>\n\n"
+            f"📌 <b>Nomi:</b> <i>{cap_display}</i>\n"
+            f"🔢 <b>Kodi:</b> <code>{movie_id}</code>\n\n"
+            f"💡 <b>Ushbu kinoni kimlar ko'ra olsin?</b>"
+        )
         if is_callback:
             try:
-                await event_obj.message.edit_text(with_footer(confirm_txt), parse_mode='HTML', reply_markup=kb)
+                await event_obj.message.edit_text(with_footer(msg_aud), parse_mode='HTML', reply_markup=kb_aud)
             except Exception:
-                await event_obj.message.answer(with_footer(confirm_txt), parse_mode='HTML', reply_markup=kb)
-            await event_obj.answer(with_footer(f'Kino {movie_id} kodi bilan saqlandi ✅'))
+                await event_obj.message.answer(with_footer(msg_aud), parse_mode='HTML', reply_markup=kb_aud)
+            await event_obj.answer()
         else:
-            await event_obj.answer(with_footer(confirm_txt), parse_mode='HTML', reply_markup=kb)
+            await event_obj.answer(with_footer(msg_aud), parse_mode='HTML', reply_markup=kb_aud)
         return True
     except Exception as e:
         import logging
@@ -405,6 +414,54 @@ async def add_movie_video_invalid(message: Message, state: FSMContext):
     m_id = data.get('movie_id', '?')
     await message.answer(with_footer(f"⚠️ Siz <b>{m_id}</b> kodi uchun video yuklash bosqichidasiz.\n\n🎬 <b>Iltimos, kino video faylini yuboring!</b>\n\n📌 <i>Eslatma: Video fayli yuklanib jarayon to'liq yakunlanmaguncha <b>{m_id}</b> kodi bazaga saqlanmaydi va bo'sh qoladi.\nJarayonni bekor qilish uchun /cancel yoki /start yuboring.</i>"), parse_mode='HTML')
 
+@router.callback_query(F.data.startswith('set_audience_'))
+async def set_movie_audience_callback(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split('_')
+    aud_type = parts[2]
+    movie_id = int(parts[3])
+    is_prem = 1 if aud_type == 'prem' else 0
+    
+    data = await state.get_data()
+    file_id = data.get('direct_file_id') or data.get('file_id')
+    formatted_caption = data.get('formatted_caption') or data.get('caption') or ''
+    candidate_cap = data.get('candidate_cap', '')
+    
+    if not file_id:
+        await callback.answer("❌ Video ma'lumoti topilmadi. Qaytadan video yuklang.", show_alert=True)
+        await state.clear()
+        return
+
+    await db_req.add_movie_with_id(movie_id, file_id, formatted_caption, is_premium_only=is_prem)
+    await state.clear()
+    
+    bot_inst = callback.bot
+    await auto_post_movie_to_channel(bot_inst, movie_id, file_id, formatted_caption)
+    total_movies = await db_req.get_total_movies_count()
+    next_free = await db_req.get_next_available_movie_id()
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]
+    ])
+    
+    aud_badge = "👑 <b>Faqat Premium (VIP) obunachilar uchun</b>" if is_prem else "👥 <b>Barcha foydalanuvchilar uchun</b>"
+    cap_display = candidate_cap[:50] if candidate_cap else '(Nomsiz video fayl)'
+    confirm_txt = (
+        f"✅ <b>KINO BAZAGA MUVAFFAQIYATLI QO'SHILDI!</b>\n\n"
+        f"📌 <b>Kino nomi / tavsifi:</b> <i>{cap_display}</i>\n"
+        f"🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n"
+        f"🔒 <b>Ko'rish huquqi:</b> {aud_badge}\n"
+        f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
+        f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
+        f"☁️ <i>Kino SQLite hamda MongoDB Atlas Cloud bulutingizga 100% saqlandi!</i>"
+    )
+    
+    try:
+        await callback.message.edit_text(with_footer(confirm_txt), parse_mode='HTML', reply_markup=kb)
+    except Exception:
+        await callback.message.answer(with_footer(confirm_txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer(f"Kino {movie_id} kodi bilan saqlandi ✅")
+
+
 @router.message(AdminStates.waiting_for_movie_caption, F.text, ~F.text.in_(MENU_BUTTONS))
 async def add_movie_caption(message: Message, state: FSMContext):
     caption = message.text
@@ -413,14 +470,19 @@ async def add_movie_caption(message: Message, state: FSMContext):
     data = await state.get_data()
     file_id = data['file_id']
     movie_id = data['movie_id']
-    await db_req.add_movie_with_id(movie_id, file_id, caption)
-    await state.clear()
-    await message.answer(with_footer(f"✅ Kino muvaffaqiyatli qo'shildi!\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>"), parse_mode='HTML')
-    await auto_post_movie_to_channel(message.bot, movie_id, file_id, caption)
-    try:
-        await db_req.check_and_notify_movie_added(message.bot, movie_id, caption)
-    except Exception:
-        pass
+    formatted_caption = db_req.clean_and_format_caption(caption)
+    
+    await state.update_data(target_id=movie_id, direct_file_id=file_id, formatted_caption=formatted_caption, candidate_cap=caption)
+    await state.set_state(AdminStates.waiting_for_movie_audience)
+    kb_aud = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👥 Barcha foydalanuvchilar uchun", callback_data=f"set_audience_all_{movie_id}")],
+        [InlineKeyboardButton(text="👑 Faqat Premium (VIP) uchun", callback_data=f"set_audience_prem_{movie_id}")]
+    ])
+    await message.answer(
+        with_footer(f"🎬 <b>KINO AUDITORIYASINI TANLANG:</b>\n\n📌 <b>Nomi:</b> <i>{caption[:50] or '(Nomsiz)'}</i>\n🔢 <b>Kodi:</b> <code>{movie_id}</code>\n\n💡 <b>Ushbu kinoni kimlar ko'ra olsin?</b>"),
+        parse_mode='HTML',
+        reply_markup=kb_aud
+    )
 
 @router.message(Command('delete'), StateFilter('*'))
 @router.message(F.text.startswith('/del_'), StateFilter('*'))

@@ -128,13 +128,24 @@ async def cmd_start(message: Message, state: FSMContext):
             user_id = message.from_user.id
             movie = await db_req.get_movie(movie_id, user_id=user_id)
             if movie:
+                file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
+                if is_prem_only and not (await db_req.is_premium_user(user_id)):
+                    kb = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
+                        [InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")]
+                    ])
+                    txt = (
+                        f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
+                        f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
+                        f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>1 soatlik bepul VIP sinov</b>dan foydalanishingiz kerak! 🍿"
+                    )
+                    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+                    return
                 await db_req.add_to_watch_history(user_id, movie_id)
-                file_id, caption, *rest = movie
-                views_count = rest[0] if rest else 1
                 avg_rating, votes = await db_req.get_movie_rating(movie_id)
                 is_fav = await db_req.is_favorite(user_id, movie_id)
                 rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
-                cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿'
+                cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
                 if views_count:
                     cap += f'\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
                 if avg_rating > 0:
@@ -214,14 +225,27 @@ async def search_movie_by_code(message: Message):
     movie_id = int(message.text.lstrip('/'))
     movie = await db_req.get_movie(movie_id, user_id=user_id)
     if movie:
+        file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
+        if is_prem_only and not (await db_req.is_premium_user(user_id)):
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
+                [InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")]
+            ])
+            txt = (
+                f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
+                f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
+                f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>1 soatlik bepul VIP sinov</b>dan foydalanishingiz kerak! 🍿"
+            )
+            await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+            return
+
         await db_req.add_to_watch_history(user_id, movie_id)
-        file_id, caption, *rest = movie
-        views_count = rest[0] if rest else 1
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         is_fav = await db_req.is_favorite(message.from_user.id, movie_id)
         likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
         rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
-        cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
+        prem_badge = " [👑 VIP]" if is_prem_only else ""
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> @Abdulaziz7o1'
@@ -1517,13 +1541,27 @@ async def show_movie_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     movie = await db_req.get_movie(movie_id, user_id=user_id)
     if movie:
+        file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
+        if is_prem_only and not (await db_req.is_premium_user(user_id)):
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")],
+                [InlineKeyboardButton(text="⏳ 1 Soatlik Bepul VIP Sinov", callback_data="claim_vip_trial_cb")]
+            ])
+            txt = (
+                f"🔒 <b>BU KINO FAQAT PREMIUM OBUNACHILAR UCHUN!</b> 👑\n\n"
+                f"🎬 <b>Kino kodi:</b> /{movie_id}\n\n"
+                f"Ushbu kinoni tomosha qilish uchun <b>VIP Premium</b> obunaga ega bo'lishingiz yoki <b>1 soatlik bepul VIP sinov</b>dan foydalanishingiz kerak! 🍿"
+            )
+            await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+            await callback.answer("🔒 Faqat Premium obunachilar uchun!", show_alert=True)
+            return
+
         await db_req.add_to_watch_history(user_id, movie_id)
-        file_id, caption, *rest = movie
-        views_count = rest[0] if rest else 1
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         is_fav = await db_req.is_favorite(user_id, movie_id)
         likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
-        cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
+        prem_badge = " [👑 VIP]" if is_prem_only else ""
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'

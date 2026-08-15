@@ -94,16 +94,21 @@ async def init_db():
         await db.commit()
         cache.clear()
 
-        # Movies jadvali (views_count bilan)
+        # Movies jadvali (views_count va is_premium_only bilan)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS movies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_id TEXT NOT NULL,
                 caption TEXT,
                 views_count INTEGER DEFAULT 0,
+                is_premium_only INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            await db.execute("ALTER TABLE movies ADD COLUMN is_premium_only INTEGER DEFAULT 0;")
+        except Exception:
+            pass
         # Eski test videosini bazadan to'liq tozalash
         await db.execute("DELETE FROM movies WHERE caption NOT LIKE '%Qimorda%' AND (caption IS NULL OR caption = '' OR file_id LIKE '%BAACAgI%')")
         await db.commit()

@@ -182,8 +182,8 @@ async def movie_exists_db(movie_id: int) -> bool:
             row = await cursor.fetchone()
             return row is not None
 
-async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
-    """Belgilangan ID (kino kodi) bilan yangi kinoni qo'shish va zaxiralash"""
+async def add_movie_with_id(movie_id: int, file_id: str, caption: str, is_premium_only: int = 0) -> bool:
+    """Belgilangan ID (kino kodi) bilan yangi kinoni qo'shish va zaxiralash (is_premium_only: 0-barcha, 1-faqat premium)"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
@@ -199,8 +199,8 @@ async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
         except Exception:
             pass
         await db.execute(
-            "INSERT INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, 0)",
-            (movie_id, file_id, caption)
+            "INSERT INTO movies (id, file_id, caption, views_count, is_premium_only) VALUES (?, ?, ?, 0, ?)",
+            (movie_id, file_id, caption, is_premium_only)
         )
         await db.commit()
         cache.delete(f"movie_{movie_id}")
@@ -208,15 +208,16 @@ async def add_movie_with_id(movie_id: int, file_id: str, caption: str) -> bool:
     return True
 
 async def get_movie(movie_id: int, user_id: int = None):
-    """Kino ma'lumotlarini bazadan olish va faqat UNIKAL foydalanuvchilar birinchi marta so'raganida +1 qilish (1 user 100 marta so'rasa ham +0)"""
+    """Kino ma'lumotlarini bazadan olish (file_id, caption, views_count, is_premium_only)"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
     async with get_db() as db:
-        async with db.execute("SELECT file_id, caption, views_count FROM movies WHERE id = ?", (movie_id,)) as cursor:
+        async with db.execute("SELECT file_id, caption, views_count, COALESCE(is_premium_only, 0) FROM movies WHERE id = ?", (movie_id,)) as cursor:
             movie = await cursor.fetchone()
         if movie:
             current_views = movie[2] or 0
+            is_prem_only = movie[3] or 0
             new_views = current_views
 
             if user_id is not None:
@@ -232,7 +233,7 @@ async def get_movie(movie_id: int, user_id: int = None):
                         new_views = cnt_row[0] if cnt_row else current_views + 1
                     await db.execute("UPDATE movies SET views_count = ? WHERE id = ?", (new_views, movie_id))
                     await db.commit()
-            return (movie[0], movie[1], new_views)
+            return (movie[0], movie[1], new_views, is_prem_only)
         return None
 
 async def delete_movie(movie_id: int):
@@ -272,8 +273,8 @@ async def export_master_backup_json() -> str:
     import json
     async with get_db() as db:
         # 1. Movies
-        async with db.execute("SELECT id, file_id, caption, views_count FROM movies ORDER BY id ASC") as c:
-            movies = [{"id": r[0], "file_id": r[1], "caption": r[2], "views_count": r[3]} for r in await c.fetchall()]
+        async with db.execute("SELECT id, file_id, caption, views_count, COALESCE(is_premium_only, 0) FROM movies ORDER BY id ASC") as c:
+            movies = [{"id": r[0], "file_id": r[1], "caption": r[2], "views_count": r[3], "is_premium_only": r[4]} for r in await c.fetchall()]
 
         # 2. Sponsor channels
         async with db.execute("SELECT id, channel_id, channel_name FROM sponsor_channels") as c:
@@ -412,8 +413,8 @@ async def import_master_backup_json(json_str: str) -> dict:
                 for m in data["movies"]:
                     if m.get("id") and m.get("file_id"):
                         await db.execute(
-                            "INSERT OR REPLACE INTO movies (id, file_id, caption, views_count) VALUES (?, ?, ?, ?)",
-                            (m["id"], m["file_id"], m.get("caption", ""), m.get("views_count", 0))
+                            "INSERT OR REPLACE INTO movies (id, file_id, caption, views_count, is_premium_only) VALUES (?, ?, ?, ?, ?)",
+                            (m["id"], m["file_id"], m.get("caption", ""), m.get("views_count", 0), m.get("is_premium_only", 0))
                         )
                         m_cnt += 1
                 stats["movies"] = m_cnt
