@@ -150,7 +150,7 @@ def get_user_menu():
                 KeyboardButton(text="🔍 Kino qidirish")
             ],
             [
-                KeyboardButton(text="🔥 Sizga mos kinolar"),
+                KeyboardButton(text="🔥 Menga mos kinolar"),
                 KeyboardButton(text="⭐️ Saqlanganlar")
             ],
             [

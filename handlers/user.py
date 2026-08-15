@@ -99,6 +99,7 @@ def fmt_price(n: int) -> str:
 USER_MENU_BUTTONS = [
     '🔍 Kino qidirish', 'Kino qidirish 🔍', 'Kino qidirish',
     '💎 VIP Premium', 'VIP Premium 💎', '💎 Premium', 'VIP Premium',
+    '🔥 Menga mos kinolar', 'Menga mos kinolar 🔥', 'Menga mos kinolar',
     '🔥 Sizga mos kinolar', 'Sizga mos kinolar 🔥', 'Sizga mos kinolar',
     'Tanlanganlar ⭐️', 'Saqlanganlar ⭐️', '⭐️ Saqlanganlar', 'Tanlanganlar', 'Saqlanganlar',
     'Tarixim 🕐', 'Tarixim 🕒', 'Tarixim',
@@ -1718,7 +1719,7 @@ async def user_daily_bonus(message: Message, state: FSMContext):
     await message.answer(with_footer(msg), parse_mode='HTML')
 
 
-@router.message(F.text.regexp('(?i).*(sizga mos kinolar|mos kinolar).*'))
+@router.message(F.text.regexp('(?i).*(menga mos kinolar|sizga mos kinolar|mos kinolar).*'))
 async def cmd_user_recommendations(message: Message, state: FSMContext):
     await state.clear()
     uid = message.from_user.id
@@ -1726,7 +1727,7 @@ async def cmd_user_recommendations(message: Message, state: FSMContext):
     if not movies:
         await message.answer(with_footer("❌ <b>Hozircha siz uchun mos janrlar aniqlanmadi.</b>\n\nKo'proq kino ko'ring, shunda siz yoqtirgan janrlar bo'yicha saralangan kinolar shu yerda chiqadi! 🍿"), parse_mode='HTML')
         return
-    txt = "🔥 <b>SIZGA MOS KINOLAR (JANR TAVSIYASI):</b>\n\n"
+    txt = "🔥 <b>MENGA MOS KINOLAR (JANR TAVSIYASI):</b>\n\n"
     for idx, mv in enumerate(movies, 1):
         m_id, caption, views = mv
         name = (caption or 'Nomsiz').split('\n')[0][:50]
