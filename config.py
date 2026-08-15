@@ -43,3 +43,12 @@ PAYME_SECRET_KEY = os.getenv("PAYME_SECRET_KEY", "")
 
 # Admin payment verification (manual payment)
 ADMIN_PAYMENT_CHAT_ID = os.getenv("ADMIN_PAYMENT_CHAT_ID", "")
+
+# ─── 🕒 O'ZBEKISTON VAQTI (UTC+5 / NAMANGAN) ──────────────────────────────────
+from datetime import datetime, timedelta, timezone
+
+UZB_TZ = timezone(timedelta(hours=5))
+
+def get_uzb_now() -> datetime:
+    """O'zbekiston / Namangan vaqtini (+UTC 5) qaytaradi (timezone-naive datetime)"""
+    return datetime.now(UZB_TZ).replace(tzinfo=None)

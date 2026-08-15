@@ -47,7 +47,7 @@ async def broadcast_scheduler(bot: Bot):
         await asyncio.sleep(60)
         try:
             pending = await db_req.get_pending_broadcasts()
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
             for bid, chat_id, message_id, send_at in pending:
                 if send_at <= now_str:
                     logging.info(f"Rejalashtirilgan reklama yuborilmoqda: ID {bid}")
@@ -109,7 +109,7 @@ async def biweekly_premium_scheduler(bot: Bot):
         await asyncio.sleep(3600)
         try:
             last_run = await db_req.get_setting("last_biweekly_premium_run")
-            now = datetime.now()
+            now = config.get_uzb_now()
             
             should_run = False
             if not last_run:
@@ -295,7 +295,7 @@ async def inactive_cleanup_reminder_scheduler(bot: Bot):
         await asyncio.sleep(86400)
         try:
             last_run = await db_req.get_setting("last_inactive_cleanup_check")
-            now = datetime.now()
+            now = config.get_uzb_now()
             
             should_run = False
             if not last_run:
@@ -333,7 +333,7 @@ async def biyearly_global_unban_scheduler(bot: Bot):
         await asyncio.sleep(86400) # Kuniga 1 marta
         try:
             last_run = await db_req.get_setting("last_biyearly_global_unban")
-            now = datetime.now()
+            now = config.get_uzb_now()
             
             should_run = False
             if not last_run:
@@ -419,7 +419,7 @@ async def auto_expire_movies_scheduler(bot: Bot):
     while True:
         await asyncio.sleep(3600)
         try:
-            now = datetime.now()
+            now = config.get_uzb_now()
             if now.hour == 3:
                 expired_cnt = await db_req.auto_expire_movies()
                 if expired_cnt > 0:

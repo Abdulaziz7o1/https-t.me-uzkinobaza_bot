@@ -416,7 +416,7 @@ async def premium_info(message: Message):
                 end_dt = datetime.fromisoformat(end_raw.replace(' ', 'T'))
                 start_str = start_dt.strftime('%d.%m.%Y')
                 end_str = end_dt.strftime('%d.%m.%Y')
-                diff_sec = (end_dt - datetime.now()).total_seconds()
+                diff_sec = (end_dt - config.get_uzb_now()).total_seconds()
                 if diff_sec <= 0:
                     days_left_str = '0 kun'
                 elif diff_sec < 86400:
@@ -437,7 +437,7 @@ async def premium_info(message: Message):
                 try:
                     end_dt = datetime.fromisoformat(end_raw.replace(' ', 'T'))
                     end_str = end_dt.strftime('%d.%m.%Y')
-                    diff_sec = (end_dt - datetime.now()).total_seconds()
+                    diff_sec = (end_dt - config.get_uzb_now()).total_seconds()
                     if diff_sec <= 0:
                         days_left_str = '0 kun'
                     elif diff_sec < 86400:
@@ -1615,7 +1615,7 @@ async def user_birthday_save(message: Message, state: FSMContext):
     except ValueError:
         await message.answer(with_footer("⚠️ <b>Mavjud bo'lmagan sana kiritildi!</b> Iltimos to'g'ri sana kiriting (Masalan: 10.10.2013):"), parse_mode='HTML')
         return
-    now = datetime.now()
+    now = config.get_uzb_now()
     if birth_dt > now:
         await message.answer(with_footer("⚠️ Tug'ilgan kun kelajakdagi sana bo'la olmaydi! Qayta kiriting:"))
         return

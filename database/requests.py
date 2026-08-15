@@ -10,7 +10,7 @@ async def add_user(user_id: int, username: str, full_name: str, referred_by: int
     role = 'admin' if user_id in config.ADMINS else 'member'
     from datetime import datetime, timedelta, timezone
     uzb_tz = timezone(timedelta(hours=5))
-    now_str = datetime.now(uzb_tz).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
     
     async with get_db() as db:
         # Foydalanuvchi allaqachon bor-yo'qligini tekshirish
@@ -48,7 +48,7 @@ async def add_user(user_id: int, username: str, full_name: str, referred_by: int
 async def update_user_activity(user_id: int):
     """Foydalanuvchining faollik vaqtini yangilash"""
     from datetime import datetime
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         await db.execute("UPDATE users SET last_active_at = ? WHERE id = ?", (now_str, user_id))
         await db.commit()
@@ -56,7 +56,7 @@ async def update_user_activity(user_id: int):
 async def get_inactive_users_count(months: int = 6) -> int:
     """Nofaol (belgilangan oydan ko'p vaqt kirmagan) foydalanuvchilar sonini hisoblash"""
     from datetime import datetime, timedelta
-    cutoff = datetime.now() - timedelta(days=months * 30)
+    cutoff = config.get_uzb_now() - timedelta(days=months * 30)
     cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         async with db.execute(
@@ -69,7 +69,7 @@ async def get_inactive_users_count(months: int = 6) -> int:
 async def delete_inactive_users(months: int = 6) -> int:
     """Nofaol a'zolarni bazadan butunlay tozalash"""
     from datetime import datetime, timedelta
-    cutoff = datetime.now() - timedelta(days=months * 30)
+    cutoff = config.get_uzb_now() - timedelta(days=months * 30)
     cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         async with db.execute(
@@ -976,8 +976,8 @@ async def can_post_comment(user_id: int) -> tuple[bool, str]:
     
     if last_time:
         last_dt = datetime.strptime(last_time, "%Y-%m-%d %H:%M:%S")
-        if datetime.now() - last_dt < timedelta(seconds=cooldown):
-            remaining = cooldown - int((datetime.now() - last_dt).total_seconds())
+        if config.get_uzb_now() - last_dt < timedelta(seconds=cooldown):
+            remaining = cooldown - int((config.get_uzb_now() - last_dt).total_seconds())
             return False, f"⏱ Izohlar orasida {cooldown} soniya kutish sharti. Qolgan vaqt: {remaining} soniya"
     
     return True, ""
@@ -1462,7 +1462,7 @@ async def check_notify_150pts_reward(bot, user_id: int):
 async def add_premium_subscription(user_id: int, plan: str, months: int) -> bool:
     """Foydalanuvchiga premium obuna qo'shish"""
     from datetime import datetime, timedelta
-    start_date = datetime.now()
+    start_date = config.get_uzb_now()
     end_date = start_date + timedelta(days=months * 30)
 
     async with get_db() as db:
@@ -1481,7 +1481,7 @@ async def add_premium_subscription(user_id: int, plan: str, months: int) -> bool
 async def add_premium_days(user_id: int, plan: str, days: int) -> bool:
     """Foydalanuvchiga kun hisobida premium obuna qo'shish"""
     from datetime import datetime, timedelta
-    start_date = datetime.now()
+    start_date = config.get_uzb_now()
     end_date = start_date + timedelta(days=days)
 
     async with get_db() as db:
@@ -1509,7 +1509,7 @@ async def get_premium_subscription(user_id: int):
             if row:
                 # Obuna muddati tugaganmi tekshirish
                 end_date = datetime.fromisoformat(row[2])
-                if datetime.now() > end_date:
+                if config.get_uzb_now() > end_date:
                     return None
                 return row
             return None
@@ -1830,7 +1830,7 @@ async def get_recent_abuse_logs(limit: int = 20):
 async def increment_wrong_code_count(user_id: int) -> int:
     """Foydalanuvchining xato kino kodi kiritishlarini oshirish va joriy sonini qaytarish"""
     from datetime import datetime, timedelta
-    now = datetime.now()
+    now = config.get_uzb_now()
     cutoff = now - timedelta(minutes=5)  # 5 daqiqa ichidagi xatolar
     
     async with get_db() as db:
@@ -1863,7 +1863,7 @@ async def clear_abuse_logs():
 async def clear_old_daily_points(days: int = 30):
     """Eski kunlik ballarni tozalash (default 30 kun)"""
     from datetime import datetime, timedelta
-    cutoff = datetime.now() - timedelta(days=days)
+    cutoff = config.get_uzb_now() - timedelta(days=days)
     cutoff_str = cutoff.strftime("%Y-%m-%d")
     
     async with get_db() as db:
@@ -2022,7 +2022,7 @@ async def get_comment_likes_count(comment_id: int) -> int:
 async def set_user_premium(user_id: int, days: int = 7, plan: str = None) -> bool:
     """Foydalanuvchiga Premium maqomini berish"""
     from datetime import datetime, timedelta
-    now = datetime.now()
+    now = config.get_uzb_now()
     until = now + timedelta(days=days)
     until_str = until.strftime("%Y-%m-%d %H:%M:%S")
     start_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -2113,7 +2113,7 @@ async def set_user_premium_custom_dates(user_id: int, start_date: str, end_date:
 async def is_user_premium(user_id: int) -> bool:
     """Foydalanuvchi Premium maqomidami tekshirish"""
     from datetime import datetime
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
     
     async with get_db() as db:
         async with db.execute(
@@ -2198,7 +2198,7 @@ async def reply_to_ticket(ticket_id: int, admin_id: int, reply_text: str) -> boo
                 """UPDATE tickets 
                    SET status = 'replied', reply_text = ?, admin_id = ?, replied_at = ?
                    WHERE id = ?""",
-                (reply_text, admin_id, datetime.now(), ticket_id)
+                (reply_text, admin_id, config.get_uzb_now(), ticket_id)
             )
             await db.commit()
             return True
@@ -2289,7 +2289,7 @@ async def get_user_birthday(user_id: int):
 async def get_today_birthdays() -> list:
     """Bugun tug'ilgan kunli foydalanuvchilar (KK.OO formati bilan solishtirish)"""
     from datetime import datetime
-    today = datetime.now().strftime("%d.%m")
+    today = config.get_uzb_now().strftime("%d.%m")
     async with get_db() as db:
         async with db.execute(
             "SELECT id, full_name, username, birthday, last_birthday_bonus_year FROM users WHERE birthday LIKE ?",
@@ -2339,7 +2339,7 @@ async def verify_admin_pin(admin_id: int, pin: str) -> tuple:
             # Bloklangan vaqtni tekshirish
             if blocked_until:
                 blocked_dt = datetime.fromisoformat(str(blocked_until))
-                if datetime.now() < blocked_dt:
+                if config.get_uzb_now() < blocked_dt:
                     return (False, True, failed)
                 else:
                     # Blok muddati tugagan — tozalash
@@ -2356,7 +2356,7 @@ async def verify_admin_pin(admin_id: int, pin: str) -> tuple:
                 new_failed = failed + 1
                 if new_failed >= 5:
                     from datetime import timedelta
-                    block_until = (datetime.now() + timedelta(minutes=10)).isoformat()
+                    block_until = (config.get_uzb_now() + timedelta(minutes=10)).isoformat()
                     await db.execute(
                         "UPDATE admin_pins SET failed_attempts = ?, blocked_until = ? WHERE admin_id = ?",
                         (new_failed, block_until, admin_id)
@@ -2604,7 +2604,7 @@ async def ban_user_custom(user_id: int, hours: int = None) -> bool:
     from datetime import datetime, timedelta
     async with get_db() as db:
         if hours and hours > 0:
-            ban_until = (datetime.now() + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+            ban_until = (config.get_uzb_now() + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
             await db.execute(
                 "UPDATE users SET status = 'banned', role = 'banned', temp_ban_until = ? WHERE id = ?",
                 (ban_until, user_id)
@@ -2638,7 +2638,7 @@ async def warn_user_progressive(user_id: int) -> tuple[bool, int, str, int]:
 
         if warn_cnt >= 3:
             hours, duration_text = get_progressive_ban_duration(b_stage)
-            ban_until = (datetime.now() + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+            ban_until = (config.get_uzb_now() + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
             new_stage = b_stage + 1
             
             await db.execute(
@@ -2664,7 +2664,7 @@ async def is_user_temp_banned(user_id: int) -> tuple:
     """
     try:
         from datetime import datetime
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
         
         async with get_db() as db:
             async with db.execute(
@@ -2687,7 +2687,7 @@ async def is_user_temp_banned(user_id: int) -> tuple:
                             return False, ""
                         else:
                             until_dt = datetime.strptime(temp_until, "%Y-%m-%d %H:%M:%S")
-                            diff = until_dt - datetime.now()
+                            diff = until_dt - config.get_uzb_now()
                             days = diff.days
                             hours = diff.seconds // 3600
                             minutes = (diff.seconds % 3600) // 60
@@ -2732,7 +2732,7 @@ async def add_payment_record(user_id: int, amount: int, plan: str, confirmed_by:
     """To'lov yozuvini Uzbekistan (UTC+5 Namangan) vaqti bilan saqlash va Kassa balansini oshirish"""
     from datetime import datetime, timedelta, timezone
     uzb_tz = timezone(timedelta(hours=5))
-    now_uzb_str = datetime.now(uzb_tz).strftime("%Y-%m-%d %H:%M:%S")
+    now_uzb_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
 
     async with get_db() as db:
         await db.execute(
@@ -2798,7 +2798,7 @@ async def get_today_new_users_count() -> int:
     """Bugun (Uzbekistan / Namangan vaqti bilan) ro'yxatdan o'tgan yangi foydalanuvchilar soni"""
     from datetime import datetime, timedelta, timezone
     uzb_tz = timezone(timedelta(hours=5))
-    today_uzb = datetime.now(uzb_tz).strftime("%Y-%m-%d")
+    today_uzb = config.get_uzb_now().strftime("%Y-%m-%d")
     async with get_db() as db:
         async with db.execute(
             "SELECT COUNT(*) FROM users WHERE created_at LIKE ?",
@@ -2812,7 +2812,7 @@ async def get_today_new_users_count() -> int:
 async def create_promo_code(code: str, reward_type: str, reward_value: int, max_uses: int = 1, expires_in_days: int = 7, created_by: int = None) -> bool:
     """Yangi promo kod yaratish"""
     from datetime import datetime, timedelta
-    expires_at = (datetime.now() + timedelta(days=expires_in_days)).strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = (config.get_uzb_now() + timedelta(days=expires_in_days)).strftime("%Y-%m-%d %H:%M:%S")
     clean_code = code.strip().upper()
     async with get_db() as db:
         try:
@@ -2849,7 +2849,7 @@ async def use_promo_code(user_id: int, code: str) -> tuple:
     try:
         from datetime import datetime
         clean_code = code.strip().upper()
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
         
         async with get_db() as db:
             # 1. Avvalo ushbu foydalanuvchi muqaddam ushbu promo kodni ishlatganligini tekshiramiz (hatto kod bazadan o'chib ketgan bo'lsa ham)
@@ -3083,7 +3083,7 @@ async def get_all_promo_codes() -> list:
 async def set_movie_expiry(movie_id: int, days: int) -> bool:
     """Kino uchun ko'rsatish muddatini belgilash"""
     from datetime import datetime, timedelta
-    exp_time = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    exp_time = (config.get_uzb_now() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         await db.execute(
             "UPDATE movies SET expires_at = ?, is_expired = 0 WHERE id = ?",
@@ -3095,7 +3095,7 @@ async def set_movie_expiry(movie_id: int, days: int) -> bool:
 async def auto_expire_movies() -> int:
     """Muddati o'tgan kinolarni yashirish"""
     from datetime import datetime
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         cursor = await db.execute(
             "UPDATE movies SET is_expired = 1 WHERE expires_at IS NOT NULL AND expires_at <= ? AND is_expired = 0",
@@ -3399,7 +3399,7 @@ async def get_movies_with_high_dislikes(threshold: int = 75) -> list:
 async def get_activity_report_last_days(days: int = 7) -> dict:
     """Oxirgi N kun uchun aktivlik statistikasini olish"""
     from datetime import datetime, timedelta
-    today = datetime.now().date()
+    today = config.get_uzb_now().date()
     stats = {}
     for i in range(days - 1, -1, -1):
         d = today - timedelta(days=i)
@@ -3437,7 +3437,7 @@ async def get_activity_report_last_days(days: int = 7) -> dict:
 async def give_daily_gift_top_active(points: int = 75, limit: int = 10) -> list:
     """Kunlik eng faol top N ta userga ball berish. Berilgan userlar ro'yxatini qaytaradi."""
     from datetime import datetime
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = config.get_uzb_now().strftime("%Y-%m-%d")
     # 1) top faollarni topish
     async with get_db() as db:
         async with db.execute("""
@@ -3470,7 +3470,7 @@ async def give_daily_gift_top_active(points: int = 75, limit: int = 10) -> list:
 async def get_referrals_with_incomplete_sub(user_id: int) -> list:
     """Men taklif qilgan lekin hali homiy kanallarga obuna bo'lmagan (va Premium bo'lmagan) referallar ro'yxati"""
     from datetime import datetime, timedelta
-    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff = (config.get_uzb_now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         async with db.execute("""
             SELECT id, username, full_name, created_at
@@ -3565,7 +3565,7 @@ async def recommend_movies_by_genre(user_id: int, limit: int = 10) -> list:
 async def get_weekly_top_movies(limit: int = 10) -> list:
     """Oxirgi 7 kun ichidagi reyting bo'yicha top kinolar"""
     from datetime import datetime, timedelta
-    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    week_ago = (config.get_uzb_now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         async with db.execute(f"""
             SELECT m.id, m.caption,
@@ -3708,7 +3708,7 @@ async def claim_vip_trial(user_id: int) -> tuple[bool, str]:
     if await has_claimed_vip_trial(user_id):
         return False, "⚠️ <b>Siz allaqachon 15 minutlik bepul VIP sinov imkoniyatidan foydalangansiz!</b>\n\nVIP imtiyozlarini davom ettirish uchun /premium orqali obuna xarid qilishingiz mumkin."
 
-    now = datetime.now()
+    now = config.get_uzb_now()
     end_time = now + timedelta(minutes=15)
     end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
     start_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -3777,7 +3777,7 @@ async def activate_flash_sale(hours: int = 1, discount_pct: int = 50) -> str:
     """1 soatlik Flash Sale 50% chegirma eventini yoqish"""
     from datetime import datetime, timedelta, timezone
     uzb_tz = timezone(timedelta(hours=5))
-    until_dt = datetime.now(uzb_tz) + timedelta(hours=hours)
+    until_dt = config.get_uzb_now() + timedelta(hours=hours)
     until_str = until_dt.strftime("%Y-%m-%d %H:%M:%S")
     async with get_db() as db:
         await db.execute(
@@ -3806,7 +3806,7 @@ async def get_flash_sale_status() -> tuple[bool, int, str]:
                 until_str = r1[0]
                 disc_pct = int(r2[0]) if r2 and r2[0] else 50
                 dt_until = datetime.fromisoformat(until_str.replace(' ', 'T'))
-                if datetime.now(uzb_tz).replace(tzinfo=None) < dt_until:
+                if config.get_uzb_now().replace(tzinfo=None) < dt_until:
                     return True, disc_pct, until_str
         except Exception:
             pass

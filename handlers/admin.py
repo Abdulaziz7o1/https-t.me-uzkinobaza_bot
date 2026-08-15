@@ -1256,7 +1256,7 @@ async def scheduled_broadcast_time(message: Message, state: FSMContext):
         return
     minutes = int(text)
     from datetime import datetime, timedelta
-    send_time = datetime.now() + timedelta(minutes=minutes)
+    send_time = config.get_uzb_now() + timedelta(minutes=minutes)
     send_time_str = send_time.strftime('%Y-%m-%d %H:%M:%S')
     data = await state.get_data()
     chat_id = data['sch_chat_id']
