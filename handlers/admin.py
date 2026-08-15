@@ -18,7 +18,7 @@ def with_footer(text):
         return text
     if not isinstance(text, str):
         return text
-    if "8245305906" in text or "Abdulaziz7o1" in text or "Murojaat uchun" in text:
+    if "8245305906" in text or "Murojaat uchun" in text:
         return text
     return f"{text}{CONTACT_FOOTER}"
 

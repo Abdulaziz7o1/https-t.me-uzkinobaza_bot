@@ -63,7 +63,7 @@ def with_footer(text):
         return text
     if not isinstance(text, str):
         return text
-    if "8245305906" in text or "Abdulaziz7o1" in text or "Murojaat uchun" in text:
+    if "8245305906" in text or "Murojaat uchun" in text:
         return text
     return f"{text}{CONTACT_FOOTER}"
 
@@ -104,9 +104,9 @@ async def execute_start_logic(message: Message, state: FSMContext):
     await db_req.add_user(user_id, user.username or '', user.full_name, referred_by)
     db_admins = await db_req.get_all_admins()
     if user_id in config.ADMINS:
-        await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Bosh Admin {name_to_show}!</b>\n\n🛠 <b>Bot boshqaruv paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_admin_menu())
+        await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Bosh Admin {name_to_show}!</b>\n\n🛠 <b>Bot boshqaruv paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:'), parse_mode='HTML', reply_markup=get_admin_menu())
     elif user_id in db_admins:
-        await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Moderator {name_to_show}!</b>\n\n🛠 <b>Moderator paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_moderator_menu())
+        await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Moderator {name_to_show}!</b>\n\n🛠 <b>Moderator paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:'), parse_mode='HTML', reply_markup=get_moderator_menu())
     else:
         # Texnik ishlar rejimi tekshiruvi (Admin 4)
         if await db_req.is_maintenance_mode():
@@ -121,9 +121,9 @@ async def execute_start_logic(message: Message, state: FSMContext):
         # Premium foydalanuvchi - kanal tekshiruvini o'tkazib yuborish
         is_prem = await db_req.is_premium_user(user_id)
         if is_prem:
-            await message.answer(with_footer(f'👑 <b>Assalomu alaykum, {name_to_show}!</b>\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+            await message.answer(with_footer(f'👑 <b>Assalomu alaykum, {name_to_show}!</b>\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:'), parse_mode='HTML', reply_markup=get_user_menu())
         else:
-            await message.answer(with_footer(f'👋 <b>Assalomu alaykum, {name_to_show}!</b>\n\n🍿 <b>Kino botiga xush kelibsiz!</b>\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+            await message.answer(with_footer(f'👋 <b>Assalomu alaykum, {name_to_show}!</b>\n\n🍿 <b>Kino botiga xush kelibsiz!</b>\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:'), parse_mode='HTML', reply_markup=get_user_menu())
 
 @router.message(CommandStart(), StateFilter('*'))
 @router.message(Command('start'), StateFilter('*'))
@@ -175,12 +175,12 @@ async def btn_start(message: Message, state: FSMContext):
     await db_req.add_user(user_id, user.username, user.first_name)
     db_admins = await db_req.get_all_admins()
     if user_id in config.ADMINS or user_id in db_admins:
-        await message.answer(with_footer(f'👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+        await message.answer(with_footer(f'👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:'), parse_mode='HTML', reply_markup=get_user_menu())
         return
     # Premium foydalanuvchi sponsor kanal tekshiruvidan o'tkazilmaydi
     is_prem = await db_req.is_premium_user(user_id)
     if is_prem:
-        await message.answer(with_footer(f'👑 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+        await message.answer(with_footer(f'👑 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:'), parse_mode='HTML', reply_markup=get_user_menu())
         return
     db_channels = await db_req.get_sponsor_channels()
     all_channels = list(config.CHANNELS) + [c[1] for c in db_channels]
@@ -193,9 +193,9 @@ async def btn_start(message: Message, state: FSMContext):
             except Exception:
                 channel_buttons.append([InlineKeyboardButton(text=channel, url=f'https://t.me/{channel}')])
         channel_buttons.append([InlineKeyboardButton(text='✅ Obunani tekshirish', callback_data='check_sub')])
-        await message.answer(with_footer(f"👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:{CONTACT_FOOTER}"), parse_mode='HTML', reply_markup=InlineKeyboardMarkup(inline_keyboard=channel_buttons))
+        await message.answer(with_footer(f"👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:"), parse_mode='HTML', reply_markup=InlineKeyboardMarkup(inline_keyboard=channel_buttons))
     else:
-        await message.answer(with_footer(f'👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:{CONTACT_FOOTER}'), parse_mode='HTML', reply_markup=get_user_menu())
+        await message.answer(with_footer(f'👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:'), parse_mode='HTML', reply_markup=get_user_menu())
 
 @router.callback_query(F.data == 'check_sub')
 async def check_subscription_callback(callback: CallbackQuery):
@@ -273,7 +273,7 @@ async def search_movie_by_code(message: Message):
         await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires))
         await _movie_watched_extra(user_id, caption)
     else:
-        await message.answer(with_footer(f"❌ <b>Kino topilmadi!</b>\n\nKino kodi <code>{movie_id}</code> bo'yicha kino mavjud emas.\nIltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning.{CONTACT_FOOTER}"), parse_mode='HTML')
+        await message.answer(with_footer(f"❌ <b>Kino topilmadi!</b>\n\nKino kodi <code>{movie_id}</code> bo'yicha kino mavjud emas.\nIltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning."), parse_mode='HTML')
         return
 
 @router.callback_query(F.data.startswith('react_'))
@@ -390,7 +390,7 @@ async def premium_info(message: Message):
             else:
                 end_str = "Noma'lum"
                 days_left_str = '?'
-        await message.answer(with_footer(f"👑 <b>Premium Obuna — Faol</b> ✅\n\n📋 <b>Plan:</b> {plan}\n📅 <b>Boshlangan:</b> {start_str}\n⏳ <b>Tugaydi:</b> {end_str}\n🕐 <b>Qolgan muddat:</b> {days_left_str}\n\n🎁 <b>Premium imtiyozlari:</b>\n• Kunlik limit yo'q\n• Cheklovsiz kino ko'rish\n• Prioritet qo'llab-quvvatlash\n\n<i>Rahmat! Siz bizning Premium a'zomiz! 🙏</i>{CONTACT_FOOTER}"), parse_mode='HTML')
+        await message.answer(with_footer(f"👑 <b>Premium Obuna — Faol</b> ✅\n\n📋 <b>Plan:</b> {plan}\n📅 <b>Boshlangan:</b> {start_str}\n⏳ <b>Tugaydi:</b> {end_str}\n🕐 <b>Qolgan muddat:</b> {days_left_str}\n\n🎁 <b>Premium imtiyozlari:</b>\n• Kunlik limit yo'q\n• Cheklovsiz kino ko'rish\n• Prioritet qo'llab-quvvatlash\n\n<i>Rahmat! Siz bizning Premium a'zomiz! 🙏</i>"), parse_mode='HTML')
         return
     await send_or_edit_premium_plans_menu(message, user_id, is_edit=False)
 
@@ -511,7 +511,7 @@ async def user_promo_cmd(message: Message, state: FSMContext):
                 user_info = message.from_user
                 uname = f'@{user_info.username}' if user_info.username else user_info.full_name
                 p_1m_base = await db_req.get_premium_price_1m()
-                await message.answer(with_footer(f"🎉 <b>TABRIKLAYMIZ!</b>\n\n🏷️ Siz kiritgan promo kod orqali sizga\n<b>1 oylik 👑 Premium obuna — 0 UZS</b> ga\nmuvaffaqiyatli taqdim etildi!\n\n✅ <b>Obuna holati:</b> Faol (30 kun)\n💳 <b>To'lov summasi:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>0 UZS</b>\n\n📌 <i>Premium obunangiz tafsilotlarini ko'rish uchun /premium buyrug'ini yuboring.</i>\n🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>{CONTACT_FOOTER}"), parse_mode='HTML')
+                await message.answer(with_footer(f"🎉 <b>TABRIKLAYMIZ!</b>\n\n🏷️ Siz kiritgan promo kod orqali sizga\n<b>1 oylik 👑 Premium obuna — 0 UZS</b> ga\nmuvaffaqiyatli taqdim etildi!\n\n✅ <b>Obuna holati:</b> Faol (30 kun)\n💳 <b>To'lov summasi:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>0 UZS</b>\n\n📌 <i>Premium obunangiz tafsilotlarini ko'rish uchun /premium buyrug'ini yuboring.</i>\n🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>"), parse_mode='HTML')
                 await _notify_admin_promo_100(message.bot, user_id, uname, code)
                 return
             elif disc_pct > 0:
@@ -560,7 +560,7 @@ async def user_promo_input_exec(message: Message, state: FSMContext):
             user_info = message.from_user
             uname = f'@{user_info.username}' if user_info.username else user_info.full_name
             p_1m_base = await db_req.get_premium_price_1m()
-            await message.answer(with_footer(f"🎉 <b>TABRIKLAYMIZ!</b>\n\n🏷️ Siz kiritgan promo kod orqali sizga\n<b>1 oylik 👑 Premium obuna — 0 UZS</b> ga\nmuvaffaqiyatli taqdim etildi!\n\n✅ <b>Obuna holati:</b> Faol (30 kun)\n💳 <b>To'lov summasi:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>0 UZS</b>\n\n📌 <i>Premium obunangiz tafsilotlarini ko'rish uchun /premium buyrug'ini yuboring.</i>\n🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>{CONTACT_FOOTER}"), parse_mode='HTML')
+            await message.answer(with_footer(f"🎉 <b>TABRIKLAYMIZ!</b>\n\n🏷️ Siz kiritgan promo kod orqali sizga\n<b>1 oylik 👑 Premium obuna — 0 UZS</b> ga\nmuvaffaqiyatli taqdim etildi!\n\n✅ <b>Obuna holati:</b> Faol (30 kun)\n💳 <b>To'lov summasi:</b> <s>{p_1m_base:,} UZS</s> ➔ <b>0 UZS</b>\n\n📌 <i>Premium obunangiz tafsilotlarini ko'rish uchun /premium buyrug'ini yuboring.</i>\n🙏 <i>Botimizdan foydalanganingiz uchun rahmat!</i>"), parse_mode='HTML')
             await _notify_admin_promo_100(message.bot, user_id, uname, code)
             return
         if disc_pct > 0:
@@ -882,7 +882,7 @@ async def random_movie(message: Message, state: FSMContext):
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">@Abdulaziz7o1</a>'
         await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(random_id, is_fav, avg_rating))
     else:
-        await message.answer(with_footer(f'❌ Kino topilmadi (ID: {random_id}){CONTACT_FOOTER}'))
+        await message.answer(with_footer(f'❌ Kino topilmadi (ID: {random_id})'))
 
 @router.message(F.text.regexp('(?i).*(reytinglar).*'))
 async def show_user_leaderboard(message: Message, state: FSMContext):
@@ -969,7 +969,7 @@ async def process_movie_request(message: Message, state: FSMContext):
     movie_name = message.text
     await db_req.add_movie_request(user_id, movie_name)
     await state.clear()
-    await message.answer(with_footer(f"✅ <b>So'rov qabul qilindi!</b>\n\n🎬 Kino: {movie_name}\n📊 Adminlar tez orada ko'rib chiqishadi.\n\n⏰ Kino qo'shilganda sizga xabar beramiz.{CONTACT_FOOTER}"), parse_mode='HTML')
+    await message.answer(with_footer(f"✅ <b>So'rov qabul qilindi!</b>\n\n🎬 Kino: {movie_name}\n📊 Adminlar tez orada ko'rib chiqishadi.\n\n⏰ Kino qo'shilganda sizga xabar beramiz."), parse_mode='HTML')
 
 @router.message(F.text.regexp('(?i).*(referal).*'))
 async def show_referral_stats(message: Message, state: FSMContext):
@@ -1525,7 +1525,7 @@ async def user_birthday_start(message: Message, state: FSMContext):
     existing_bday = await db_req.get_user_birthday(user_id)
     if locked or existing_bday:
         display = existing_bday if existing_bday and existing_bday != 'BLOCKED_UNDERAGE' else "❌ Belgilanmagan"
-        await message.answer(with_footer(f"🎂 <b>Sizning saqlangan tug'ilgan kuningiz:</b> <code>{display}</code>\n\n🔒 <b>Diqqat:</b> Tug'ilgan kun ma'lumotlari <b>1 MARTAGINA</b> saqlanadi va keyinchalik o'zgartirib BO'LMAYDI!\n\n🎁 <b>Sovg'a (har yili shu kunda):</b>\n  • � 1 KUNLIK Premium\n  • � 100 ball\n  • 🎂 Maxsus stickerlar xabari\n\n<i>Biz bilan qoling! 🌟</i>{CONTACT_FOOTER}"), parse_mode='HTML')
+        await message.answer(with_footer(f"🎂 <b>Sizning saqlangan tug'ilgan kuningiz:</b> <code>{display}</code>\n\n🔒 <b>Diqqat:</b> Tug'ilgan kun ma'lumotlari <b>1 MARTAGINA</b> saqlanadi va keyinchalik o'zgartirib BO'LMAYDI!\n\n🎁 <b>Sovg'a (har yili shu kunda):</b>\n  • � 1 KUNLIK Premium\n  • � 100 ball\n  • 🎂 Maxsus stickerlar xabari\n\n<i>Biz bilan qoling! 🌟</i>"), parse_mode='HTML')
         return
     await state.set_state(UserStates.waiting_for_birthday)
     await message.answer(with_footer("🎂 <b>Tug'ilgan kuningizni kiriting!</b>\n\nAgar botimizdan tug'ilgan kuningizda <b>MAXSUS SOVG'A</b> olmoqchi bo'lsangiz:\n\n🎁 <b>Sovg'a (har yili):</b>\n  • 👑 1 KUNLIK VIP Premium\n  • 💎 100 ball\n  • � Shaxsiy tabrik + stickerlar\n\n📅 <b>Format:</b> <code>KK.OO.YYYY</code>\n  <i>Masalan: 10.10.2013 (10-oktyabr 2013-yil)</i>\n\n⚠️ <b>JUDDAM AHMIYATLI:</b>\n  • Yosh kamida <b>12 da</b> bo'lishi kerak\n  • <b>1 MARTA</b> saqlanadi — keyin o'zgartirib BO'LMAYDI!\n  • Noto'g'ri ma'lumot → imkoniyat BUTUNLAY yo'qoladi!"), parse_mode='HTML')
@@ -1558,7 +1558,7 @@ async def user_birthday_save(message: Message, state: FSMContext):
         await db_req.set_user_birthday(user_id, 'BLOCKED_UNDERAGE')
         await db_req.lock_user_birthday(user_id)
         await state.clear()
-        await message.answer(with_footer(f"❌ <b>Uzr!</b> Botimizdan foydalanish va sovg'alar olish uchun yoshingiz kamida <b>12 da</b> bo'lishi kerak.\n\nSiz kiritgan sana bo'yicha yoshingiz <b>{age} da</b> bo'lgani sababli:\n  • Tug'ilgan kun saqlanmadi\n  • Qayta kiritish IMKONIYATI BERILMAYDI\n\nBu amal <b>1 MARTA</b> bajarildi va o'zgartirib bo'lmaydi.{CONTACT_FOOTER}"), parse_mode='HTML')
+        await message.answer(with_footer(f"❌ <b>Uzr!</b> Botimizdan foydalanish va sovg'alar olish uchun yoshingiz kamida <b>12 da</b> bo'lishi kerak.\n\nSiz kiritgan sana bo'yicha yoshingiz <b>{age} da</b> bo'lgani sababli:\n  • Tug'ilgan kun saqlanmadi\n  • Qayta kiritish IMKONIYATI BERILMAYDI\n\nBu amal <b>1 MARTA</b> bajarildi va o'zgartirib bo'lmaydi."), parse_mode='HTML')
         return
     success = await db_req.set_user_birthday(user_id, text)
     await db_req.lock_user_birthday(user_id)
@@ -1703,7 +1703,7 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
             cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="tg://user?id=8245305906">@Abdulaziz7o1</a>'
             await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating))
         else:
-            await message.answer(with_footer(f'❌ <b>{movie_id}</b> kodli kino topilmadi.{CONTACT_FOOTER}'))
+            await message.answer(with_footer(f'❌ <b>{movie_id}</b> kodli kino topilmadi.'))
         return
     results = await db_req.search_movies_by_name(query)
     if results:
