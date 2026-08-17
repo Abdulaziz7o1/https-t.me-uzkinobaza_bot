@@ -3612,65 +3612,7 @@ async def cb_admin_activity_report(callback: CallbackQuery):
     await callback.answer()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  💎 A11: KUNLIK SOVG'A — ENG FAOL 10 USERGA 75 BALL
-# ═══════════════════════════════════════════════════════════════════════════════
-@router.message(F.text.in_(['Ballar 💎', "🎁 Kunlik Aktivlik Sovg'asi"]))
-async def admin_gift_menu(message: Message, state: FSMContext):
-    await state.clear()
-    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
-        return
-    from keyboards.inline import get_admin_gift_keyboard
-    txt = (
-        "💎 <b>KUNLIK AKTIVLIK SOVG'ASI PANELI</b>\n\n"
-        "🎯 Bu kuni eng ko'p kino ko'rgan TOP 10 ta foydalanuvchiga "
-        "avtomatik <b>75 ball</b> sovg'a qilinadi.\n\n"
-        "<i>Diqqat: Bir foydalanuvchiga bir kunda 1 marta dan ko'p sovg'a berilmaydi.</i>"
-    )
-    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_gift_keyboard())
-
-
-@router.callback_query(F.data == 'gift_top_10_75pts')
-async def cb_gift_top_10_75pts(callback: CallbackQuery):
-    if callback.from_user.id not in config.ADMINS:
-        await callback.answer("❌ Faqat Bosh Adminlar amalga oshirishi mumkin!", show_alert=True)
-        return
-    try:
-        awarded = await db_req.give_daily_gift_top_active(points=75, limit=10)
-    except Exception as e:
-        await callback.answer(f"❌ Xato: {e}", show_alert=True)
-        return
-
-    txt = f"🎁 <b>KUNLIK SOVG'A BERILDI (TOP 10 — 75 BALL):</b>\n\n"
-    if awarded:
-        total_pts = 0
-        for idx, (uid, display, pts) in enumerate(awarded, 1):
-            total_pts += pts
-            medals = ["🥇", "🥈", "🥉"] + [f"#{i}" for i in range(4, 11)]
-            medal = medals[idx - 1] if idx <= len(medals) else f"#{idx}"
-            txt += f"{medal} {display} (ID: <code>{uid}</code>) → +{pts} 💎\n"
-            try:
-                await callback.bot.send_message(
-                    uid,
-                    with_footer(
-                        f"🎉 <b>SIZ KUNLIK SOVG'A SO'G'INDIZ!</b>\n\n"
-                        f"🏆 Bugun eng faol foydalanuvchilardan birisiz!\n"
-                        f"💎 <b>+{pts} ball</b> hisobingizga qo'shildi.\n\n"
-                        f"<i>Yana har kuni aktiv qoling va sovg'alarga ega bo'ling!</i> 🍿"
-                    ),
-                    parse_mode='HTML'
-                )
-            except Exception:
-                pass
-        txt += f"\n✅ Jami taqdim etilgan: <b>{len(awarded)} ta foydalanuvchi, {total_pts} ball</b>"
-    else:
-        txt += "⚠️ <i>Bugun hech kimga sovg'a berilmadi. Allaqachon barcha top userlar sovg'alarini olgan yoki aktivlik yetarli emas.</i>"
-
-    try:
-        await callback.message.edit_text(with_footer(txt), parse_mode='HTML')
-    except Exception:
-        await callback.message.answer(with_footer(txt), parse_mode='HTML')
-    await callback.answer(f"✅ {len(awarded)} ta userga sovg'a berildi!")
+# (Kunlik aktivlik sovg'asi paneli va funksiyalari to'liq olib tashlandi)
 
 
 @router.callback_query(F.data == 'reset_all_points_confirm')

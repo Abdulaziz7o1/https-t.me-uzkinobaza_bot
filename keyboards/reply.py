@@ -76,7 +76,6 @@ def get_admin_menu():
                 KeyboardButton(text="📊 Aktivlik Grafigi")
             ],
             [
-                KeyboardButton(text="🎁 Kunlik Aktivlik Sovg'asi"),
                 KeyboardButton(text="➕ Mannual Premium Qo'shish")
             ]
         ],

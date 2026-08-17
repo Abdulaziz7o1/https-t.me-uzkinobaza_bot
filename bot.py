@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import FSInputFile
-from aiohttp import ClientTimeout, TCPConnector
+
 
 import config
 from database.connection import init_db
@@ -40,7 +40,6 @@ async def backup_scheduler(bot: Bot):
 
 async def broadcast_scheduler(bot: Bot):
     """Har 60 soniyada rejalashtirilgan reklamalarni tekshiradi va yuboradi"""
-    from datetime import datetime
     import database.requests as db_req
     
     while True:
@@ -210,61 +209,7 @@ async def birthday_scheduler(bot: Bot):
             logging.error(f"Birthday scheduler xatosi: {e}")
 
 
-async def daily_activity_gift_scheduler(bot: Bot):
-    """Har kuni soat 10:00 da eng faol TOP 10 foydalanuvchiga avtomatik 75 ball sovg'a + adminlarga hisobot"""
-    from datetime import datetime, timedelta, timezone
-    import database.requests as db_req
-    
-    uzb_tz = timezone(timedelta(hours=5))
-    while True:
-        await asyncio.sleep(3600)  # Har soat tekshir
-        try:
-            now = datetime.now(uzb_tz)
-            if now.hour == 10:
-                today_str = now.strftime("%Y-%m-%d")
-                last_run = await db_req.get_setting("last_daily_activity_gift_date")
-                if last_run == today_str:
-                    continue
-                await db_req.set_setting("last_daily_activity_gift_date", today_str)
-                
-                awarded = await db_req.give_daily_gift_top_active(points=75, limit=10)
-                
-                winners_txt = ""
-                total_pts = 0
-                if awarded:
-                    medals = ["🥇", "🥈", "🥉"] + [f"#{i}" for i in range(4, 11)]
-                    for idx, (uid, display, pts) in enumerate(awarded):
-                        total_pts += pts
-                        medal = medals[idx] if idx < len(medals) else f"#{idx+1}"
-                        winners_txt += f"{medal} {display} (ID: <code>{uid}</code>) → +{pts} 💎\n"
-                        try:
-                            await bot.send_message(
-                                uid,
-                                f"🎉 <b>SIZ KUNLIK SOVG'A SO'G'INDIZ!</b>\n\n"
-                                f"🏆 Bugun eng faol foydalanuvchilardan birisiz!\n"
-                                f"💎 <b>+{pts} ball</b> hisobingizga qo'shildi.\n\n"
-                                f"<i>Yana har kuni aktiv qoling va sovg'alarga ega bo'ling!</i> 🍿",
-                                parse_mode="HTML"
-                            )
-                        except Exception:
-                            pass
-                else:
-                    winners_txt = "<i>Hozircha sovg'a berilgan foydalanuvchi yo'q.</i>"
-                
-                admin_msg = (
-                    f"🎁 <b>KUNLIK AKTIVLIK SOVG'ASI (09:00):</b>\n\n"
-                    f"<b>Bugun TOP 10 eng faol foydalanuvchi:</b>\n\n"
-                    f"{winners_txt}\n"
-                    f"✅ Jami taqdim etilgan: <b>{len(awarded)} ta foydalanuvchi, {total_pts} ball</b>"
-                )
-                for admin_id in config.ADMINS:
-                    try:
-                        await bot.send_message(admin_id, admin_msg, parse_mode="HTML")
-                    except Exception:
-                        pass
-                logging.info(f"Kunlik aktivlik sovg'asi: {len(awarded)} ta userga {total_pts} ball berildi.")
-        except Exception as e:
-            logging.error(f"Daily Activity Gift scheduler xatosi: {e}")
+# (Kunlik aktivlik sovg'asi avtomatik xabarnomasi olib tashlandi)
 
 async def admin_pin_reminder_scheduler(bot: Bot):
     """Har 2 haftada (14 kun) adminlarga 2FA PIN yangilash eslatmasi yuboradi"""
@@ -276,7 +221,7 @@ async def admin_pin_reminder_scheduler(bot: Bot):
             for admin_id, last_changed in admins_to_remind:
                 try:
                     msg = (
-                        f"🔐 <b>XAVFSIZLIK OGOHLANTIRISHI:</b>\n\n"
+                        "🔐 <b>XAVFSIZLIK OGOHLANTIRISHI:</b>\n\n"
                         f"Admin PIN-kodingiz 14 kundan ortiq vaqt davomida yangilanmadi.\n"
                         f"Bot xavfsizligini ta'minlash uchun <code>/setpin</code> buyrug'i orqali kodingizni yangilashingiz tavsiya etiladi."
                     )
@@ -314,7 +259,7 @@ async def inactive_cleanup_reminder_scheduler(bot: Bot):
                     for admin_id in config.ADMINS:
                         try:
                             msg = (
-                                f"🧹 <b>NOFAOL FOYDALANUVCHILARNI TOZALASH (3 OY):</b>\n\n"
+                                "🧹 <b>NOFAOL FOYDALANUVCHILARNI TOZALASH (3 OY):</b>\n\n"
                                 f"Oxirgi 90 kun ichida botga kirmagan <b>{len(inactives)} ta</b> foydalanuvchi mavjud.\n"
                                 f"Ularni o'chirib bazani tozalash uchun <code>/cleanup_inactive</code> buyrug'ini yuboring."
                             )
@@ -413,7 +358,6 @@ async def daily_kassa_report_scheduler(bot: Bot):
 
 async def auto_expire_movies_scheduler(bot: Bot):
     """Har kuni soat 03:00 da ko'rsatish muddati tugagan kinolarni avtomatik yashiradi"""
-    from datetime import datetime
     import database.requests as db_req
     
     while True:
@@ -489,7 +433,6 @@ async def on_startup(bot: Bot):
     asyncio.create_task(broadcast_scheduler(bot))
     asyncio.create_task(biweekly_premium_scheduler(bot))
     asyncio.create_task(birthday_scheduler(bot))
-    asyncio.create_task(daily_activity_gift_scheduler(bot))
     asyncio.create_task(admin_pin_reminder_scheduler(bot))
     asyncio.create_task(inactive_cleanup_reminder_scheduler(bot))
     asyncio.create_task(biyearly_global_unban_scheduler(bot))
@@ -568,7 +511,7 @@ async def keep_alive_self_ping():
                     logging.info(f"Keep-Alive ping /health: {resp.status}")
                 async with session.get(root_url, timeout=ClientTimeout(total=10)) as resp:
                     logging.info(f"Keep-Alive ping /: {resp.status}")
-        except Exception as e:
+        except Exception:
             if local_port:
                 try:
                     async with aiohttp.ClientSession() as session:
