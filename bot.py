@@ -307,7 +307,7 @@ async def biyearly_global_unban_scheduler(bot: Bot):
             logging.error(f"Bi-yearly global unban scheduler xatosi: {e}")
 
 async def daily_kassa_report_scheduler(bot: Bot):
-    """Har kuni soat 09:00 (O'zbekiston / Namangan vaqti) da adminlarga 2 ta alohida xabar yuboradi:
+    """Har kuni soat 19:00 (O'zbekiston / Namangan vaqti) da adminlarga 2 ta alohida xabar yuboradi:
        1) Yangi foydalanuvchilar hisoboti
        2) Kassa hisoboti (ostida Kassani 0 ga tenglash tugmasi bilan)
     """
@@ -320,7 +320,7 @@ async def daily_kassa_report_scheduler(bot: Bot):
         await asyncio.sleep(60) # Har 1 daqiqada tekshirish
         try:
             now = datetime.now(uzb_tz)
-            if now.hour == 9:
+            if now.hour == 19 and now.minute == 0:
                 today_str = now.strftime("%Y-%m-%d")
                 last_sent = await db_req.get_setting("last_daily_kassa_report_date")
                 
@@ -331,7 +331,7 @@ async def daily_kassa_report_scheduler(bot: Bot):
                     kassa_total = await db_req.get_kassa_total()
                     
                     msg1 = (
-                        f"📊 <b>KUNLIK YANGI FOYDALANUVCHILAR HISOBOTI (09:00):</b>\n\n"
+                        f"📊 <b>KUNLIK YANGI FOYDALANUVCHILAR HISOBOTI (19:00):</b>\n\n"
                         f"📥 Bugun botga <b>{new_users} ta</b> yangi foydalanuvchi qo'shildi!"
                     )
                     
@@ -340,7 +340,7 @@ async def daily_kassa_report_scheduler(bot: Bot):
                     ]])
                     
                     msg2 = (
-                        f"💰 <b>KUNLIK KASSA HISOBOTI (09:00):</b>\n\n"
+                        f"💰 <b>KUNLIK KASSA HISOBOTI (19:00):</b>\n\n"
                         f"💵 <b>Hozirgi Kassa Balansi:</b> <code>{kassa_total:,} UZS</code>\n\n"
                         f"<i>Kassani 0 ga tenglash uchun quyidagi tugmani bosing:</i>"
                     )
