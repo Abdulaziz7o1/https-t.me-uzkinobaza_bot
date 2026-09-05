@@ -79,6 +79,10 @@ def get_admin_menu():
             [
                 KeyboardButton(text="Treyler Post Yuborish 🎬"),
                 KeyboardButton(text="🗑 Savat (3 kunlik)")
+            ],
+            [
+                KeyboardButton(text="👥 Barcha Foydalanuvchilar"),
+                KeyboardButton(text="🔍 Foydalanuvchi Qidirish")
             ]
         ],
         resize_keyboard=True

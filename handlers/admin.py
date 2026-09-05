@@ -405,7 +405,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)']
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish']
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -4122,6 +4122,112 @@ async def perm_delete_from_trash_cb(callback: CallbackQuery):
         parse_mode='HTML'
     )
     await callback.answer(f"Kino /{m_id} butunlay o'chirildi!", show_alert=True)
+
+
+@router.message(F.text == '🔍 Foydalanuvchi Qidirish')
+async def trigger_user_search_button(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'add_movie')):
+        await message.answer(with_footer("❌ Bu amal faqat administratorlar uchun ruxsat etilgan!"))
+        return
+    await state.set_state(AdminStates.waiting_for_user_search)
+    txt = (
+        "🔍 <b>FOYDALANUVCHINI QIDIRISH:</b>\n\n"
+        "Foydalanuvchining <b>Telegram ID raqami</b> yoki <b>@username</b>ini kiriting:\n"
+        "<i>Masalan: <code>7140599182</code> yoki <code>@username</code></i>\n\n"
+        "Bekor qilish uchun: /cancel"
+    )
+    await message.answer(with_footer(txt), parse_mode='HTML')
+
+
+@router.message(F.text == '👥 Barcha Foydalanuvchilar')
+async def show_all_users_list_handler(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
+        await message.answer(with_footer("❌ Bu amal faqat administratorlar uchun ruxsat etilgan!"))
+        return
+    await render_users_page(message, page=1, is_edit=False)
+
+
+async def render_users_page(target_msg_obj, page: int = 1, is_edit: bool = False):
+    per_page = 20
+    offset = (page - 1) * per_page
+    users_list, total_count = await db_req.get_all_users_basic_list(limit=per_page, offset=offset)
+
+    if not users_list:
+        txt = "👥 <b>Botda hali foydalanuvchilar ro'yxatdan o'tmagan.</b>"
+        if is_edit:
+            await target_msg_obj.edit_text(with_footer(txt), parse_mode='HTML')
+        else:
+            await target_msg_obj.answer(with_footer(txt), parse_mode='HTML')
+        return
+
+    import math
+    total_pages = max(1, math.ceil(total_count / per_page))
+
+    lines = [
+        f"👥 <b>BOTGA KIRGAN BARCHA FOYDALANUVCHILAR:</b>\n",
+        f"📊 <b>Jami a'zolar:</b> <code>{total_count:,} ta</code>",
+        f"📄 <b>Sahifa:</b> <code>{page}/{total_pages}</code>\n",
+        "────────────────────────"
+    ]
+
+    for idx, (u_id, username, full_name, c_at) in enumerate(users_list, start=offset + 1):
+        uname_str = f"@{username}" if username else "—"
+        name_str = (full_name[:25] if full_name else "Nomsiz").replace("<", "&lt;").replace(">", "&gt;")
+        date_str = str(c_at)[:10] if c_at else ""
+        lines.append(
+            f"{idx}. <b>ID:</b> <code>{u_id}</code>\n"
+            f"   👤 <b>Name:</b> {name_str}\n"
+            f"   🔗 <b>User:</b> {uname_str} | 📅 {date_str}\n"
+        )
+
+    full_text = "\n".join(lines)
+
+    # Pagination buttons
+    kb_row = []
+    if page > 1:
+        kb_row.append(InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"users_page_{page - 1}"))
+    if page < total_pages:
+        kb_row.append(InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"users_page_{page + 1}"))
+
+    extra_row = [InlineKeyboardButton(text="🔍 Qidirish (ID/@username)", callback_data="users_btn_search")]
+
+    kb = InlineKeyboardMarkup(inline_keyboard=([kb_row] if kb_row else []) + [extra_row])
+
+    if is_edit:
+        try:
+            await target_msg_obj.edit_text(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+        except Exception:
+            pass
+    else:
+        await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith('users_page_'))
+async def users_page_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'view_stats')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    page = int(callback.data.split('_')[-1])
+    await render_users_page(callback.message, page=page, is_edit=True)
+    await callback.answer()
+
+
+@router.callback_query(F.data == 'users_btn_search')
+async def users_btn_search_cb(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'add_movie')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await state.set_state(AdminStates.waiting_for_user_search)
+    txt = (
+        "🔍 <b>FOYDALANUVCHINI QIDIRISH:</b>\n\n"
+        "Foydalanuvchining <b>Telegram ID raqami</b> yoki <b>@username</b>ini kiriting:\n"
+        "<i>Masalan: <code>7140599182</code> yoki <code>@username</code></i>\n\n"
+        "Bekor qilish uchun: /cancel"
+    )
+    await callback.message.answer(with_footer(txt), parse_mode='HTML')
+    await callback.answer()
 
 
 @router.callback_query(F.data == 'admin_menu')

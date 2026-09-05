@@ -2544,6 +2544,21 @@ async def search_user_by_query(query: str):
             ) as cursor:
                 return await cursor.fetchone()
 
+async def get_all_users_basic_list(limit: int = 50, offset: int = 0):
+    """Barcha botga kirgan foydalanuvchilarning id, username va name (full_name) ma'lumotlarini olish"""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT id, username, full_name, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            
+        async with db.execute("SELECT COUNT(*) FROM users") as count_cursor:
+            c_row = await count_cursor.fetchone()
+            total_count = c_row[0] if c_row else len(rows)
+            
+        return rows, total_count
+
 async def add_points_to_user(user_id: int, delta: int) -> int:
     """Foydalanuvchiga ball qo'shish yoki ayirish, yangi ballarni qaytarish"""
     async with get_db() as db:
