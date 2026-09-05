@@ -106,8 +106,8 @@ async def update_user_activity(user_id: int):
                     client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=3000, tls=True, tlsAllowInvalidCertificates=True)
                     await client["kino_bot_database"]["users"].update_one(
                         {"_id": int(user_id)},
-                        {"$set": {"last_active_at": now_str}},
-                        upsert=False
+                        {"$set": {"last_active_at": now_str, "id": int(user_id)}},
+                        upsert=True
                     )
                 except Exception:
                     pass
@@ -785,144 +785,150 @@ async def sync_master_backup_to_mongodb(master_data: dict):
         print(f"MongoDB Cloud sync error: {e}")
 
 async def restore_from_mongodb_cloud() -> bool:
-    """MongoDB Cloud'dan (movies kolleksiyasi va master_backups hujjatidan) kinolarni 100% tiklash"""
+    """MongoDB Cloud'dan (movies, users, sponsor_channels, settings va master_backups) 100% tiklash (3 marta qayta urinish bilan)"""
     mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
     if not mongo_uri:
         return False
-    restored = False
-    try:
-        from motor.motor_asyncio import AsyncIOMotorClient
-        client = AsyncIOMotorClient(
-            mongo_uri,
-            serverSelectionTimeoutMS=5000,
-            tls=True,
-            tlsAllowInvalidCertificates=True
-        )
-        db = client["kino_bot_database"]
-        
-        # 1. Avval master_backups yagona hujjatini tiklash
+    
+    for attempt in range(1, 4):
+        restored = False
         try:
-            collection = db["master_backups"]
-            doc = await collection.find_one({"_id": "latest_master_backup"})
-            if doc and "data" in doc:
-                import json
-                master_json = json.dumps(doc["data"], ensure_ascii=False)
-                res = await import_master_backup_json(master_json)
-                print(f"MongoDB Cloud (Master): Bulutdan barcha ma'lumotlar tiklandi: {res}")
-                restored = True
-        except Exception as e:
-            print(f"MongoDB Cloud master restore error: {e}")
+            from motor.motor_asyncio import AsyncIOMotorClient
+            client = AsyncIOMotorClient(
+                mongo_uri,
+                serverSelectionTimeoutMS=8000,
+                tls=True,
+                tlsAllowInvalidCertificates=True
+            )
+            db = client["kino_bot_database"]
+            
+            # 1. Avval master_backups yagona hujjatini tiklash
+            try:
+                collection = db["master_backups"]
+                doc = await collection.find_one({"_id": "latest_master_backup"})
+                if doc and "data" in doc:
+                    import json
+                    master_json = json.dumps(doc["data"], ensure_ascii=False)
+                    res = await import_master_backup_json(master_json)
+                    print(f"MongoDB Cloud (Master): Bulutdan barcha ma'lumotlar tiklandi: {res}")
+                    restored = True
+            except Exception as e:
+                print(f"MongoDB Cloud master restore error: {e}")
 
-        # 2. Har bir kinoni 'movies' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
-        try:
-            movies_coll = db["movies"]
-            m_count = 0
-            async with get_db() as local_db:
-                async for m_doc in movies_coll.find({}):
-                    m_id = m_doc.get("_id") or m_doc.get("id")
-                    f_id = m_doc.get("file_id")
-                    cap = m_doc.get("caption", "")
-                    views = m_doc.get("views_count", 0)
-                    is_prem = m_doc.get("is_premium_only", 0)
-                    if m_id and f_id:
-                        await local_db.execute(
-                            "INSERT INTO movies (id, file_id, caption, views_count, is_premium_only) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET file_id=?, caption=?, views_count=?, is_premium_only=?",
-                            (m_id, f_id, cap, views, is_prem, f_id, cap, views, is_prem)
-                        )
-                        m_count += 1
-                await local_db.commit()
-            if m_count > 0:
-                print(f"MongoDB Cloud (Movies Collection): {m_count} ta kino to'g'ridan-to'g'ri bulutdan tiklandi! ☁️🎬")
-                restored = True
-        except Exception as e:
-            print(f"MongoDB Cloud movies collection restore error: {e}")
-
-        # 3. Homiy kanallarni 'sponsor_channels' kolleksiyasidan to'g'ridan-to'g'ri tiklash
-        try:
-            sponsors_coll = db["sponsor_channels"]
-            sp_count = 0
-            async with get_db() as local_db:
-                async for s_doc in sponsors_coll.find({}):
-                    ch_id = s_doc.get("channel_id")
-                    ch_name = s_doc.get("channel_name", str(ch_id))
-                    if ch_id:
-                        await local_db.execute(
-                            "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
-                            (ch_id, ch_name)
-                        )
-                        sp_count += 1
-                await local_db.commit()
-            if sp_count > 0:
-                print(f"MongoDB Cloud (Sponsors Collection): {sp_count} ta homiy kanal tiklandi! 📢")
-                restored = True
-        except Exception as e:
-            print(f"MongoDB Cloud sponsor_channels restore error: {e}")
-
-        # 4. Karta va sozlamalarni 'settings' kolleksiyasidan to'g'ridan-to'g'ri tiklash
-        try:
-            settings_coll = db["settings"]
-            st_count = 0
-            async with get_db() as local_db:
-                async for st_doc in settings_coll.find({}):
-                    k = st_doc.get("key") or st_doc.get("_id")
-                    v = st_doc.get("value", "")
-                    if k:
-                        await local_db.execute(
-                            "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)",
-                            (str(k), str(v))
-                        )
-                        st_count += 1
-                await local_db.commit()
-            if st_count > 0:
-                print(f"MongoDB Cloud (Settings Collection): {st_count} ta sozlama va karta tiklandi! 💳⚙️")
-                restored = True
-        except Exception as e:
-            print(f"MongoDB Cloud settings restore error: {e}")
-
-        # 5. Foydalanuvchilarni 'users' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
-        try:
-            users_coll = db["users"]
-            u_count = 0
-            async with get_db() as local_db:
-                async for u_doc in users_coll.find({}):
-                    u_id = u_doc.get("_id") or u_doc.get("id")
-                    if u_id:
-                        u_role = 'admin' if int(u_id) == 7140599182 else u_doc.get("role", "member")
-                        await local_db.execute(
-                            """INSERT INTO users (id, username, full_name, role, status, points, referrals_count, created_at, last_active_at, premium_until)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                               ON CONFLICT(id) DO UPDATE SET
-                               username=COALESCE(excluded.username, users.username),
-                               full_name=COALESCE(excluded.full_name, users.full_name),
-                               role=CASE WHEN users.id = 7140599182 THEN 'admin' ELSE COALESCE(excluded.role, users.role) END,
-                               status=COALESCE(excluded.status, users.status),
-                               points=COALESCE(excluded.points, users.points),
-                               referrals_count=COALESCE(excluded.referrals_count, users.referrals_count),
-                               last_active_at=COALESCE(excluded.last_active_at, users.last_active_at),
-                               premium_until=COALESCE(excluded.premium_until, users.premium_until)""",
-                            (
-                                int(u_id),
-                                u_doc.get("username"),
-                                u_doc.get("full_name"),
-                                u_role,
-                                u_doc.get("status", "active"),
-                                u_doc.get("points", 0),
-                                u_doc.get("referrals_count", 0),
-                                u_doc.get("created_at"),
-                                u_doc.get("last_active_at") or u_doc.get("created_at"),
-                                u_doc.get("premium_until")
+            # 2. Har bir kinoni 'movies' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
+            try:
+                movies_coll = db["movies"]
+                m_count = 0
+                async with get_db() as local_db:
+                    async for m_doc in movies_coll.find({}):
+                        m_id = m_doc.get("_id") or m_doc.get("id")
+                        f_id = m_doc.get("file_id")
+                        cap = m_doc.get("caption", "")
+                        views = m_doc.get("views_count", 0)
+                        is_prem = m_doc.get("is_premium_only", 0)
+                        if m_id and f_id:
+                            await local_db.execute(
+                                "INSERT INTO movies (id, file_id, caption, views_count, is_premium_only) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET file_id=?, caption=?, views_count=?, is_premium_only=?",
+                                (m_id, f_id, cap, views, is_prem, f_id, cap, views, is_prem)
                             )
-                        )
-                        u_count += 1
-                await local_db.commit()
-            if u_count > 0:
-                print(f"MongoDB Cloud (Users Collection): {u_count} ta foydalanuvchi to'g'ridan-to'g'ri bulutdan tiklandi! 👥☁️")
-                restored = True
-        except Exception as e:
-            print(f"MongoDB Cloud users restore error: {e}")
+                            m_count += 1
+                    await local_db.commit()
+                if m_count > 0:
+                    print(f"MongoDB Cloud (Movies Collection): {m_count} ta kino to'g'ridan-to'g'ri bulutdan tiklandi! ☁️🎬")
+                    restored = True
+            except Exception as e:
+                print(f"MongoDB Cloud movies collection restore error: {e}")
 
-    except Exception as e:
-        print(f"MongoDB Cloud connection error: {e}")
+            # 3. Homiy kanallarni 'sponsor_channels' kolleksiyasidan to'g'ridan-to'g'ri tiklash
+            try:
+                sponsors_coll = db["sponsor_channels"]
+                sp_count = 0
+                async with get_db() as local_db:
+                    async for s_doc in sponsors_coll.find({}):
+                        ch_id = s_doc.get("channel_id")
+                        ch_name = s_doc.get("channel_name", str(ch_id))
+                        if ch_id:
+                            await local_db.execute(
+                                "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
+                                (ch_id, ch_name)
+                            )
+                            sp_count += 1
+                    await local_db.commit()
+                if sp_count > 0:
+                    print(f"MongoDB Cloud (Sponsors Collection): {sp_count} ta homiy kanal tiklandi! 📢")
+                    restored = True
+            except Exception as e:
+                print(f"MongoDB Cloud sponsor_channels restore error: {e}")
+
+            # 4. Karta va sozlamalarni 'settings' kolleksiyasidan to'g'ridan-to'g'ri tiklash
+            try:
+                settings_coll = db["settings"]
+                st_count = 0
+                async with get_db() as local_db:
+                    async for st_doc in settings_coll.find({}):
+                        k = st_doc.get("key") or st_doc.get("_id")
+                        v = st_doc.get("value", "")
+                        if k:
+                            await local_db.execute(
+                                "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)",
+                                (str(k), str(v))
+                            )
+                            st_count += 1
+                    await local_db.commit()
+                if st_count > 0:
+                    print(f"MongoDB Cloud (Settings Collection): {st_count} ta sozlama va karta tiklandi! 💳⚙️")
+                    restored = True
+            except Exception as e:
+                print(f"MongoDB Cloud settings restore error: {e}")
+
+            # 5. Foydalanuvchilarni 'users' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
+            try:
+                users_coll = db["users"]
+                u_count = 0
+                async with get_db() as local_db:
+                    async for u_doc in users_coll.find({}):
+                        u_id = u_doc.get("_id") or u_doc.get("id")
+                        if u_id:
+                            u_role = 'admin' if int(u_id) == 7140599182 else u_doc.get("role", "member")
+                            await local_db.execute(
+                                """INSERT INTO users (id, username, full_name, role, status, points, referrals_count, created_at, last_active_at, premium_until)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   ON CONFLICT(id) DO UPDATE SET
+                                   username=COALESCE(excluded.username, users.username),
+                                   full_name=COALESCE(excluded.full_name, users.full_name),
+                                   role=CASE WHEN users.id = 7140599182 THEN 'admin' ELSE COALESCE(excluded.role, users.role) END,
+                                   status=COALESCE(excluded.status, users.status),
+                                   points=COALESCE(excluded.points, users.points),
+                                   referrals_count=COALESCE(excluded.referrals_count, users.referrals_count),
+                                   last_active_at=COALESCE(excluded.last_active_at, users.last_active_at),
+                                   premium_until=COALESCE(excluded.premium_until, users.premium_until)""",
+                                (
+                                    int(u_id),
+                                    u_doc.get("username"),
+                                    u_doc.get("full_name"),
+                                    u_role,
+                                    u_doc.get("status", "active"),
+                                    u_doc.get("points", 0),
+                                    u_doc.get("referrals_count", 0),
+                                    u_doc.get("created_at"),
+                                    u_doc.get("last_active_at") or u_doc.get("created_at"),
+                                    u_doc.get("premium_until")
+                                )
+                            )
+                            u_count += 1
+                    await local_db.commit()
+                if u_count > 0:
+                    print(f"MongoDB Cloud (Users Collection): {u_count} ta foydalanuvchi to'g'ridan-to'g'ri bulutdan tiklandi! 👥☁️")
+                    restored = True
+            except Exception as e:
+                print(f"MongoDB Cloud users restore error: {e}")
+
+            if restored:
+                return True
+        except Exception as e:
+            print(f"MongoDB Cloud connection error (attempt {attempt}/3): {e}")
+            if attempt < 3:
+                await asyncio.sleep(2)
 
     return restored
 
