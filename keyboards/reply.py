@@ -33,7 +33,8 @@ def get_admin_menu():
                 KeyboardButton(text="Referal sozlash 👥")
             ],
             [
-                KeyboardButton(text="Ballar 💎")
+                KeyboardButton(text="Ballar 💎"),
+                KeyboardButton(text="➕ Mannual Premium Qo'shish")
             ],
             [
                 KeyboardButton(text="Shubhali harakatlar 🚨"),
@@ -76,7 +77,6 @@ def get_admin_menu():
                 KeyboardButton(text="📊 Aktivlik Grafigi")
             ],
             [
-                KeyboardButton(text="➕ Mannual Premium Qo'shish"),
                 KeyboardButton(text="Treyler Post Yuborish 🎬")
             ]
         ],
