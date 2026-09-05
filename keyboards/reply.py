@@ -76,7 +76,8 @@ def get_admin_menu():
                 KeyboardButton(text="📊 Aktivlik Grafigi")
             ],
             [
-                KeyboardButton(text="➕ Mannual Premium Qo'shish")
+                KeyboardButton(text="➕ Mannual Premium Qo'shish"),
+                KeyboardButton(text="Treyler Post Yuborish 🎬")
             ]
         ],
         resize_keyboard=True
