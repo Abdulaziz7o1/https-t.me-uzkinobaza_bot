@@ -237,18 +237,24 @@ async def get_movie(movie_id: int, user_id: int = None):
         return None
 
 async def delete_movie(movie_id: int):
-    """Kinoni bazadan va barcha xotira bo'limlaridan yo'q qilish hamda tavsifini qaytarish"""
+    """Kinoni asosiy bazadan o'chirib, 3 kunlik Savatga (deleted_movies) ko'chirish"""
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
     caption = ""
     async with get_db() as db:
-        async with db.execute("SELECT caption FROM movies WHERE id = ?", (movie_id,)) as cursor:
+        async with db.execute("SELECT file_id, caption, views_count, COALESCE(is_premium_only, 0) FROM movies WHERE id = ?", (movie_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 cache.delete(f"movie_{movie_id}")
                 return False, ""
-            caption = row[0] or ""
+            file_id, caption, views_count, is_prem = row[0], row[1] or "", row[2] or 0, row[3] or 0
+
+        # Savat jadvaliga saqlash (3 kunga)
+        await db.execute(
+            "INSERT OR REPLACE INTO deleted_movies (id, file_id, caption, views_count, is_premium_only, deleted_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+            (movie_id, file_id, caption, views_count, is_prem)
+        )
 
         await db.execute("DELETE FROM movies WHERE id = ?", (movie_id,))
         await db.execute("DELETE FROM favorites WHERE movie_id = ?", (movie_id,))
@@ -265,6 +271,49 @@ async def delete_movie(movie_id: int):
         cache.delete(f"movie_{movie_id}")
     await export_master_backup_json()
     return True, caption
+
+async def get_trash_movies():
+    """Savatdagi barcha o'chirilgan kinolarni olish"""
+    async with get_db() as db:
+        async with db.execute("SELECT id, caption, is_premium_only, deleted_at FROM deleted_movies ORDER BY deleted_at DESC") as cursor:
+            return await cursor.fetchall()
+
+async def restore_movie_from_trash(movie_id: int):
+    """Savatdagi kinoni qayta asosiy bazaga tiklash"""
+    from database.connection import cache
+    async with get_db() as db:
+        async with db.execute("SELECT file_id, caption, views_count, is_premium_only FROM deleted_movies WHERE id = ?", (movie_id,)) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return False, "Savatda bunday kino topilmadi."
+            file_id, caption, views_count, is_prem = row[0], row[1], row[2] or 0, row[3] or 0
+
+        # Asosiy movies jadvaliga qaytarish
+        await db.execute(
+            "INSERT OR REPLACE INTO movies (id, file_id, caption, views_count, is_premium_only) VALUES (?, ?, ?, ?, ?)",
+            (movie_id, file_id, caption, views_count, is_prem)
+        )
+        # Savatdan o'chirish
+        await db.execute("DELETE FROM deleted_movies WHERE id = ?", (movie_id,))
+        await db.commit()
+        cache.delete(f"movie_{movie_id}")
+    await export_master_backup_json()
+    return True, caption
+
+async def permanently_delete_from_trash(movie_id: int):
+    """Savatdan butunlay o'chirish"""
+    async with get_db() as db:
+        await db.execute("DELETE FROM deleted_movies WHERE id = ?", (movie_id,))
+        await db.commit()
+    return True
+
+async def cleanup_expired_trash_movies(days: int = 3):
+    """3 kundan oshgan o'chirilgan kinolarni savatdan avtomatik tozalash"""
+    async with get_db() as db:
+        await db.execute(
+            f"DELETE FROM deleted_movies WHERE datetime(deleted_at) < datetime('now', '-{days} days')"
+        )
+        await db.commit()
 
 MASTER_BACKUP_FILE = "master_bot_backup.json"
 

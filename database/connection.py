@@ -651,6 +651,18 @@ async def init_db():
         except Exception:
             pass
 
+        # 🗑 Savat (Trash / Recycle Bin) jadvali (3 kunlik saqlash)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS deleted_movies (
+                id INTEGER PRIMARY KEY,
+                file_id TEXT NOT NULL,
+                caption TEXT,
+                views_count INTEGER DEFAULT 0,
+                is_premium_only INTEGER DEFAULT 0,
+                deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         await db.commit()
 
 

@@ -77,7 +77,8 @@ def get_admin_menu():
                 KeyboardButton(text="📊 Aktivlik Grafigi")
             ],
             [
-                KeyboardButton(text="Treyler Post Yuborish 🎬")
+                KeyboardButton(text="Treyler Post Yuborish 🎬"),
+                KeyboardButton(text="🗑 Savat (3 kunlik)")
             ]
         ],
         resize_keyboard=True

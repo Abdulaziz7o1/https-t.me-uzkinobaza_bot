@@ -405,7 +405,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬']
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)']
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -502,10 +502,17 @@ async def direct_delete_command_handler(message: Message, state: FSMContext):
         if deleted_flag:
             total_movies = await db_req.get_total_movies_count()
             name_str = m_cap[:50] if m_cap else '(Nomsiz kino)'
-            await message.answer(with_footer(f"🗑️ <b>KINO BAZADAN O'CHIRILDI!</b>\n\n🎬 <b>O'chirilgan Kino kodi:</b> <code>{movie_id}</code>\n📌 <b>O'chirilgan Kino nomi:</b> <i>{name_str}</i>\n📊 <b>Bazada qolgan jami kinolar:</b> <code>{total_movies} ta</code>\n☁️ <i>O'chirish SQLite hamda MongoDB Atlas Cloud bulutingizdan to'liq amamalga oshirildi!</i>"), parse_mode='HTML')
+            txt = (
+                f"🗑️ <b>KINO O'CHIRILDI VA SAVATGA KO'CHIRILDI!</b>\n\n"
+                f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+                f"📌 <b>Nomi:</b> <i>{name_str}</i>\n"
+                f"📊 <b>Bazada qolgan kinolar:</b> <code>{total_movies} ta</code>\n\n"
+                f"⏳ <i>Kino <b>3 kun davomida «🗑 Savat»</b>da saqlanadi. Xohlasangiz uni 3 kun ichida qayta tiklashingiz mumkin!</i>"
+            )
+            await message.answer(with_footer(txt), parse_mode='HTML')
             await sync_movies_backup_storage(message.bot)
         else:
-            await message.answer(with_footer(f"❌ <b>Bunday kodli kino bazada mavjud emas: {movie_id}</b>\n\n<i>Kino ilgari o'chirilgan yoki bazaga qo'shilmadi.</i>"), parse_mode='HTML')
+            await message.answer(with_footer(f"❌ <b>Bunday kodli kino bazada mavjud emas: {movie_id}</b>\n\n<i>Kino allaqachon o'chirilgan yoki bazada mavjud emas.</i>"), parse_mode='HTML')
 
 @router.message(F.text.regexp("(?i).*(kino o'chirish|delete movie).*"))
 async def delete_movie_start(message: Message, state: FSMContext):
@@ -535,10 +542,17 @@ async def delete_movie_exec(message: Message, state: FSMContext):
         if deleted_flag:
             total_movies = await db_req.get_total_movies_count()
             name_str = m_cap[:50] if m_cap else '(Nomsiz kino)'
-            await message.answer(with_footer(f"🗑️ <b>KINO BAZADAN O'CHIRILDI!</b>\n\n🎬 <b>O'chirilgan Kino kodi:</b> <code>{movie_id}</code>\n📌 <b>O'chirilgan Kino nomi:</b> <i>{name_str}</i>\n📊 <b>Bazada qolgan jami kinolar:</b> <code>{total_movies} ta</code>\n☁️ <i>O'chirish SQLite hamda MongoDB Atlas Cloud bulutingizdan to'liq amalga oshirildi!</i>"), parse_mode='HTML')
+            txt = (
+                f"🗑️ <b>KINO O'CHIRILDI VA SAVATGA KO'CHIRILDI!</b>\n\n"
+                f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
+                f"📌 <b>Nomi:</b> <i>{name_str}</i>\n"
+                f"📊 <b>Bazada qolgan kinolar:</b> <code>{total_movies} ta</code>\n\n"
+                f"⏳ <i>Kino <b>3 kun davomida «🗑 Savat»</b>da saqlanadi. Xohlasangiz uni 3 kun ichida yana qayta tiklashingiz mumkin!</i>"
+            )
+            await message.answer(with_footer(txt), parse_mode='HTML')
             await sync_movies_backup_storage(message.bot)
         else:
-            await message.answer(with_footer(f"❌ <b>Bunday kodli kino bazada mavjud emas: {movie_id}</b>\n\n<i>Kino ilgari o'chirilgan yoki bazaga qo'shilmadi.</i>"), parse_mode='HTML')
+            await message.answer(with_footer(f"❌ <b>Bunday kodli kino bazada mavjud emas: {movie_id}</b>\n\n<i>Kino allaqachon o'chirilgan yoki bazada mavjud emas.</i>"), parse_mode='HTML')
 
 @router.message(F.text.regexp('(?i).*(kino trendlari|trending movies).*'))
 async def show_trending_movies(message: Message, state: FSMContext):
@@ -4028,6 +4042,86 @@ async def trailer_broadcast_confirm_cb(callback: CallbackQuery, state: FSMContex
         f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{ch_report_str}"
     )
     await callback.message.answer(with_footer(summary_txt), parse_mode='HTML')
+
+
+@router.message(F.text == '🗑 Savat (3 kunlik)')
+async def show_trash_panel(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'delete_movie')):
+        await message.answer(with_footer("❌ Bu amal faqat Bosh Admin yoki ruxsat berilgan moderatorlar uchun!"))
+        return
+
+    # Muddati 3 kundan oshganlarni tozalab yuborish
+    await db_req.cleanup_expired_trash_movies(days=3)
+
+    trash_list = await db_req.get_trash_movies()
+    if not trash_list:
+        txt = (
+            "🗑 <b>XAVFSIZ O'CHIRISH SAVATI BO'SH:</b>\n\n"
+            "Hozirda savatda hech qanday o'chirilgan kino mavjud emas. ✅\n\n"
+            "💡 <i>Eslatma: Agar kino bazadan o'chirilsa, u darhol butunlay yo'qolmaydi, "
+            "balki 3 kun davomida ushbu Savatda saqlanadi va xohlagan paytda 1 ta tugma bilan qayta tiklash mumkin bo'ladi!</i>"
+        )
+        await message.answer(with_footer(txt), parse_mode='HTML')
+        return
+
+    txt = (
+        f"🗑 <b>XAVFSIZ O'CHIRISH SAVATI ({len(trash_list)} ta kino):</b>\n\n"
+        f"⏳ <i>Ushbu kinolar 3 kundan so'ng avtomatik butunlay tozalanadi. "
+        f"Kerakli kinoni qayta tiklashingiz yoki hoziroq butunlay yo'q qilishingiz mumkin:</i>\n"
+    )
+    await message.answer(with_footer(txt), parse_mode='HTML')
+
+    for m_id, caption, is_prem, del_time in trash_list[:25]:
+        name = caption[:40] if caption else "(Nomsiz kino)"
+        prem_badge = " [👑 VIP]" if is_prem else ""
+        item_text = (
+            f"🎬 <b>Kino kodi:</b> /{m_id}{prem_badge}\n"
+            f"📌 <b>Nomi:</b> <i>{name}</i>\n"
+            f"🕒 <b>O'chirilgan vaqt:</b> <code>{del_time}</code>"
+        )
+        item_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="♻️ Qayta Tiklash", callback_data=f"trash_restore_{m_id}"),
+                InlineKeyboardButton(text="❌ Butunlay Yo'q Qilish", callback_data=f"trash_perm_{m_id}")
+            ]
+        ])
+        await message.answer(with_footer(item_text), parse_mode='HTML', reply_markup=item_kb)
+
+
+@router.callback_query(F.data.startswith('trash_restore_'))
+async def restore_from_trash_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'delete_movie')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+
+    m_id = int(callback.data.split('_')[-1])
+    success, caption = await db_req.restore_movie_from_trash(m_id)
+    if success:
+        total = await db_req.get_total_movies_count()
+        name = caption[:40] if caption else f"Kino {m_id}"
+        await callback.message.edit_text(
+            with_footer(f"✅ <b>/{m_id} — {name}</b> kinosi Savatdan muvaffaqiyatli <b>ASOSIY BAZAGA TIKLANDI!</b> 🍿\n\n📊 Bazadagi jami kinolar: <b>{total} ta</b>"),
+            parse_mode='HTML'
+        )
+        await callback.answer(f"Kino /{m_id} tiklandi! ✅", show_alert=True)
+    else:
+        await callback.answer("❌ Tiklashda xatolik yuz berdi yoki kino topilmadi.", show_alert=True)
+
+
+@router.callback_query(F.data.startswith('trash_perm_'))
+async def perm_delete_from_trash_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'delete_movie')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+
+    m_id = int(callback.data.split('_')[-1])
+    await db_req.permanently_delete_from_trash(m_id)
+    await callback.message.edit_text(
+        with_footer(f"🗑 <b>/{m_id}</b> kodi bo'yicha kino Savatdan ham <b>BUTUNLAY O'CHIRILDI!</b> ❌"),
+        parse_mode='HTML'
+    )
+    await callback.answer(f"Kino /{m_id} butunlay o'chirildi!", show_alert=True)
 
 
 @router.callback_query(F.data == 'admin_menu')

@@ -356,20 +356,15 @@ async def daily_kassa_report_scheduler(bot: Bot):
         except Exception as e:
             logging.error(f"Daily Kassa Report scheduler xatosi: {e}")
 
-async def auto_expire_movies_scheduler(bot: Bot):
-    """Har kuni soat 03:00 da ko'rsatish muddati tugagan kinolarni avtomatik yashiradi"""
+async def trash_cleanup_scheduler(bot: Bot):
+    """Har 6 soatda Savatdagi 3 kundan oshgan o'chirilgan kinolarni avtomatik tozalaydi"""
     import database.requests as db_req
-    
     while True:
-        await asyncio.sleep(3600)
+        await asyncio.sleep(21600)  # Har 6 soatda
         try:
-            now = config.get_uzb_now()
-            if now.hour == 3:
-                expired_cnt = await db_req.auto_expire_movies()
-                if expired_cnt > 0:
-                    logging.info(f"Muddati o'tgan {expired_cnt} ta kino avtomatik yashirildi.")
+            await db_req.cleanup_expired_trash_movies(days=3)
         except Exception as e:
-            logging.error(f"Auto Expire Movies scheduler xatosi: {e}")
+            logging.error(f"Trash cleanup scheduler xatosi: {e}")
 
 async def periodic_mongodb_sync(bot: Bot):
     """Har 5 daqiqada barcha kinolar va bazani MongoDB Atlas bulutga sinxronlaydi"""
@@ -437,6 +432,7 @@ async def on_startup(bot: Bot):
     asyncio.create_task(inactive_cleanup_reminder_scheduler(bot))
     asyncio.create_task(biyearly_global_unban_scheduler(bot))
     asyncio.create_task(daily_kassa_report_scheduler(bot))
+    asyncio.create_task(trash_cleanup_scheduler(bot))
     
     # MongoDB hamda Telegram Cloud Bulutidan barcha kinolarni 100% tiklash (restart da)
     try:
