@@ -209,7 +209,8 @@ async def cmd_start(message: Message, state: FSMContext):
             avg_rating, votes = await db_req.get_movie_rating(movie_id)
             is_fav = await db_req.is_favorite(user_id, movie_id)
             rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
-            cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
+            access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+            cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
             if views_count:
                 cap += f'\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
             if avg_rating > 0:
@@ -339,7 +340,8 @@ async def search_movie_by_code(message: Message):
         likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
         rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
         prem_badge = " [👑 VIP]" if is_prem_only else ""
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
+        access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
@@ -960,11 +962,11 @@ async def random_movie(message: Message, state: FSMContext):
     movie = await db_req.get_movie(random_id, user_id=user_id)
     if movie:
         await db_req.add_to_watch_history(user_id, random_id)
-        file_id, caption, *rest = movie
-        views_count = rest[0] if rest else 1
+        file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
         avg_rating, votes = await db_req.get_movie_rating(random_id)
         is_fav = await db_req.is_favorite(user_id, random_id)
-        cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{random_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta'
+        access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{random_id}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz)'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
@@ -1727,7 +1729,8 @@ async def show_movie_callback(callback: CallbackQuery):
         is_fav = await db_req.is_favorite(user_id, movie_id)
         likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
         prem_badge = " [👑 VIP]" if is_prem_only else ""
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
+        access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
         if avg_rating > 0:
             rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
@@ -1855,13 +1858,14 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
     inline_match = re.match('^@\\w+\\s+(\\d+)$', query)
     if inline_match:
         movie_id = int(inline_match.group(1))
-        movie = await db_req.get_movie(movie_id)
+        movie = await db_req.get_movie(movie_id, user_id=message.from_user.id)
         if movie:
-            file_id, caption = movie
+            file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
             avg_rating, votes = await db_req.get_movie_rating(movie_id)
             is_fav = await db_req.is_favorite(message.from_user.id, movie_id)
             rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
-            cap = f'{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿'
+            access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+            cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿"
             if avg_rating > 0:
                 cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
             cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
