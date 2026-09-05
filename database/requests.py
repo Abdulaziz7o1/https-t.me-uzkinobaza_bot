@@ -5,6 +5,36 @@ import logging
 from database.connection import get_db
 import config
 
+DEFAULT_MONGO_URI = "mongodb+srv://abdulaziz10102013abdz_db_user:Abdulaziz1010201300@uzkinobazabot.ychyfp5.mongodb.net/?appName=uzkinobazabot"
+
+async def sync_user_to_mongodb(user_id: int, username: str = None, full_name: str = None, role: str = 'member', status: str = 'active', points: int = 0, referrals_count: int = 0, created_at: str = None, last_active_at: str = None, premium_until: str = None):
+    """MongoDB Atlas bulut bazasiga foydalanuvchini alohida 'users' kolleksiyasiga muhrlash (Render restartda 100% tiklanish uchun)"""
+    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
+    if not mongo_uri:
+        return
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+        client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=4000, tls=True, tlsAllowInvalidCertificates=True)
+        db_m = client["kino_bot_database"]
+        users_coll = db_m["users"]
+        u_role = 'admin' if int(user_id) == 7140599182 else role
+        doc = {
+            "_id": int(user_id),
+            "id": int(user_id),
+            "username": username,
+            "full_name": full_name,
+            "role": u_role,
+            "status": status or "active",
+            "points": points or 0,
+            "referrals_count": referrals_count or 0,
+            "created_at": created_at,
+            "last_active_at": last_active_at,
+            "premium_until": premium_until
+        }
+        await users_coll.replace_one({"_id": int(user_id)}, doc, upsert=True)
+    except Exception:
+        pass
+
 async def add_user(user_id: int, username: str, full_name: str, referred_by: int = None):
     """Foydalanuvchini bazaga qo'shish, rolini tekshirish va referalni bog'lash"""
     role = 'admin' if user_id in config.ADMINS else 'member'
@@ -45,6 +75,21 @@ async def add_user(user_id: int, username: str, full_name: str, referred_by: int
             await db.execute("UPDATE users SET role = 'member' WHERE id = ? AND role = 'admin'", (user_id,))
         await db.commit()
 
+    # MongoDB Atlas bulutiga zudlik bilan avtomatik saqlash (foydalanuvchi hech qachon yo'qolmasligi uchun)
+    try:
+        user_role = 'admin' if user_id == 7140599182 else role
+        asyncio.create_task(sync_user_to_mongodb(
+            user_id=user_id,
+            username=username,
+            full_name=full_name,
+            role=user_role,
+            status='active',
+            created_at=now_str,
+            last_active_at=now_str
+        ))
+    except Exception:
+        pass
+
 async def update_user_activity(user_id: int):
     """Foydalanuvchining faollik vaqtini yangilash"""
     from datetime import datetime
@@ -52,6 +97,23 @@ async def update_user_activity(user_id: int):
     async with get_db() as db:
         await db.execute("UPDATE users SET last_active_at = ? WHERE id = ?", (now_str, user_id))
         await db.commit()
+    try:
+        mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
+        if mongo_uri:
+            async def _update_mongo_act():
+                try:
+                    from motor.motor_asyncio import AsyncIOMotorClient
+                    client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=3000, tls=True, tlsAllowInvalidCertificates=True)
+                    await client["kino_bot_database"]["users"].update_one(
+                        {"_id": int(user_id)},
+                        {"$set": {"last_active_at": now_str}},
+                        upsert=False
+                    )
+                except Exception:
+                    pass
+            asyncio.create_task(_update_mongo_act())
+    except Exception:
+        pass
 
 async def get_inactive_users_count(months: int = 6) -> int:
     """Nofaol (belgilangan oydan ko'p vaqt kirmagan) foydalanuvchilar sonini hisoblash"""
@@ -484,12 +546,38 @@ async def import_master_backup_json(json_str: str) -> dict:
             if "users" in data:
                 u_cnt = 0
                 for u in data["users"]:
-                    if u.get("id"):
-                        await db.execute(
-                            "INSERT OR REPLACE INTO users (id, username, full_name, role, points, is_blocked, referred_by, created_at, last_active_at, premium_until, daily_movie_count, daily_movie_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            (u["id"], u.get("username"), u.get("full_name"), u.get("role", "member"), u.get("points", 0), u.get("is_blocked", 0), u.get("referred_by"), u.get("created_at"), u.get("last_active_at"), u.get("premium_until"), u.get("daily_movie_count", 0), u.get("daily_movie_date"))
-                        )
-                        u_cnt += 1
+                    u_id = u.get("id")
+                    if u_id:
+                        try:
+                            u_role = 'admin' if int(u_id) == 7140599182 else u.get("role", "member")
+                            await db.execute(
+                                """INSERT INTO users (id, username, full_name, role, status, points, referrals_count, created_at, last_active_at, premium_until)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   ON CONFLICT(id) DO UPDATE SET
+                                   username=COALESCE(excluded.username, users.username),
+                                   full_name=COALESCE(excluded.full_name, users.full_name),
+                                   role=CASE WHEN users.id = 7140599182 THEN 'admin' ELSE COALESCE(excluded.role, users.role) END,
+                                   status=COALESCE(excluded.status, users.status),
+                                   points=COALESCE(excluded.points, users.points),
+                                   referrals_count=COALESCE(excluded.referrals_count, users.referrals_count),
+                                   last_active_at=COALESCE(excluded.last_active_at, users.last_active_at),
+                                   premium_until=COALESCE(excluded.premium_until, users.premium_until)""",
+                                (
+                                    int(u_id),
+                                    u.get("username"),
+                                    u.get("full_name"),
+                                    u_role,
+                                    u.get("status", "active"),
+                                    u.get("points", 0),
+                                    u.get("referrals_count", 0),
+                                    u.get("created_at"),
+                                    u.get("last_active_at") or u.get("created_at"),
+                                    u.get("premium_until")
+                                )
+                            )
+                            u_cnt += 1
+                        except Exception:
+                            pass
                 stats["users"] = u_cnt
 
             # 4. Premium subscriptions
@@ -646,15 +734,53 @@ async def sync_master_backup_to_mongodb(master_data: dict):
                             upsert=True
                         )
 
-        # 4. Master backup yagona hujjatini saqlash
+        # 4. Foydalanuvchilarni alohida 'users' kolleksiyasiga muhrlash (100% yo'qolmaslik kafolati)
+        if "users" in master_data and master_data["users"]:
+            users_coll = db["users"]
+            for u in master_data["users"]:
+                u_id = u.get("id")
+                if u_id:
+                    u_role = 'admin' if int(u_id) == 7140599182 else u.get("role", "member")
+                    await users_coll.replace_one(
+                        {"_id": int(u_id)},
+                        {
+                            "_id": int(u_id),
+                            "id": int(u_id),
+                            "username": u.get("username"),
+                            "full_name": u.get("full_name"),
+                            "role": u_role,
+                            "status": u.get("status", "active"),
+                            "points": u.get("points", 0),
+                            "referrals_count": u.get("referrals_count", 0),
+                            "created_at": u.get("created_at"),
+                            "last_active_at": u.get("last_active_at") or u.get("created_at"),
+                            "premium_until": u.get("premium_until")
+                        },
+                        upsert=True
+                    )
+
+        # 5. Master backup yagona hujjatini saqlash (eskisidagi foydalanuvchilar bilan birlashtirish)
         collection = db["master_backups"]
+        try:
+            existing_doc = await collection.find_one({"_id": "latest_master_backup"})
+            if existing_doc and "data" in existing_doc and "users" in existing_doc["data"]:
+                old_users_map = {u["id"]: u for u in existing_doc["data"]["users"] if isinstance(u, dict) and u.get("id")}
+                current_users_list = master_data.get("users", [])
+                curr_ids = {u["id"] for u in current_users_list if isinstance(u, dict) and u.get("id")}
+                for o_id, o_u in old_users_map.items():
+                    if o_id not in curr_ids:
+                        current_users_list.append(o_u)
+                master_data["users"] = current_users_list
+        except Exception:
+            pass
+
         doc = {
             "_id": "latest_master_backup",
             "data": master_data,
             "updated_at": os.getenv("TZ", "Asia/Tashkent")
         }
         await collection.replace_one({"_id": "latest_master_backup"}, doc, upsert=True)
-        print("MongoDB Cloud: Barcha kinolar, homiy kanallar, karta raqamlari va sozlamalar Bulutli bazaga (MongoDB Atlas) 100% saqlandi! ☁️🚀")
+        print("MongoDB Cloud: Barcha kinolar, homiy kanallar, karta raqamlari, sozlamalar va FOYDALANUVCHILAR Bulutli bazaga (MongoDB Atlas) 100% saqlandi! ☁️👥🚀")
     except Exception as e:
         print(f"MongoDB Cloud sync error: {e}")
 
@@ -752,6 +878,48 @@ async def restore_from_mongodb_cloud() -> bool:
                 restored = True
         except Exception as e:
             print(f"MongoDB Cloud settings restore error: {e}")
+
+        # 5. Foydalanuvchilarni 'users' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
+        try:
+            users_coll = db["users"]
+            u_count = 0
+            async with get_db() as local_db:
+                async for u_doc in users_coll.find({}):
+                    u_id = u_doc.get("_id") or u_doc.get("id")
+                    if u_id:
+                        u_role = 'admin' if int(u_id) == 7140599182 else u_doc.get("role", "member")
+                        await local_db.execute(
+                            """INSERT INTO users (id, username, full_name, role, status, points, referrals_count, created_at, last_active_at, premium_until)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               ON CONFLICT(id) DO UPDATE SET
+                               username=COALESCE(excluded.username, users.username),
+                               full_name=COALESCE(excluded.full_name, users.full_name),
+                               role=CASE WHEN users.id = 7140599182 THEN 'admin' ELSE COALESCE(excluded.role, users.role) END,
+                               status=COALESCE(excluded.status, users.status),
+                               points=COALESCE(excluded.points, users.points),
+                               referrals_count=COALESCE(excluded.referrals_count, users.referrals_count),
+                               last_active_at=COALESCE(excluded.last_active_at, users.last_active_at),
+                               premium_until=COALESCE(excluded.premium_until, users.premium_until)""",
+                            (
+                                int(u_id),
+                                u_doc.get("username"),
+                                u_doc.get("full_name"),
+                                u_role,
+                                u_doc.get("status", "active"),
+                                u_doc.get("points", 0),
+                                u_doc.get("referrals_count", 0),
+                                u_doc.get("created_at"),
+                                u_doc.get("last_active_at") or u_doc.get("created_at"),
+                                u_doc.get("premium_until")
+                            )
+                        )
+                        u_count += 1
+                await local_db.commit()
+            if u_count > 0:
+                print(f"MongoDB Cloud (Users Collection): {u_count} ta foydalanuvchi to'g'ridan-to'g'ri bulutdan tiklandi! 👥☁️")
+                restored = True
+        except Exception as e:
+            print(f"MongoDB Cloud users restore error: {e}")
 
     except Exception as e:
         print(f"MongoDB Cloud connection error: {e}")

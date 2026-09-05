@@ -91,6 +91,36 @@ async def init_db():
         await db.execute("UPDATE users SET role = 'member' WHERE id != 7140599182")
         await db.execute("INSERT OR IGNORE INTO users (id, username, full_name, role) VALUES (7140599182, 'admin', 'Bosh Admin', 'admin')")
         await db.execute("UPDATE users SET role = 'admin' WHERE id = 7140599182")
+
+        # Container qayta o'rnatilganda (restart/deploy) master_bot_backup.json dan mavjud foydalanuvchilarni darhol yuklash
+        if os.path.exists("master_bot_backup.json"):
+            try:
+                import json
+                with open("master_bot_backup.json", "r", encoding="utf-8") as f:
+                    b_data = json.load(f)
+                if "users" in b_data and isinstance(b_data["users"], list):
+                    for bu in b_data["users"]:
+                        b_id = bu.get("id")
+                        if b_id:
+                            b_role = 'admin' if int(b_id) == 7140599182 else bu.get("role", "member")
+                            await db.execute(
+                                """INSERT OR IGNORE INTO users (id, username, full_name, role, status, points, referrals_count, created_at, last_active_at)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                (
+                                    b_id,
+                                    bu.get("username"),
+                                    bu.get("full_name"),
+                                    b_role,
+                                    bu.get("status", "active"),
+                                    bu.get("points", 0),
+                                    bu.get("referrals_count", 0),
+                                    bu.get("created_at"),
+                                    bu.get("created_at")
+                                )
+                            )
+            except Exception:
+                pass
+
         await db.commit()
         cache.clear()
 
