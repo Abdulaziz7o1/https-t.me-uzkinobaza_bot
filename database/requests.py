@@ -2471,6 +2471,7 @@ async def clean_and_format_caption_async(raw_caption: str) -> str:
     import re, config
     bot_tag = config.BOT_USERNAME if config.BOT_USERNAME.startswith("@") else f"@{config.BOT_USERNAME}"
     
+    clean_bot_name = bot_tag.lstrip('@')
     custom_wm = await get_setting("custom_watermark_text")
     wm_text = custom_wm if custom_wm else f"🎬 <b>{bot_tag} — Eng sara kinolar bazasi 🍿</b>"
 
@@ -2479,6 +2480,10 @@ async def clean_and_format_caption_async(raw_caption: str) -> str:
 
     cleaned = re.sub(r'@(?!uzkinobaza_bot\b)[a-zA-Z0-9_]{5,}', '', raw_caption)
     cleaned = re.sub(r'https?://t\.me/\S+', '', cleaned).strip()
+    # Takroriy brend sarlavhalarini tozalash
+    cleaned = re.sub(r'🎬\s*<b>?@?' + re.escape(clean_bot_name) + r'[^<\n]*</b>?\s*🍿?', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'🎬\s*@?' + re.escape(clean_bot_name) + r'[^<\n]*🍿?', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'Eng sara kinolar( bazasi)?\s*🍿?', '', cleaned, flags=re.IGNORECASE).strip()
     
     if cleaned:
         return f"{wm_text}\n\n{cleaned}"
@@ -2488,10 +2493,15 @@ def clean_and_format_caption(raw_caption: str) -> str:
     """Begona reklama va havolalarni tozala va @uzkinobaza_bot brendini qo'sh"""
     import re, config
     bot_tag = config.BOT_USERNAME if config.BOT_USERNAME.startswith("@") else f"@{config.BOT_USERNAME}"
+    clean_bot_name = bot_tag.lstrip('@')
     if not raw_caption:
         return f"🎬 <b>Kino Bot:</b> {bot_tag}"
     cleaned = re.sub(r'@(?!uzkinobaza_bot\b)[a-zA-Z0-9_]{5,}', '', raw_caption)
     cleaned = re.sub(r'https?://t\.me/\S+', '', cleaned).strip()
+    # Takroriy brend sarlavhalarini tozalash
+    cleaned = re.sub(r'🎬\s*<b>?@?' + re.escape(clean_bot_name) + r'[^<\n]*</b>?\s*🍿?', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'🎬\s*@?' + re.escape(clean_bot_name) + r'[^<\n]*🍿?', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'Eng sara kinolar( bazasi)?\s*🍿?', '', cleaned, flags=re.IGNORECASE).strip()
     header = f"🎬 <b>{bot_tag} — Eng sara kinolar 🍿</b>"
     if cleaned:
         return f"{header}\n\n{cleaned}"

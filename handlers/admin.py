@@ -4016,9 +4016,18 @@ async def process_trailer_movie_id(message: Message, state: FSMContext):
     # Deep-link to direct movie
     watch_url = f"https://t.me/{bot_username}?start=kino_{movie_id}"
 
+    # Sarlavhadagi bot brendi takrorlanmasligi uchun caption ichidagi mavjud sarlavhani tozalash
+    import re
+    clean_desc = caption or "🔥 Yangi Premyera Kinoni Tomosha Qiling!"
+    clean_desc = re.sub(r'🎬\s*<b>?@?' + re.escape(bot_username) + r'[^<\n]*</b>?\s*🍿?', '', clean_desc, flags=re.IGNORECASE)
+    clean_desc = re.sub(r'🎬\s*@?' + re.escape(bot_username) + r'[^<\n]*🍿?', '', clean_desc, flags=re.IGNORECASE)
+    clean_desc = re.sub(r'Eng sara kinolar( bazasi)?\s*🍿?', '', clean_desc, flags=re.IGNORECASE).strip()
+    if not clean_desc:
+        clean_desc = "🔥 Yangi Premyera Kinoni Tomosha Qiling!"
+
     post_caption = (
         f"🎬 <b>@{bot_username} — Eng sara kinolar</b> 🍿\n\n"
-        f"{caption or '🔥 Yangi Premyera Kinoni Tomosha Qiling!'}\n\n"
+        f"{clean_desc}\n\n"
         f"🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n"
         f"{access_status}\n"
         f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n"
