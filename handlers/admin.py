@@ -63,6 +63,7 @@ class AdminStates(StatesGroup):
     waiting_for_ticket_reply = State()
     waiting_for_setpin = State()
     waiting_for_user_search = State()
+    waiting_for_user_direct_msg = State()
     waiting_for_inactive_confirm = State()
     waiting_for_card_number = State()
     waiting_for_bonus_limit_value = State()
@@ -2166,6 +2167,54 @@ async def admin_resetbday_callback(callback: CallbackQuery):
         await db.execute('UPDATE users SET birthday = NULL WHERE id = ?', (u_id,))
         await db.commit()
     await callback.answer("Tug'ilgan kuni tozalandi! Endi u qayta kiritishi mumkin. 🎂", show_alert=True)
+
+@router.callback_query(F.data.startswith('admin_sendmsg_'))
+async def admin_sendmsg_callback(callback: CallbackQuery, state: FSMContext):
+    db_admins = await db_req.get_all_admins()
+    if callback.from_user.id not in config.ADMINS and callback.from_user.id not in db_admins:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    u_id = int(callback.data.split('_')[2])
+    await state.set_state(AdminStates.waiting_for_user_direct_msg)
+    await state.update_data(target_user_id=u_id)
+    cancel_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_user_direct_msg")]])
+    await callback.message.answer(
+        with_footer(f"✉️ <b>Foydalanuvchiga to'g'ridan-to'g'ri xabar yuborish:</b>\n\n🆔 <b>Foydalanuvchi ID:</b> <code>{u_id}</code>\n\nFoydalanuvchiga yubormoqchi bo'lgan xabaringizni (matn, rasm, video, audio yoki stiker) yuboring:"),
+        parse_mode="HTML",
+        reply_markup=cancel_kb
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == 'cancel_user_direct_msg')
+async def cancel_user_direct_msg_callback(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(with_footer("❌ Xabar yuborish bekor qilindi."))
+    await callback.answer("Bekor qilindi")
+
+@router.message(AdminStates.waiting_for_user_direct_msg, ~F.text.in_(MENU_BUTTONS))
+async def process_user_direct_msg(message: Message, state: FSMContext):
+    data = await state.get_data()
+    target_user_id = data.get('target_user_id')
+    await state.clear()
+    if not target_user_id:
+        await message.answer(with_footer("❌ Foydalanuvchi aniqlanmadi."))
+        return
+    try:
+        await message.bot.send_message(
+            target_user_id,
+            with_footer("📩 <b>Administratordan xabar:</b>"),
+            parse_mode="HTML"
+        )
+        await message.copy_to(chat_id=target_user_id)
+        await message.answer(
+            with_footer(f"✅ <b>Xabaringiz foydalanuvchiga (ID: <code>{target_user_id}</code>) muvaffaqiyatli yetkazildi!</b>"),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(
+            with_footer(f"❌ <b>Xabar yetkazilmadi!</b>\nFoydalanuvchi botni bloklagan yoki xatolik yuz berdi: <i>{e}</i>"),
+            parse_mode="HTML"
+        )
 
 @router.message(Command('cleanup_inactive'))
 async def cleanup_inactive_cmd(message: Message, state: FSMContext):

@@ -136,7 +136,8 @@ def get_user_manage_keyboard(target_user_id: int) -> InlineKeyboardMarkup:
     builder.button(text="💎 -10 Ball Ayirish", callback_data=f"admin_subpts_{target_user_id}_10")
     builder.button(text="👑 Premium Berish (7 kun)", callback_data=f"admin_premium_{target_user_id}")
     builder.button(text="🎂 Tug'ilgan Kun Reset", callback_data=f"admin_resetbday_{target_user_id}")
-    builder.adjust(2, 2, 1, 1)
+    builder.button(text="✉️ Xabar Yozish", callback_data=f"admin_sendmsg_{target_user_id}")
+    builder.adjust(2, 2, 1, 1, 1)
     return builder.as_markup()
 
 
