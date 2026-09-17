@@ -2211,10 +2211,51 @@ async def process_user_direct_msg(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
     except Exception as e:
-        await message.answer(
-            with_footer(f"❌ <b>Xabar yetkazilmadi!</b>\nFoydalanuvchi botni bloklagan yoki xatolik yuz berdi: <i>{e}</i>"),
-            parse_mode="HTML"
-        )
+        err_str = str(e).lower()
+        if "blocked by the user" in err_str or "bot was blocked" in err_str or "user is deactivated" in err_str:
+            try:
+                async with db_req.get_db() as db:
+                    await db.execute("UPDATE users SET status = 'blocked_bot' WHERE id = ?", (target_user_id,))
+                    await db.commit()
+            except Exception:
+                pass
+            
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"tg://user?id={target_user_id}")],
+                [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
+            ])
+            await message.answer(
+                with_footer(
+                    f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
+                    f"🆔 <b>Foydalanuvchi ID:</b> <code>{target_user_id}</code>\n\n"
+                    f"Ushbu foydalanuvchi o'z Telegramida botni to'xtatib bloklagan (<i>Stop and Block Bot</i>). "
+                    f"Telegram rasmiy qoidasiga binoan, botni bloklagan odamga bot orqali xabar yuborish taqiqlangan.\n\n"
+                    f"💡 <b>YECHIM:</b>\n"
+                    f"1. <b>«👤 Shaxsiy Profiliga O'tish»</b> tugmasini bosib, unga o'zingizning Telegram profilingizdan to'g'ridan-to'g'ri yozishingiz mumkin.\n"
+                    f"2. Yoki bunday botni bloklagan odamni <b>«🗑 Foydalanuvchini Bazadan O'chirish»</b> tugmasi orqali o'chirib yuborishingiz mumkin."
+                ),
+                parse_mode="HTML",
+                reply_markup=kb
+            )
+        else:
+            await message.answer(
+                with_footer(f"❌ <b>Xabar yetkazilmadi!</b>\nXatolik yuz berdi: <i>{e}</i>"),
+                parse_mode="HTML"
+            )
+
+@router.callback_query(F.data.startswith('admin_deluser_'))
+async def admin_deluser_callback(callback: CallbackQuery):
+    db_admins = await db_req.get_all_admins()
+    if callback.from_user.id not in config.ADMINS and callback.from_user.id not in db_admins:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    u_id = int(callback.data.split('_')[2])
+    await db_req.delete_user(u_id)
+    await callback.message.edit_text(
+        with_footer(f"🗑 <b>Foydalanuvchi (ID: <code>{u_id}</code>) bazadan butunlay o'chirildi!</b>"),
+        parse_mode="HTML"
+    )
+    await callback.answer("Foydalanuvchi bazadan o'chirildi")
 
 @router.message(Command('cleanup_inactive'))
 async def cleanup_inactive_cmd(message: Message, state: FSMContext):

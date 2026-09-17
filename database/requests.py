@@ -1181,7 +1181,20 @@ async def delete_user(user_id: int) -> bool:
     async with get_db() as db:
         await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
         await db.commit()
-        return True
+    try:
+        mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
+        if mongo_uri:
+            async def _del_mongo():
+                try:
+                    from motor.motor_asyncio import AsyncIOMotorClient
+                    client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=3000, tls=True, tlsAllowInvalidCertificates=True)
+                    await client["kino_bot_database"]["users"].delete_one({"_id": int(user_id)})
+                except Exception:
+                    pass
+            asyncio.create_task(_del_mongo())
+    except Exception:
+        pass
+    return True
 
 async def get_all_users():
     """Barcha bloklanmagan a'zolar ID ro'yxatini olish"""
