@@ -1153,13 +1153,34 @@ async def get_sponsor_channels() -> list:
         async with db.execute("SELECT id, channel_id, channel_name FROM sponsor_channels") as cursor:
             return await cursor.fetchall()
 
+def normalize_channel_identifier(channel_id):
+    """Kanal havolasini (@username yoki -100... raqamli ID) formatiga to'g'rilash"""
+    if not channel_id:
+        return channel_id
+    if isinstance(channel_id, int):
+        return channel_id
+    s = str(channel_id).strip()
+    if s.startswith("-") and s.lstrip("-").isdigit():
+        return int(s)
+    import re
+    # https://t.me/username yoki t.me/username dan faqat @username ni ajratib olish
+    m = re.search(r'(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.me)/([a-zA-Z0-9_]{4,})/?$', s)
+    if m:
+        return f"@{m.group(1)}"
+    if s.startswith("@"):
+        return s
+    if re.match(r'^[a-zA-Z0-9_]{4,}$', s):
+        return f"@{s}"
+    return s
+
 async def add_sponsor_channel(channel_id: str, channel_name: str = None) -> bool:
     """Yangi hamkor kanal qo'shish va zaxiraga saqlash"""
+    norm_id = str(normalize_channel_identifier(channel_id))
     async with get_db() as db:
         try:
             await db.execute(
                 "INSERT INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
-                (channel_id, channel_name or channel_id)
+                (norm_id, channel_name or norm_id)
             )
             await db.commit()
             await save_sponsor_channels_backup()

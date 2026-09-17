@@ -601,11 +601,12 @@ async def add_channel_name(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    # Agar raqamli ID (-100...) kiritilgan bo'lsa va bot kanalda admin bo'lsa, havolasini olamiz
-    channel_to_save = channel_id
-    if channel_id.startswith("-") and channel_id.lstrip("-").isdigit():
+    # Kanal havolasini (@username yoki -100...) formatiga avtomatik to'g'irlaymiz
+    norm_ch = db_req.normalize_channel_identifier(channel_id)
+    channel_to_save = str(norm_ch)
+    if isinstance(norm_ch, int) or (isinstance(norm_ch, str) and norm_ch.startswith("-") and norm_ch.lstrip("-").isdigit()):
         try:
-            target_chat_id = int(channel_id)
+            target_chat_id = int(norm_ch)
             chat = await message.bot.get_chat(target_chat_id)
             if chat.username:
                 channel_to_save = f"@{chat.username}"
@@ -4110,25 +4111,35 @@ async def trailer_broadcast_confirm_cb(callback: CallbackQuery, state: FSMContex
             all_ch.append(backup_ch)
 
         for ch in all_ch:
-            ch_display = str(ch)
+            target_chat = db_req.normalize_channel_identifier(ch)
+            ch_display = str(target_chat)
             try:
-                chat_info = await bot.get_chat(ch)
-                ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(ch))
+                chat_info = await bot.get_chat(target_chat)
+                ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(target_chat))
             except Exception:
-                pass
+                ch_display = str(target_chat)
 
             try:
                 await bot.send_video(
-                    chat_id=ch,
+                    chat_id=target_chat,
                     video=trailer_file_id,
                     caption=post_caption,
                     reply_markup=post_btn_kb,
                     parse_mode='HTML'
                 )
-                channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli")
-                await asyncio.sleep(0.1)
+                channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli yuborildi 🚀")
+                await asyncio.sleep(0.2)
             except Exception as err:
-                channel_report.append(f"❌ <b>{ch_display}</b> — Yuborilmadi ({err})")
+                err_text = str(err)
+                if "chat not found" in err_text.lower():
+                    tip = "Bot ushbu kanalda admin emas yoki kanal mavjud emas"
+                elif "not enough rights" in err_text.lower() or "administrator rights" in err_text.lower():
+                    tip = "Botga kanalda xabar yozish (Post Messages) ruxsati berilmagan"
+                elif "bot is not a member" in err_text.lower():
+                    tip = "Bot kanalga a'zo yoki admin qilinmagan"
+                else:
+                    tip = err_text
+                channel_report.append(f"❌ <b>{ch_display}</b> — Yuborilmadi ({tip})")
 
     except Exception as e:
         channel_report.append(f"⚠️ Xatolik: {e}")

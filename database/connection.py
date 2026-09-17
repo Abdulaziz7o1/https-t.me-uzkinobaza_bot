@@ -196,6 +196,20 @@ async def init_db():
                 channel_name TEXT
             )
         """)
+        # Homiy kanallarning URL formatini @username ga avtomatik to'g'irlash
+        try:
+            async with db.execute("SELECT id, channel_id FROM sponsor_channels") as c:
+                ch_rows = await c.fetchall()
+            for row_id, raw_ch in ch_rows:
+                if "t.me/" in str(raw_ch):
+                    import re
+                    m = re.search(r'(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.me)/([a-zA-Z0-9_]{4,})/?$', str(raw_ch).strip())
+                    if m:
+                        clean_u = f"@{m.group(1)}"
+                        await db.execute("UPDATE sponsor_channels SET channel_id = ? WHERE id = ?", (clean_u, row_id))
+            await db.commit()
+        except Exception:
+            pass
         
         # Moderator permissions jadvali
         await db.execute("""
