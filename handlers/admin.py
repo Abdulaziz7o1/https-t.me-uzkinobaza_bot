@@ -2044,16 +2044,24 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
         else:
             is_blocked = False
             
+    await callback.answer()
     if is_blocked:
-        await callback.answer(
-            f"❌ HA! Foydalanuvchi botni BLOKLAGAN!\n\n🆔 ID: {u_id}\n📌 Holat: {block_reason}\n🚫 Bot unga xabar yubora olmaydi.",
-            show_alert=True
+        msg_text = (
+            f"🔍 <b>BOT BLOKI TEKSHIRUVI NATIJASI:</b>\n\n"
+            f"🆔 <b>Foydalanuvchi ID:</b> <code>{u_id}</code>\n"
+            f"🚫 <b>Holati:</b> ❌ <b>HA, foydalanuvchi botni BLOKLAGAN!</b>\n"
+            f"📌 <b>Batafsil:</b> <i>{block_reason}</i>\n\n"
+            f"⚠️ <i>Ushbu foydalanuvchiga bot orqali xabar yuborib bo'lmaydi.</i>"
         )
     else:
-        await callback.answer(
-            f"🟢 YO'Q! Foydalanuvchi botni bloklamagan!\n\n🆔 ID: {u_id}\n✅ Holat: Faol (Bot bilan aloqada)\n📩 Unga bemalol xabar yuborish mumkin.",
-            show_alert=True
+        msg_text = (
+            f"🔍 <b>BOT BLOKI TEKSHIRUVI NATIJASI:</b>\n\n"
+            f"🆔 <b>Foydalanuvchi ID:</b> <code>{u_id}</code>\n"
+            f"🟢 <b>Holati:</b> ✅ <b>YO'Q, foydalanuvchi botni bloklamagan!</b>\n"
+            f"⚡ <b>Aloqa:</b> <i>Faol (Bot bilan aloqada)</i>\n\n"
+            f"📩 <i>Ushbu foydalanuvchiga bemalol xabar yoki bildirishnoma yuborish mumkin.</i>"
         )
+    await callback.message.answer(with_footer(msg_text), parse_mode="HTML")
 
 @router.callback_query(F.data.startswith('admin_addpts_'))
 async def admin_addpts_callback(callback: CallbackQuery):
