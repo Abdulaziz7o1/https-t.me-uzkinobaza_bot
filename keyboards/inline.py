@@ -127,7 +127,7 @@ def get_ticket_reply_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_user_manage_keyboard(target_user_id: int) -> InlineKeyboardMarkup:
+def get_user_manage_keyboard(target_user_id: int, username: str = None) -> InlineKeyboardMarkup:
     """Admin foydalanuvchini boshqarish inline tugmalari"""
     builder = InlineKeyboardBuilder()
     builder.button(text="🚫 Bloklash", callback_data=f"admin_ban_{target_user_id}")
@@ -137,7 +137,13 @@ def get_user_manage_keyboard(target_user_id: int) -> InlineKeyboardMarkup:
     builder.button(text="👑 Premium Berish (7 kun)", callback_data=f"admin_premium_{target_user_id}")
     builder.button(text="🎂 Tug'ilgan Kun Reset", callback_data=f"admin_resetbday_{target_user_id}")
     builder.button(text="✉️ Xabar Yozish", callback_data=f"admin_sendmsg_{target_user_id}")
-    builder.adjust(2, 2, 1, 1, 1)
+    clean_username = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
+    if clean_username:
+        profile_url = f"https://t.me/{clean_username}"
+    else:
+        profile_url = f"tg://user?id={target_user_id}"
+    builder.button(text="👤 Profilni Ochish", url=profile_url)
+    builder.adjust(2, 2, 1, 1, 2)
     return builder.as_markup()
 
 

@@ -1982,7 +1982,7 @@ async def process_user_search(message: Message, query: str):
     level_name, level_emoji, _ = db_req.get_user_level(points)
     bday_display = birthday if birthday else 'Kiritilmagan ❌'
     txt = f"👤 <b>FOYDALANUVCHI MA'LUMOTLARI:</b>\n\n🆔 <b>ID:</b> <code>{u_id}</code>\n👤 <b>Ismi / Username:</b> {name_display}\n🎭 <b>Rol:</b> <code>{role}</code> | <b>Holati:</b> <code>{status}</code>\n💎 <b>Ballari:</b> <code>{points}</code> 💎 ({level_emoji} {level_name})\n👥 <b>Referallari:</b> {referrals_count} ta\n🎂 <b>Tug'ilgan kuni:</b> {bday_display}\n📅 <b>Ro'yxatdan o'tgan:</b> {created_at}\n\n<i>Boshqarish uchun tugmalardan foydalaning:</i>"
-    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id))
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username))
 
 @router.callback_query(F.data.startswith('admin_ban_'))
 async def admin_ban_callback(callback: CallbackQuery):
