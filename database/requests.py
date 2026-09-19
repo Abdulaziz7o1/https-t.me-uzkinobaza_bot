@@ -3994,7 +3994,7 @@ async def check_and_notify_movie_added(bot, movie_id: int, caption: str):
                         f"Qidirgan: <i>{sq}</i>\n"
                         f"🎬 Kino kodi: /{movie_id}\n\n"
                         f"Zavqlanib ko'ring! 🎬🍿\n\n"
-                        f"📩 <b>Murojaat uchun:</b> @Abdulaziz7o1",
+                        f"📩 <b>Murojaat uchun:</b> <a href=\"{config.ADMIN_CONTACT_URL}\">ABDULAZIZ</a>",
                         parse_mode="HTML")
                     notified.add(req_id)
                 except Exception:

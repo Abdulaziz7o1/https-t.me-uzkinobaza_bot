@@ -11,7 +11,7 @@ from database import requests as db_req
 from keyboards import inline
 router = Router()
 
-CONTACT_FOOTER = '\n\n📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
+CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
 
 def with_footer(text):
     if text is None:
@@ -103,7 +103,7 @@ async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: 
                 f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
                 f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n\n"
                 f"🤖 {config.BOT_USERNAME}\n"
-                f'📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
+                f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
             )
             await bot.send_video(
                 chat_id=backup_channel,
@@ -4034,7 +4034,7 @@ async def process_trailer_movie_id(message: Message, state: FSMContext):
         f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n"
         f"📥 <b>Yuklashlar:</b> {views_count:,} marta\n\n"
         f"🤖 @{bot_username}\n"
-        f'📩 <b>Murojaat uchun:</b> <a href="https://t.me/Abdulaziz7o1">ABDULAZIZ</a>'
+        f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
     )
 
     data = await state.get_data()

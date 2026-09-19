@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 from dotenv import load_dotenv
 
 # .env faylini yuklash
@@ -27,6 +28,10 @@ if channels_raw:
 # Bot usernamesi (captionlarda ko'rsatish uchun)
 BOT_USERNAME = os.getenv("BOT_USERNAME", "@uzkinobaza_bot")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "@Abdulaziz7o1")
+
+_clean_admin = ADMIN_USERNAME.lstrip('@')
+_auto_contact_text = f"Assalomu alaykum! Men {BOT_USERNAME} yuzasidan murojaat qilmoqchiman."
+ADMIN_CONTACT_URL = f"https://t.me/{_clean_admin}?text={urllib.parse.quote(_auto_contact_text)}"
 
 # Proxy settings (optional - agar Telegram bloklangan bo'lsa)
 # Masalan: PROXY_URL=http://username:password@proxy-server:port
