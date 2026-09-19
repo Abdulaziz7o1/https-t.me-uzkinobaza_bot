@@ -4246,3 +4246,26 @@ def check_anti_scraping_guard(user_id: int) -> bool:
     if len(stamps) > 4:
         return False
     return True
+
+async def set_user_bot_blocked(user_id: int, is_blocked: int = 1):
+    """Foydalanuvchi botni bloklagan yoki qayta faollashtirgan holatini saqlash"""
+    async with get_db() as db:
+        await db.execute("UPDATE users SET is_blocked = ? WHERE id = ?", (is_blocked, user_id))
+        await db.commit()
+
+async def get_blocked_users_list(limit: int = 10, offset: int = 0):
+    """Botni bloklagan foydalanuvchilar ro'yxati va umumiy soni"""
+    async with get_db() as db:
+        async with db.execute("SELECT COUNT(*) FROM users WHERE is_blocked = 1") as c:
+            row = await c.fetchone()
+            total = row[0] if row else 0
+        async with db.execute(
+            """SELECT id, username, full_name, last_active_at, created_at 
+               FROM users 
+               WHERE is_blocked = 1 
+               ORDER BY id DESC 
+               LIMIT ? OFFSET ?""",
+            (limit, offset)
+        ) as c:
+            rows = await c.fetchall()
+        return rows, total

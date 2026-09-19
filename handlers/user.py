@@ -1,7 +1,8 @@
 import random
 from aiogram import Router, F, types
-from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultCachedVideo, InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, LabeledPrice
+from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultCachedVideo, InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, LabeledPrice, ChatMemberUpdated
 from aiogram.filters import CommandStart, Command, StateFilter, Filter
+from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, KICKED, MEMBER
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -10,6 +11,14 @@ from database import requests as db_req
 from keyboards.reply import get_admin_menu, get_user_menu, get_moderator_menu
 from keyboards.inline import get_subscription_keyboard, get_movie_action_keyboard, get_rating_keyboard, get_comments_keyboard
 router = Router()
+
+@router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=KICKED))
+async def on_user_blocked_bot(event: ChatMemberUpdated):
+    await db_req.set_user_bot_blocked(event.from_user.id, 1)
+
+@router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=MEMBER))
+async def on_user_unblocked_bot(event: ChatMemberUpdated):
+    await db_req.set_user_bot_blocked(event.from_user.id, 0)
 
 class NotBannedFilter(Filter):
     async def __call__(self, event: Message | CallbackQuery) -> bool:

@@ -406,7 +406,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish']
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar']
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -2045,6 +2045,14 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
             is_blocked = False
             
     await callback.answer()
+    await db_req.set_user_bot_blocked(u_id, 1 if is_blocked else 0)
+    user_info = await db_req.get_user(u_id)
+    u_username = user_info[1] if user_info and len(user_info) > 1 else None
+    clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
+    prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
+    prof_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Profilni Ochish", url=prof_url)]
+    ])
     if is_blocked:
         msg_text = (
             f"🔍 <b>BOT BLOKI TEKSHIRUVI NATIJASI:</b>\n\n"
@@ -2061,7 +2069,7 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
             f"⚡ <b>Aloqa:</b> <i>Faol (Bot bilan aloqada)</i>\n\n"
             f"📩 <i>Ushbu foydalanuvchiga bemalol xabar yoki bildirishnoma yuborish mumkin.</i>"
         )
-    await callback.message.answer(with_footer(msg_text), parse_mode="HTML")
+    await callback.message.answer(with_footer(msg_text), parse_mode="HTML", reply_markup=prof_kb)
 
 @router.callback_query(F.data.startswith('admin_addpts_'))
 async def admin_addpts_callback(callback: CallbackQuery):
@@ -4397,4 +4405,94 @@ async def cb_admin_menu(callback: CallbackQuery):
     except Exception:
         pass
     await execute_start_logic(callback.message, None)
+    await callback.answer()
+
+
+@router.message(F.text == '🚫 Botni Bloklaganlar')
+async def show_blocked_users_list_handler(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
+        await message.answer(with_footer("❌ Bu amal faqat administratorlar uchun ruxsat etilgan!"))
+        return
+    await render_blocked_users_page(message, page=1, is_edit=False)
+
+
+async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool = False):
+    per_page = 10
+    offset = (page - 1) * per_page
+    users_list, total_count = await db_req.get_blocked_users_list(limit=per_page, offset=offset)
+
+    if not users_list:
+        txt = (
+            "🚫 <b>BOTNI BLOKLAGAN FOYDALANUVCHILAR RO'YXATI:</b>\n\n"
+            "Hozircha bazada botni bloklagan foydalanuvchilar aniqlanmadi yoki ro'yxat bo'sh! ✅\n\n"
+            "<i>💡 Foydalanuvchi botni bloklaganda yoki «Foydalanuvchi Qidirish» orqali tekshirilganda ushbu ro'yxatda avtomatik paydo bo'ladi.</i>"
+        )
+        extra_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔍 Foydalanuvchi Qidirish", callback_data="users_btn_search")]
+        ])
+        if is_edit:
+            await target_msg_obj.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+        else:
+            await target_msg_obj.answer(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+        return
+
+    import math
+    total_pages = max(1, math.ceil(total_count / per_page))
+
+    lines = [
+        f"🚫 <b>BOTNI BLOKLAGAN FOYDALANUVCHILAR:</b>\n",
+        f"📊 <b>Jami aniqlanganlar:</b> <code>{total_count:,} ta</code>",
+        f"📄 <b>Sahifa:</b> <code>{page}/{total_pages}</code>\n",
+        "────────────────────────"
+    ]
+
+    inline_keyboard = []
+
+    for idx, (u_id, username, full_name, last_act, c_at) in enumerate(users_list, start=offset + 1):
+        uname_str = f"@{username}" if username else "—"
+        name_str = (full_name[:20] if full_name else "Nomsiz").replace("<", "&lt;").replace(">", "&gt;")
+        lines.append(
+            f"{idx}. <b>ID:</b> <code>{u_id}</code>\n"
+            f"   👤 <b>Name:</b> {name_str}\n"
+            f"   🔗 <b>User:</b> {uname_str}\n"
+        )
+        clean_u = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
+        p_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
+        inline_keyboard.append([
+            InlineKeyboardButton(text=f"👤 {idx}. {name_str[:15]} — Profilni Ochish", url=p_url)
+        ])
+
+    full_text = "\n".join(lines)
+
+    # Pagination buttons
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"blocked_users_page_{page - 1}"))
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"blocked_users_page_{page + 1}"))
+
+    if nav_row:
+        inline_keyboard.append(nav_row)
+
+    inline_keyboard.append([InlineKeyboardButton(text="🔍 Qidirish (ID/@username)", callback_data="users_btn_search")])
+
+    kb = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+    if is_edit:
+        try:
+            await target_msg_obj.edit_text(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+        except Exception:
+            pass
+    else:
+        await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith('blocked_users_page_'))
+async def blocked_users_page_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'view_stats')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    page = int(callback.data.split('_')[-1])
+    await render_blocked_users_page(callback.message, page=page, is_edit=True)
     await callback.answer()
