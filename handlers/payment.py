@@ -7,7 +7,7 @@ from database import requests as db_req
 import config
 router = Router()
 
-CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
+CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
 
 def with_footer(text):
     if text is None:

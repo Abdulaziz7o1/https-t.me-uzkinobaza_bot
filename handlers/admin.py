@@ -8,10 +8,10 @@ import asyncio
 import os
 import config
 from database import requests as db_req
-from keyboards import inline
+from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 router = Router()
 
-CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
+CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
 
 def with_footer(text):
     if text is None:
@@ -103,7 +103,7 @@ async def auto_post_movie_to_channel(bot, movie_id: int, file_id: str, caption: 
                 f"🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n"
                 f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n\n"
                 f"🤖 {config.BOT_USERNAME}\n"
-                f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
+                f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
             )
             await bot.send_video(
                 chat_id=backup_channel,
@@ -2013,6 +2013,47 @@ async def admin_unban_callback(callback: CallbackQuery):
     status_note = 'va foydalanuvchiga bildirishnoma yuborildi 📩' if user_sent else '(Foydalanuvchi botni bloklagan)'
     await callback.answer(f'Foydalanuvchi blokdan chiqarildi 🔓 {status_note}', show_alert=True)
     await callback.message.edit_text(with_footer(f'{callback.message.text}\n\n🔓 <b>Holati: Faol (Unbanned) {status_note}!</b>'), parse_mode='HTML')
+
+@router.callback_query(F.data.startswith('admin_checkblock_'))
+async def admin_check_user_blocked_callback(callback: CallbackQuery):
+    db_admins = await db_req.get_all_admins()
+    if callback.from_user.id not in config.ADMINS and callback.from_user.id not in db_admins:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    u_id = int(callback.data.split('_')[2])
+    
+    is_blocked = False
+    block_reason = ""
+    try:
+        await callback.bot.send_chat_action(chat_id=u_id, action="typing")
+    except TelegramForbiddenError:
+        is_blocked = True
+        block_reason = "Foydalanuvchi botni bloklagan"
+    except TelegramBadRequest as e:
+        if "chat not found" in str(e).lower():
+            is_blocked = True
+            block_reason = "Chat topilmadi (bot boshlanmagan yoki bloklangan)"
+        else:
+            is_blocked = True
+            block_reason = str(e)
+    except Exception as e:
+        err_str = str(e).lower()
+        if any(w in err_str for w in ["blocked", "forbidden", "deactivated", "chat not found", "bot was blocked"]):
+            is_blocked = True
+            block_reason = "Bot bloklangan yoki profil o'chirilgan"
+        else:
+            is_blocked = False
+            
+    if is_blocked:
+        await callback.answer(
+            f"❌ HA! Foydalanuvchi botni BLOKLAGAN!\n\n🆔 ID: {u_id}\n📌 Holat: {block_reason}\n🚫 Bot unga xabar yubora olmaydi.",
+            show_alert=True
+        )
+    else:
+        await callback.answer(
+            f"🟢 YO'Q! Foydalanuvchi botni bloklamagan!\n\n🆔 ID: {u_id}\n✅ Holat: Faol (Bot bilan aloqada)\n📩 Unga bemalol xabar yuborish mumkin.",
+            show_alert=True
+        )
 
 @router.callback_query(F.data.startswith('admin_addpts_'))
 async def admin_addpts_callback(callback: CallbackQuery):
@@ -4034,7 +4075,7 @@ async def process_trailer_movie_id(message: Message, state: FSMContext):
         f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n"
         f"📥 <b>Yuklashlar:</b> {views_count:,} marta\n\n"
         f"🤖 @{bot_username}\n"
-        f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
+        f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
     )
 
     data = await state.get_data()

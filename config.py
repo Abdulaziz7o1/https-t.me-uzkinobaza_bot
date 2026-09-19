@@ -31,7 +31,7 @@ ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "@Abdulaziz7o1")
 
 _clean_admin = ADMIN_USERNAME.lstrip('@')
 _auto_contact_text = f"Assalomu alaykum! Men {BOT_USERNAME} yuzasidan murojaat qilmoqchiman."
-ADMIN_CONTACT_URL = os.getenv("ADMIN_CONTACT_URL", "https://t.me/m/WDaKxNaZZGYy")
+ADMIN_CONTACT_URL = os.getenv("ADMIN_CONTACT_URL", "https://t.me/Abdulaziz7o1")
 
 # Proxy settings (optional - agar Telegram bloklangan bo'lsa)
 # Masalan: PROXY_URL=http://username:password@proxy-server:port

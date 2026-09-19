@@ -8,7 +8,7 @@ from aiogram.types import Message, TelegramObject
 
 import config
 
-CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">ABDULAZIZ</a>'
+CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
 CONTACT_FOOTER_PLAIN = f"\n\nMurojaat uchun: {config.ADMIN_CONTACT_URL}"
 
 def _append_footer(text: str, parse_mode: str = None) -> str:
