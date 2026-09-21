@@ -138,8 +138,10 @@ def get_user_manage_keyboard(target_user_id: int, username: str = None) -> Inlin
     builder.button(text="🎂 Tug'ilgan Kun Reset", callback_data=f"admin_resetbday_{target_user_id}")
     builder.button(text="✉️ Xabar Yozish", callback_data=f"admin_sendmsg_{target_user_id}")
     clean_username = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
-    profile_url = f"https://t.me/{clean_username}" if clean_username else f"tg://user?id={target_user_id}"
-    builder.button(text="👤 Shaxsiy Profiliga O'tish", url=profile_url)
+    if clean_username:
+        builder.button(text="👤 Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_username}")
+    else:
+        builder.button(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{target_user_id}")
     builder.button(text="🤖 Botni Bloklaganmi?", callback_data=f"admin_checkblock_{target_user_id}")
     builder.adjust(2, 2, 1, 1, 2, 1)
     return builder.as_markup()

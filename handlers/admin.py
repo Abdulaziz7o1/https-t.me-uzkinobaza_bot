@@ -1978,10 +1978,15 @@ async def process_user_search(message: Message, query: str):
         await message.answer(with_footer(f"❌ <code>{query}</code> bo'yicha foydalanuvchi topilmadi."), parse_mode='HTML')
         return
     u_id, username, full_name, role, status, points, referrals_count, created_at, birthday = user
-    name_display = f'@{username}' if username else full_name or str(u_id)
+    clean_u = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
+    if clean_u:
+        name_display = f"@{clean_u}"
+    else:
+        fn_safe = (full_name or str(u_id)).replace('<', '&lt;').replace('>', '&gt;')
+        name_display = f"<a href='tg://user?id={u_id}'>{fn_safe}</a>"
     level_name, level_emoji, _ = db_req.get_user_level(points)
     bday_display = birthday if birthday else 'Kiritilmagan ❌'
-    txt = f"👤 <b>FOYDALANUVCHI MA'LUMOTLARI:</b>\n\n🆔 <b>ID:</b> <code>{u_id}</code>\n👤 <b>Ismi / Username:</b> {name_display}\n🎭 <b>Rol:</b> <code>{role}</code> | <b>Holati:</b> <code>{status}</code>\n💎 <b>Ballari:</b> <code>{points}</code> 💎 ({level_emoji} {level_name})\n👥 <b>Referallari:</b> {referrals_count} ta\n🎂 <b>Tug'ilgan kuni:</b> {bday_display}\n📅 <b>Ro'yxatdan o'tgan:</b> {created_at}\n\n<i>Boshqarish uchun tugmalardan foydalaning:</i>"
+    txt = f"👤 <b>FOYDALANUVCHI MA'LUMOTLARI:</b>\n\n🆔 <b>ID:</b> <code>{u_id}</code>\n👤 <b>Ismi / Profil:</b> {name_display}\n🎭 <b>Rol:</b> <code>{role}</code> | <b>Holati:</b> <code>{status}</code>\n💎 <b>Ballari:</b> <code>{points}</code> 💎 ({level_emoji} {level_name})\n👥 <b>Referallari:</b> {referrals_count} ta\n🎂 <b>Tug'ilgan kuni:</b> {bday_display}\n📅 <b>Ro'yxatdan o'tgan:</b> {created_at}\n\n<i>Boshqarish uchun tugmalardan foydalaning:</i>"
     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username))
 
 @router.callback_query(F.data.startswith('admin_ban_'))
@@ -2066,10 +2071,13 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     user_info = await db_req.get_user(u_id)
     u_username = user_info[1] if user_info and len(user_info) > 1 else None
     clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
-    prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
+    if clean_u:
+        prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_u}")
+    else:
+        prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{u_id}")
     prof_kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=prof_url),
+            prof_btn,
             InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
         ]
     ])
@@ -2301,9 +2309,12 @@ async def process_user_direct_msg(message: Message, state: FSMContext):
             user_for_btn = await db_req.get_user(target_user_id)
             u_btn_username = user_for_btn[1] if user_for_btn and len(user_for_btn) > 1 else None
             clean_btn_u = str(u_btn_username).strip().lstrip('@') if u_btn_username and str(u_btn_username).strip() and str(u_btn_username).strip().lower() != 'none' else None
-            prof_url = f"https://t.me/{clean_btn_u}" if clean_btn_u else f"tg://user?id={target_user_id}"
+            if clean_btn_u:
+                prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"https://t.me/{clean_btn_u}")
+            else:
+                prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", callback_data=f"admin_open_profile_{target_user_id}")
             kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=prof_url)],
+                [prof_btn],
                 [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
             ])
             await message.answer(
@@ -4496,10 +4507,13 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
             f"   🔗 <b>User:</b> {uname_str}\n"
         )
         clean_u = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
-        p_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
+        if clean_u:
+            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_u}")
+        else:
+            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{u_id}")
         
         row = [
-            InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=p_url),
+            prof_btn,
             InlineKeyboardButton(text="⚙️ Boshqarish", callback_data=f"admin_manage_user_{u_id}")
         ]
         inline_keyboard.append(row)
@@ -4578,3 +4592,25 @@ async def admin_manage_user_callback(callback: CallbackQuery):
     u_id = callback.data.split('_')[-1]
     await callback.answer()
     await process_user_search(callback.message, u_id)
+
+
+@router.callback_query(F.data.startswith('admin_open_profile_'))
+async def admin_open_profile_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'add_movie')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    u_id = int(callback.data.split('_')[-1])
+    user_info = await db_req.get_user(u_id)
+    u_name = (user_info[2] if user_info and len(user_info) > 2 and user_info[2] else f"Foydalanuvchi {u_id}").replace('<', '&lt;').replace('>', '&gt;')
+    await callback.answer()
+    txt = (
+        f"👤 <b>FOYDALANUVCHI PROFILI:</b>\n\n"
+        f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
+        f"👤 <b>Ismi:</b> <a href='tg://user?id={u_id}'>{u_name}</a>\n\n"
+        f"🔗 <b>Telegram profiliga o'tish uchun bosing:</b>\n"
+        f"👉 <a href='tg://user?id={u_id}'>[ 👤 Shaxsiy Profilini Ochish ]</a> 👈"
+    )
+    manage_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
+    ])
+    await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=manage_kb)
