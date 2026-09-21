@@ -4653,7 +4653,22 @@ async def admin_open_profile_callback(callback: CallbackQuery):
         f"🔗 <b>Telegram profiliga o'tish uchun bosing:</b>\n"
         f"👉 <a href='tg://user?id={u_id}'>[ 👤 Shaxsiy Profilini Ochish ]</a> 👈"
     )
+    u_username = user_info[1] if user_info and len(user_info) > 1 else None
+    clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
+    prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
+
     manage_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=prof_url)],
         [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
     ])
-    await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=manage_kb)
+    try:
+        await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=manage_kb, disable_web_page_preview=True)
+    except TelegramBadRequest as e:
+        if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
+            fallback_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Web)", url=f"https://web.telegram.org/k/#{u_id}")],
+                [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
+            ])
+            await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=fallback_kb, disable_web_page_preview=True)
+        else:
+            raise
