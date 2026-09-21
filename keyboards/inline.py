@@ -141,7 +141,7 @@ def get_user_manage_keyboard(target_user_id: int, username: str = None, fallback
     if clean_username:
         builder.button(text="👤 Shaxsiy Profiliga O'tish", url=f"tg://resolve?domain={clean_username}&profile")
     elif fallback_callback:
-        builder.button(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_privacy_alert_{target_user_id}")
+        builder.button(text="🗑 Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")
     else:
         builder.button(text="👤 Shaxsiy Profiliga O'tish", url=f"tg://user?id={target_user_id}")
     builder.button(text="🤖 Botni Bloklaganmi?", callback_data=f"admin_checkblock_{target_user_id}")
