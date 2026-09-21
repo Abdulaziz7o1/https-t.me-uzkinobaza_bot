@@ -1986,8 +1986,13 @@ async def process_user_search(message: Message, query: str):
         name_display = f"<a href='tg://user?id={u_id}'>{fn_safe}</a>"
     level_name, level_emoji, _ = db_req.get_user_level(points)
     bday_display = birthday if birthday else 'Kiritilmagan ❌'
-    txt = f"👤 <b>FOYDALANUVCHI MA'LUMOTLARI:</b>\n\n🆔 <b>ID:</b> <code>{u_id}</code>\n👤 <b>Ismi / Profil:</b> {name_display}\n🎭 <b>Rol:</b> <code>{role}</code> | <b>Holati:</b> <code>{status}</code>\n💎 <b>Ballari:</b> <code>{points}</code> 💎 ({level_emoji} {level_name})\n👥 <b>Referallari:</b> {referrals_count} ta\n🎂 <b>Tug'ilgan kuni:</b> {bday_display}\n📅 <b>Ro'yxatdan o'tgan:</b> {created_at}\n\n<i>Boshqarish uchun tugmalardan foydalaning:</i>"
-    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username))
+    try:
+        await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username))
+    except TelegramBadRequest as e:
+        if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
+            await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username, fallback_callback=True))
+        else:
+            raise
 
 @router.callback_query(F.data.startswith('admin_ban_'))
 async def admin_ban_callback(callback: CallbackQuery):
@@ -2071,13 +2076,10 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     user_info = await db_req.get_user(u_id)
     u_username = user_info[1] if user_info and len(user_info) > 1 else None
     clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
-    if clean_u:
-        prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_u}")
-    else:
-        prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=f"tg://openmessage?user_id={u_id}")
+    prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
     prof_kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            prof_btn,
+            InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=prof_url),
             InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
         ]
     ])
@@ -2097,7 +2099,19 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
             f"⚡ <b>Aloqa:</b> <i>Faol (Bot bilan aloqada)</i>\n\n"
             f"📩 <i>Ushbu foydalanuvchiga bemalol xabar yoki bildirishnoma yuborish mumkin.</i>"
         )
-    await callback.message.answer(with_footer(msg_text), parse_mode="HTML", reply_markup=prof_kb)
+    try:
+        await callback.message.answer(with_footer(msg_text), parse_mode="HTML", reply_markup=prof_kb)
+    except TelegramBadRequest as e:
+        if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
+            fb_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{u_id}"),
+                    InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
+                ]
+            ])
+            await callback.message.answer(with_footer(msg_text), parse_mode="HTML", reply_markup=fb_kb)
+        else:
+            raise
 
 @router.callback_query(F.data.startswith('admin_addpts_'))
 async def admin_addpts_callback(callback: CallbackQuery):
@@ -2309,27 +2323,31 @@ async def process_user_direct_msg(message: Message, state: FSMContext):
             user_for_btn = await db_req.get_user(target_user_id)
             u_btn_username = user_for_btn[1] if user_for_btn and len(user_for_btn) > 1 else None
             clean_btn_u = str(u_btn_username).strip().lstrip('@') if u_btn_username and str(u_btn_username).strip() and str(u_btn_username).strip().lower() != 'none' else None
-            if clean_btn_u:
-                prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"https://t.me/{clean_btn_u}")
-            else:
-                prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"tg://openmessage?user_id={target_user_id}")
+            prof_url = f"https://t.me/{clean_btn_u}" if clean_btn_u else f"tg://user?id={target_user_id}"
             kb = InlineKeyboardMarkup(inline_keyboard=[
-                [prof_btn],
+                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=prof_url)],
                 [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
             ])
-            await message.answer(
-                with_footer(
-                    f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
-                    f"🆔 <b>Foydalanuvchi ID:</b> <code>{target_user_id}</code>\n\n"
-                    f"Ushbu foydalanuvchi o'z Telegramida botni to'xtatib bloklagan (<i>Stop and Block Bot</i>). "
-                    f"Telegram rasmiy qoidasiga binoan, botni bloklagan odamga bot orqali xabar yuborish taqiqlangan.\n\n"
-                    f"💡 <b>YECHIM:</b>\n"
-                    f"1. <b>«👤 Shaxsiy Profiliga O'tish»</b> tugmasini bosib, unga o'zingizning Telegram profilingizdan to'g'ridan-to'g'ri yozishingiz mumkin.\n"
-                    f"2. Yoki bunday botni bloklagan odamni <b>«🗑 Foydalanuvchini Bazadan O'chirish»</b> tugmasi orqali o'chirib yuborishingiz mumkin."
-                ),
-                parse_mode="HTML",
-                reply_markup=kb
+            msg_alert_text = with_footer(
+                f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
+                f"🆔 <b>Foydalanuvchi ID:</b> <code>{target_user_id}</code>\n\n"
+                f"Ushbu foydalanuvchi o'z Telegramida botni to'xtatib bloklagan (<i>Stop and Block Bot</i>). "
+                f"Telegram rasmiy qoidasiga binoan, botni bloklagan odamga bot orqali xabar yuborish taqiqlangan.\n\n"
+                f"💡 <b>YECHIM:</b>\n"
+                f"1. <b>«👤 Shaxsiy Profiliga O'tish»</b> tugmasini bosib, unga o'zingizning Telegram profilingizdan to'g'ridan-to'g'ri yozishingiz mumkin.\n"
+                f"2. Yoki bunday botni bloklagan odamni <b>«🗑 Foydalanuvchini Bazadan O'chirish»</b> tugmasi orqali o'chirib yuborishingiz mumkin."
             )
+            try:
+                await message.answer(msg_alert_text, parse_mode="HTML", reply_markup=kb)
+            except TelegramBadRequest as err:
+                if any(k in str(err).lower() for k in ['button_user_privacy_restricted', 'button_user_invalid']):
+                    fb_kb = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", callback_data=f"admin_open_profile_{target_user_id}")],
+                        [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
+                    ])
+                    await message.answer(msg_alert_text, parse_mode="HTML", reply_markup=fb_kb)
+                else:
+                    raise
         else:
             await message.answer(
                 with_footer(f"❌ <b>Xabar yetkazilmadi!</b>\nXatolik yuz berdi: <i>{e}</i>"),
@@ -4510,7 +4528,7 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
         if clean_u:
             prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_u}")
         else:
-            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"tg://openmessage?user_id={u_id}")
+            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"tg://user?id={u_id}")
         
         row = [
             prof_btn,
@@ -4539,13 +4557,38 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
 
     kb = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
-    if is_edit:
-        try:
-            await target_msg_obj.edit_text(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
-        except Exception:
+    try:
+        if is_edit:
+            try:
+                await target_msg_obj.edit_text(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+            except TelegramBadRequest as edit_err:
+                if any(k in str(edit_err).lower() for k in ['button_user_privacy_restricted', 'button_user_invalid']):
+                    raise edit_err
+                await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+        else:
             await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
-    else:
-        await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+    except TelegramBadRequest as e:
+        if any(k in str(e).lower() for k in ['button_user_privacy_restricted', 'button_user_invalid']):
+            fallback_keyboard = []
+            for r in inline_keyboard:
+                new_r = []
+                for b in r:
+                    if b.url and b.url.startswith('tg://user?id='):
+                        target_id = b.url.split('=')[-1]
+                        new_r.append(InlineKeyboardButton(text=b.text, callback_data=f'admin_open_profile_{target_id}'))
+                    else:
+                        new_r.append(b)
+                fallback_keyboard.append(new_r)
+            fb_kb = InlineKeyboardMarkup(inline_keyboard=fallback_keyboard)
+            if is_edit:
+                try:
+                    await target_msg_obj.edit_text(with_footer(full_text), parse_mode='HTML', reply_markup=fb_kb)
+                except Exception:
+                    await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=fb_kb)
+            else:
+                await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=fb_kb)
+        else:
+            raise
 
 
 @router.callback_query(F.data.startswith('blocked_users_page_'))
