@@ -139,7 +139,7 @@ def get_user_manage_keyboard(target_user_id: int, username: str = None, fallback
     builder.button(text="✉️ Xabar Yozish", callback_data=f"admin_sendmsg_{target_user_id}")
     clean_username = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
     if clean_username:
-        builder.button(text="👤 Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_username}")
+        builder.button(text="👤 Shaxsiy Profiliga O'tish", url=f"tg://resolve?domain={clean_username}&profile")
     elif fallback_callback:
         builder.button(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{target_user_id}")
     else:
