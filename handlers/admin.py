@@ -1986,11 +1986,12 @@ async def process_user_search(message: Message, query: str):
         name_display = f"<a href='tg://user?id={u_id}'>{fn_safe}</a>"
     level_name, level_emoji, _ = db_req.get_user_level(points)
     bday_display = birthday if birthday else 'Kiritilmagan ❌'
+    txt = f"👤 <b>FOYDALANUVCHI MA'LUMOTLARI:</b>\n\n🆔 <b>ID:</b> <code>{u_id}</code>\n👤 <b>Ismi / Profil:</b> {name_display}\n🎭 <b>Rol:</b> <code>{role}</code> | <b>Holati:</b> <code>{status}</code>\n💎 <b>Ballari:</b> <code>{points}</code> 💎 ({level_emoji} {level_name})\n👥 <b>Referallari:</b> {referrals_count} ta\n🎂 <b>Tug'ilgan kuni:</b> {bday_display}\n📅 <b>Ro'yxatdan o'tgan:</b> {created_at}\n\n<i>Boshqarish uchun tugmalardan foydalaning:</i>"
     try:
-        await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username))
+        await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username), disable_web_page_preview=True)
     except TelegramBadRequest as e:
         if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
-            await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username, fallback_callback=True))
+            await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username, fallback_callback=True), disable_web_page_preview=True)
         else:
             raise
 
