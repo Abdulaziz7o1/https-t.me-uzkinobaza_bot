@@ -141,7 +141,7 @@ def get_user_manage_keyboard(target_user_id: int, username: str = None) -> Inlin
     if clean_username:
         builder.button(text="👤 Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_username}")
     else:
-        builder.button(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{target_user_id}")
+        builder.button(text="👤 Shaxsiy Profiliga O'tish", url=f"tg://openmessage?user_id={target_user_id}")
     builder.button(text="🤖 Botni Bloklaganmi?", callback_data=f"admin_checkblock_{target_user_id}")
     builder.adjust(2, 2, 1, 1, 2, 1)
     return builder.as_markup()

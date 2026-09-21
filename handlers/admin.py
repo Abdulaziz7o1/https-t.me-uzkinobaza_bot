@@ -2074,7 +2074,7 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     if clean_u:
         prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_u}")
     else:
-        prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{u_id}")
+        prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=f"tg://openmessage?user_id={u_id}")
     prof_kb = InlineKeyboardMarkup(inline_keyboard=[
         [
             prof_btn,
@@ -2312,7 +2312,7 @@ async def process_user_direct_msg(message: Message, state: FSMContext):
             if clean_btn_u:
                 prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"https://t.me/{clean_btn_u}")
             else:
-                prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", callback_data=f"admin_open_profile_{target_user_id}")
+                prof_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"tg://openmessage?user_id={target_user_id}")
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [prof_btn],
                 [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
@@ -4510,7 +4510,7 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
         if clean_u:
             prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"https://t.me/{clean_u}")
         else:
-            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{u_id}")
+            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"tg://openmessage?user_id={u_id}")
         
         row = [
             prof_btn,
