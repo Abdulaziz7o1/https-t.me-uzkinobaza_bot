@@ -2069,7 +2069,7 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
     prof_kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="👤 Profilni Ochish", url=prof_url),
+            InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=prof_url),
             InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
         ]
     ])
@@ -4499,7 +4499,7 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
         p_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
         
         row = [
-            InlineKeyboardButton(text=f"👤 {idx}. Profilni Ochish", url=p_url),
+            InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=p_url),
             InlineKeyboardButton(text="⚙️ Boshqarish", callback_data=f"admin_manage_user_{u_id}")
         ]
         inline_keyboard.append(row)
