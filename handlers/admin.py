@@ -2077,17 +2077,10 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     user_info = await db_req.get_user(u_id)
     u_username = user_info[1] if user_info and len(user_info) > 1 else None
     clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
-    
-    if clean_u:
-        first_btn = InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=f"tg://resolve?domain={clean_u}&profile")
-    elif is_blocked:
-        first_btn = InlineKeyboardButton(text="🗑 Bazadan O'chirish", callback_data=f"admin_deluser_{u_id}")
-    else:
-        first_btn = InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")
-
+    prof_url = f"tg://resolve?domain={clean_u}&profile" if clean_u else f"tg://user?id={u_id}"
     prof_kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            first_btn,
+            InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=prof_url),
             InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
         ]
     ])
@@ -2107,7 +2100,19 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
             f"⚡ <b>Aloqa:</b> <i>Faol (Bot bilan aloqada)</i>\n\n"
             f"📩 <i>Ushbu foydalanuvchiga bemalol xabar yoki bildirishnoma yuborish mumkin.</i>"
         )
-    await callback.message.answer(with_footer(msg_text), parse_mode="HTML", reply_markup=prof_kb)
+    try:
+        await callback.message.answer(with_footer(msg_text), parse_mode="HTML", reply_markup=prof_kb)
+    except TelegramBadRequest as e:
+        if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
+            fb_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{u_id}"),
+                    InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
+                ]
+            ])
+            await callback.message.answer(with_footer(msg_text), parse_mode="HTML", reply_markup=fb_kb)
+        else:
+            raise
 
 @router.callback_query(F.data.startswith('admin_addpts_'))
 async def admin_addpts_callback(callback: CallbackQuery):
@@ -2318,44 +2323,32 @@ async def process_user_direct_msg(message: Message, state: FSMContext):
             
             user_for_btn = await db_req.get_user(target_user_id)
             u_btn_username = user_for_btn[1] if user_for_btn and len(user_for_btn) > 1 else None
-            u_btn_fullname = (user_for_btn[2] if user_for_btn and len(user_for_btn) > 2 and user_for_btn[2] else f"Foydalanuvchi {target_user_id}").replace('<', '&lt;').replace('>', '&gt;')
             clean_btn_u = str(u_btn_username).strip().lstrip('@') if u_btn_username and str(u_btn_username).strip() and str(u_btn_username).strip().lower() != 'none' else None
-            
-            if clean_btn_u:
-                prof_url = f"tg://resolve?domain={clean_btn_u}&profile"
-                kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=prof_url)],
-                    [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
-                ])
-                msg_alert_text = with_footer(
-                    f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
-                    f"🆔 <b>Foydalanuvchi ID:</b> <code>{target_user_id}</code>\n"
-                    f"👤 <b>Ismi:</b> <b>{u_btn_fullname}</b>\n"
-                    f"🔗 <b>Username:</b> @{clean_btn_u}\n\n"
-                    f"Ushbu foydalanuvchi o'z Telegramida botni to'xtatib bloklagan (<i>Stop and Block Bot</i>).\n\n"
-                    f"💡 <b>NIMA QILISH MUMKIN?</b>\n"
-                    f"1. <b>«👤 Shaxsiy Profiliga O'tish»</b> tugmasini bosib, unga shaxsiy Telegramingizdan yozishingiz mumkin.\n"
-                    f"2. Yoki bunday foydalanuvchini <b>«🗑 Foydalanuvchini Bazadan O'chirish»</b> tugmasi orqali bazadan butunlay o'chirib tashlashingiz mumkin."
-                )
-                await message.answer(msg_alert_text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
-            else:
-                fb_kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")],
-                    [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{target_user_id}")]
-                ])
-                restricted_alert_text = with_footer(
-                    f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
-                    f"🆔 <b>Foydalanuvchi ID:</b> <code>{target_user_id}</code>\n"
-                    f"👤 <b>Ismi:</b> <b>{u_btn_fullname}</b>\n"
-                    f"🔗 <b>Username:</b> <i>Mavjud emas (yo'q)</i>\n\n"
-                    f"🔒 <b>TELEGRAM MAXFIYLIK VA BLOK HOLATI:</b>\n"
-                    f"1. Ushbu foydalanuvchi botni to'xtatib bloklagan (<i>Stop and Block Bot</i>).\n"
-                    f"2. Foydalanuvchida username (@) yo'q va uning Telegram maxfiyligi «Hech kim» qilib yopilgan.\n"
-                    f"3. Telegram xavfsizlik qoidasiga ko'ra bunday hisoblarga tashqaridan hech qanday havola orqali ulanib bo'lmaydi.\n\n"
-                    f"💡 <b>ANIQ YECHIM:</b>\n"
-                    f"Botni bloklagan bunday o'lik hisoblarni bazada saqlamaslik uchun pastdagi <b>«🗑 Foydalanuvchini Bazadan O'chirish»</b> tugmasini bosing."
-                )
-                await message.answer(restricted_alert_text, parse_mode="HTML", reply_markup=fb_kb, disable_web_page_preview=True)
+            prof_url = f"tg://resolve?domain={clean_btn_u}&profile" if clean_btn_u else f"tg://user?id={target_user_id}"
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=prof_url)],
+                [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
+            ])
+            msg_alert_text = with_footer(
+                f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
+                f"🆔 <b>Foydalanuvchi ID:</b> <code>{target_user_id}</code>\n\n"
+                f"Ushbu foydalanuvchi o'z Telegramida botni to'xtatib bloklagan (<i>Stop and Block Bot</i>). "
+                f"Telegram rasmiy qoidasiga binoan, botni bloklagan odamga bot orqali xabar yuborish taqiqlangan.\n\n"
+                f"💡 <b>YECHIM:</b>\n"
+                f"1. <b>«👤 Shaxsiy Profiliga O'tish»</b> tugmasini bosib, unga o'zingizning Telegram profilingizdan to'g'ridan-to'g'ri yozishingiz mumkin.\n"
+                f"2. Yoki bunday botni bloklagan odamni <b>«🗑 Foydalanuvchini Bazadan O'chirish»</b> tugmasi orqali o'chirib yuborishingiz mumkin."
+            )
+            try:
+                await message.answer(msg_alert_text, parse_mode="HTML", reply_markup=kb)
+            except TelegramBadRequest as err:
+                if any(k in str(err).lower() for k in ['button_user_privacy_restricted', 'button_user_invalid']):
+                    fb_kb = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", callback_data=f"admin_open_profile_{target_user_id}")],
+                        [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
+                    ])
+                    await message.answer(msg_alert_text, parse_mode="HTML", reply_markup=fb_kb)
+                else:
+                    raise
         else:
             await message.answer(
                 with_footer(f"❌ <b>Xabar yetkazilmadi!</b>\nXatolik yuz berdi: <i>{e}</i>"),
@@ -4526,16 +4519,17 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
     for idx, (u_id, username, full_name, last_act, c_at) in enumerate(users_list, start=offset + 1):
         uname_str = f"@{username}" if username else "—"
         name_str = (full_name[:20] if full_name else "Nomsiz").replace("<", "&lt;").replace(">", "&gt;")
+        user_link = f"<a href='tg://user?id={u_id}'>{name_str}</a>"
         lines.append(
             f"{idx}. <b>ID:</b> <code>{u_id}</code>\n"
-            f"   👤 <b>Ism:</b> <b>{name_str}</b>\n"
+            f"   👤 <b>Ism:</b> {user_link}\n"
             f"   🔗 <b>User:</b> {uname_str}\n"
         )
         clean_u = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
         if clean_u:
-            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profil (TG)", url=f"tg://resolve?domain={clean_u}&profile")
+            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"tg://resolve?domain={clean_u}&profile")
         else:
-            prof_btn = InlineKeyboardButton(text=f"🗑 {idx}. O'chirish", callback_data=f"admin_deluser_{u_id}")
+            prof_btn = InlineKeyboardButton(text=f"👤 {idx}. Shaxsiy Profiliga O'tish", url=f"tg://user?id={u_id}")
         
         row = [
             prof_btn,
@@ -4582,7 +4576,7 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
                 for b in r:
                     if b.url and b.url.startswith('tg://user?id='):
                         target_id = b.url.split('=')[-1]
-                        new_r.append(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f'admin_deluser_{target_id}'))
+                        new_r.append(InlineKeyboardButton(text=b.text, callback_data=f'admin_open_profile_{target_id}'))
                     else:
                         new_r.append(b)
                 fallback_keyboard.append(new_r)
@@ -4656,37 +4650,49 @@ async def admin_open_profile_callback(callback: CallbackQuery):
     clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
     await callback.answer()
     
+    txt = (
+        f"👤 <b>FOYDALANUVCHI PROFILI:</b>\n\n"
+        f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
+        f"👤 <b>Ismi:</b> <a href='tg://user?id={u_id}'>{u_name}</a>\n"
+    )
     if clean_u:
-        txt = (
-            f"👤 <b>FOYDALANUVCHI PROFILI:</b>\n\n"
-            f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
-            f"👤 <b>Ismi:</b> <b>{u_name}</b>\n"
-            f"🔗 <b>Username:</b> @{clean_u}\n\n"
-            f"Quyidagi tugma orqali foydalanuvchining shaxsiy profilini Telegram ichida ochishingiz mumkin:"
-        )
-        manage_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"tg://resolve?domain={clean_u}&profile")],
-            [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
-        ])
-        await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=manage_kb, disable_web_page_preview=True)
+        txt += f"🔗 <b>Username:</b> @{clean_u}\n\n"
     else:
-        restricted_txt = (
-            f"👤 <b>FOYDALANUVCHI PROFILI:</b>\n\n"
-            f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
-            f"👤 <b>Ismi:</b> <b>{u_name}</b>\n"
-            f"🔗 <b>Username:</b> <i>Mavjud emas</i>\n\n"
-            f"🔒 <b>TELEGRAM MAXFIYLIK VA HAVOLA HOLATI:</b>\n"
-            f"Ushbu foydalanuvchida username (@) yo'q va uning Telegram maxfiyligi «Hech kim» qilib yopilgan.\n"
-            f"Telegram xavfsizlik qoidasiga ko'ra bunday yopiq hisoblarga begona odamlar havola orqali kirolmaydi.\n\n"
-            f"💡 <b>ADMIN AMALLARI:</b>\n"
-            f"• Agar hisob botni bloklagan bo'lsa: <b>«🗑 Foydalanuvchini Bazadan O'chirish»</b>\n"
-            f"• Boshqa sozlamalar: <b>«⚙️ Foydalanuvchini Boshqarish»</b>"
-        )
-        fallback_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{u_id}")],
-            [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
-        ])
-        await callback.message.answer(with_footer(restricted_txt), parse_mode="HTML", reply_markup=fallback_kb, disable_web_page_preview=True)
+        txt += "\n"
+        
+    txt += (
+        f"👉 <b>Telegram ichida profilni ochish uchun:</b>\n"
+        f"👉 <a href='tg://user?id={u_id}'><b>[ 👤 {u_name} Profilini Ochish ]</b></a> 👈\n\n"
+        f"<i>(Ushbu havolani bossangiz, profil brauzerda emas, 100% Telegram ichida ochiladi)</i>"
+    )
+
+    prof_url = f"tg://resolve?domain={clean_u}&profile" if clean_u else f"tg://user?id={u_id}"
+
+    manage_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", url=prof_url)],
+        [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
+    ])
+    try:
+        await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=manage_kb, disable_web_page_preview=True)
+    except TelegramBadRequest as e:
+        if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
+            restricted_txt = (
+                f"👤 <b>FOYDALANUVCHI PROFILI:</b>\n\n"
+                f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
+                f"👤 <b>Ismi:</b> <b>{u_name}</b>\n\n"
+                f"🔒 <b>TELEGRAM MAXFIYLIK CHEKLOVI:</b>\n"
+                f"Ushbu foydalanuvchi o'z Telegram sozlamalarida (<i>Maxfiylik -> Uzatilgan xabarlar / Profil havolasi</i>) bo'limini «Hech kim» qilib yashirib qo'ygan.\n"
+                f"Telegram server qoidasiga ko'ra, bunday profillarga tashqaridan to'g'ridan-to'g'ri ulanish taqiqlanadi.\n\n"
+                f"💡 <b>Muloqot qilish:</b>\n"
+                f"Unga quyidagi «✉️ Xabar Yozish» tugmasi orqali botdan to'g'ridan-to'g'ri xabar yozishingiz mumkin."
+            )
+            fallback_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✉️ Xabar Yozish", callback_data=f"admin_sendmsg_{u_id}")],
+                [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
+            ])
+            await callback.message.answer(with_footer(restricted_txt), parse_mode="HTML", reply_markup=fallback_kb, disable_web_page_preview=True)
+        else:
+            raise
 
 
 @router.callback_query(F.data.startswith('admin_privacy_alert_'))
@@ -4695,7 +4701,7 @@ async def admin_privacy_alert_callback(callback: CallbackQuery):
     user_info = await db_req.get_user(u_id)
     u_name = (user_info[2] if user_info and len(user_info) > 2 and user_info[2] else f"Foydalanuvchi {u_id}")
     await callback.answer(
-        f"🔒 Foydalanuvchi ({u_name}) hisobida username yo'q va profil havolasi Telegram maxfiyligi bilan yopilgan.\n\n"
-        f"Telegram qoidasiga ko'ra bunga havola orqali kirib bo'lmaydi!",
+        f"🔒 Ushbu foydalanuvchi ({u_name}) Telegramida profilini yashirgan.\n\n"
+        f"Telegram qoidasiga binoan bunga havola orqali kirib bo'lmaydi. Unga «✉️ Xabar Yozish» orqali yozishingiz mumkin.",
         show_alert=True
     )

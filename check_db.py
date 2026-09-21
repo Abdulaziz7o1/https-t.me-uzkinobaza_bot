@@ -1,12 +1,12 @@
-import asyncio
 from database.connection import get_db
+import asyncio
 
 async def main():
     async with get_db() as db:
         # Check youtube_channels table
         async with db.execute("SELECT * FROM youtube_channels") as cursor:
             channels = await cursor.fetchall()
-            print(f"📊 YouTube kanallari (direct DB):")
+            print("📊 YouTube kanallari (direct DB):")
             if channels:
                 for ch in channels:
                     print(f"ID: {ch[0]}, Channel ID: {ch[1]}, Name: {ch[2]}, URL: {ch[3]}")

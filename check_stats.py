@@ -1,10 +1,9 @@
 import asyncio
-from database.connection import get_db
 from database.requests import get_stats
 
 async def main():
     stats = await get_stats()
-    print(f"📊 Bot statistikasi:")
+    print("📊 Bot statistikasi:")
     print(f"👥 Jami a'zolar: {stats['users']}")
     print(f"🚫 Bloklanganlar: {stats['banned']}")
     print(f"🎬 Kinolar soni: {stats['movies']}")
