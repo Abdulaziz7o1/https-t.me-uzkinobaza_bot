@@ -4676,11 +4676,21 @@ async def admin_open_profile_callback(callback: CallbackQuery):
         await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=manage_kb, disable_web_page_preview=True)
     except TelegramBadRequest as e:
         if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
+            restricted_txt = (
+                f"👤 <b>FOYDALANUVCHI PROFILI:</b>\n\n"
+                f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
+                f"👤 <b>Ismi:</b> <b>{u_name}</b>\n\n"
+                f"🔒 <b>TELEGRAM MAXFIYLIK CHEKLOVI:</b>\n"
+                f"Ushbu foydalanuvchi o'z Telegram sozlamalarida (<i>Maxfiylik -> Uzatilgan xabarlar / Profil havolasi</i>) bo'limini «Hech kim» qilib yashirib qo'ygan.\n"
+                f"Telegram server qoidasiga ko'ra, bunday profillarga tashqaridan to'g'ridan-to'g'ri ulanish taqiqlanadi.\n\n"
+                f"💡 <b>Muloqot qilish:</b>\n"
+                f"Unga quyidagi «✉️ Xabar Yozish» tugmasi orqali botdan to'g'ridan-to'g'ri xabar yozishingiz mumkin."
+            )
             fallback_kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_privacy_alert_{u_id}")],
+                [InlineKeyboardButton(text="✉️ Xabar Yozish", callback_data=f"admin_sendmsg_{u_id}")],
                 [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
             ])
-            await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=fallback_kb, disable_web_page_preview=True)
+            await callback.message.answer(with_footer(restricted_txt), parse_mode="HTML", reply_markup=fallback_kb, disable_web_page_preview=True)
         else:
             raise
 
@@ -4691,7 +4701,7 @@ async def admin_privacy_alert_callback(callback: CallbackQuery):
     user_info = await db_req.get_user(u_id)
     u_name = (user_info[2] if user_info and len(user_info) > 2 and user_info[2] else f"Foydalanuvchi {u_id}")
     await callback.answer(
-        f"⚠️ Ushbu foydalanuvchi ({u_name}) o'z Telegram sozlamalarida profilini yashirgan!\n\n"
-        f"Profilni Telegram ichida ochish uchun xabardagi ko'k rangli havola ustiga bosing.",
+        f"🔒 Ushbu foydalanuvchi ({u_name}) Telegramida profilini yashirgan.\n\n"
+        f"Telegram qoidasiga binoan bunga havola orqali kirib bo'lmaydi. Unga «✉️ Xabar Yozish» orqali yozishingiz mumkin.",
         show_alert=True
     )
