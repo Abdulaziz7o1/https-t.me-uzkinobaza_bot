@@ -2026,15 +2026,31 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     block_reason = ""
     try:
         await callback.bot.send_chat_action(chat_id=u_id, action="typing")
-    except TelegramForbiddenError:
+        is_blocked = False
+        block_reason = "Bot bilan aloqa faol va ochiq"
+        try:
+            chat = await callback.bot.get_chat(chat_id=u_id)
+            if chat and chat.username:
+                await db_req.update_user_username(u_id, chat.username)
+        except Exception:
+            pass
+    except TelegramForbiddenError as e:
         is_blocked = True
-        block_reason = "Foydalanuvchi botni bloklagan"
+        err_msg = str(e).lower()
+        if "deactivated" in err_msg:
+            block_reason = "Telegram hisobi o'chirilgan (Deleted Account)"
+        else:
+            block_reason = "Foydalanuvchi botni bloklagan"
     except TelegramBadRequest as e:
-        if "chat not found" in str(e).lower():
+        err_msg = str(e).lower()
+        if "chat not found" in err_msg:
             is_blocked = True
             block_reason = "Chat topilmadi (bot boshlanmagan yoki bloklangan)"
-        else:
+        elif "bot can't initiate conversation" in err_msg:
             is_blocked = True
+            block_reason = "Bot bilan muloqot boshlanmagan"
+        else:
+            is_blocked = False
             block_reason = str(e)
     except Exception as e:
         err_str = str(e).lower()
@@ -2043,6 +2059,7 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
             block_reason = "Bot bloklangan yoki profil o'chirilgan"
         else:
             is_blocked = False
+            block_reason = f"Holat: {e}"
             
     await callback.answer()
     await db_req.set_user_bot_blocked(u_id, 1 if is_blocked else 0)
@@ -2051,7 +2068,10 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
     prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
     prof_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👤 Profilni Ochish", url=prof_url)]
+        [
+            InlineKeyboardButton(text="👤 Profilni Ochish", url=prof_url),
+            InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
+        ]
     ])
     if is_blocked:
         msg_text = (
@@ -2059,7 +2079,7 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
             f"🆔 <b>Foydalanuvchi ID:</b> <code>{u_id}</code>\n"
             f"🚫 <b>Holati:</b> ❌ <b>HA, foydalanuvchi botni BLOKLAGAN!</b>\n"
             f"📌 <b>Batafsil:</b> <i>{block_reason}</i>\n\n"
-            f"⚠️ <i>Ushbu foydalanuvchiga bot orqali xabar yuborib bo'lmaydi.</i>"
+            f"⚠️ <i>Ushbu foydalanuvchiga bot orqali xabar yuborib bo'lmaydi. U «🚫 Botni Bloklaganlar» ro'yxatiga kiritildi.</i>"
         )
     else:
         msg_text = (
@@ -4430,10 +4450,16 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
         txt = (
             "🚫 <b>BOTNI BLOKLAGAN FOYDALANUVCHILAR RO'YXATI:</b>\n\n"
             "Hozircha bazada botni bloklagan foydalanuvchilar aniqlanmadi yoki ro'yxat bo'sh! ✅\n\n"
-            "<i>💡 Foydalanuvchi botni bloklaganda yoki «Foydalanuvchi Qidirish» orqali tekshirilganda ushbu ro'yxatda avtomatik paydo bo'ladi.</i>"
+            "<i>💡 Barcha foydalanuvchilarni real-time tekshirib, botni kimlar bloklaganini 100% aniqlash uchun quyidagi «⚡ Bazani Skanerlash» tugmasini bosing:</i>"
         )
         extra_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔍 Foydalanuvchi Qidirish", callback_data="users_btn_search")]
+            [
+                InlineKeyboardButton(text="⚡ Bazani Skanerlash", callback_data="admin_scan_blocked_users"),
+                InlineKeyboardButton(text="🔄 Yangilash", callback_data="blocked_users_page_1")
+            ],
+            [
+                InlineKeyboardButton(text="🔍 Foydalanuvchi Qidirish", callback_data="users_btn_search")
+            ]
         ])
         if is_edit:
             await target_msg_obj.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
@@ -4479,6 +4505,11 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
     if nav_row:
         inline_keyboard.append(nav_row)
 
+    # Action buttons
+    inline_keyboard.append([
+        InlineKeyboardButton(text="⚡ Bazani Skanerlash", callback_data="admin_scan_blocked_users"),
+        InlineKeyboardButton(text="🔄 Yangilash", callback_data=f"blocked_users_page_{page}")
+    ])
     inline_keyboard.append([InlineKeyboardButton(text="🔍 Qidirish (ID/@username)", callback_data="users_btn_search")])
 
     kb = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
@@ -4500,3 +4531,29 @@ async def blocked_users_page_callback(callback: CallbackQuery):
     page = int(callback.data.split('_')[-1])
     await render_blocked_users_page(callback.message, page=page, is_edit=True)
     await callback.answer()
+
+
+@router.callback_query(F.data == "admin_scan_blocked_users")
+async def admin_scan_blocked_users_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'view_stats')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await callback.answer("⏳ Bazani skanerlash boshlandi...", show_alert=False)
+    status_msg = await callback.message.answer(
+        with_footer("🔄 <b>Bazada botni bloklagan foydalanuvchilar real-time tekshirilmoqda...</b>\n\n<i>Biroz kuting, jarayon yakunlangach aniq statistika chiqariladi.</i>"),
+        parse_mode="HTML"
+    )
+    try:
+        total, blocked, active = await db_req.scan_all_users_for_blocks(callback.bot)
+        await status_msg.edit_text(
+            with_footer(
+                f"✅ <b>Skanerlash muvaffaqiyatli yakunlandi!</b>\n\n"
+                f"👥 <b>Jami tekshirildi:</b> <code>{total:,} ta</code>\n"
+                f"🟢 <b>Faol (aloqada):</b> <code>{active:,} ta</code>\n"
+                f"🚫 <b>Botni bloklaganlar:</b> <code>{blocked:,} ta</code>"
+            ),
+            parse_mode="HTML"
+        )
+        await render_blocked_users_page(callback.message, page=1, is_edit=True)
+    except Exception as e:
+        await status_msg.edit_text(with_footer(f"❌ Skanerlashda xatolik yuz berdi: {e}"), parse_mode="HTML")

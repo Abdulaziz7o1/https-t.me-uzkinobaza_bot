@@ -580,7 +580,7 @@ async def main():
     logging.info("Bot polling ishga tushmoqda...")
     while True:
         try:
-            await dp.start_polling(bot, handle_signals=False)
+            await dp.start_polling(bot, handle_signals=False, allowed_updates=dp.resolve_used_update_types())
             break
         except Exception as e:
             if "Conflict" in str(e) or "terminated by other getUpdates" in str(e) or "TelegramConflictError" in type(e).__name__:

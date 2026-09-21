@@ -103,9 +103,10 @@ async def init_db():
                         b_id = bu.get("id")
                         if b_id:
                             b_role = 'admin' if int(b_id) == 7140599182 else bu.get("role", "member")
+                            b_blocked = bu.get("is_blocked", 0)
                             await db.execute(
-                                """INSERT OR IGNORE INTO users (id, username, full_name, role, status, points, referrals_count, created_at, last_active_at)
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                """INSERT OR IGNORE INTO users (id, username, full_name, role, status, points, referrals_count, created_at, last_active_at, is_blocked)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                                 (
                                     b_id,
                                     bu.get("username"),
@@ -115,9 +116,12 @@ async def init_db():
                                     bu.get("points", 0),
                                     bu.get("referrals_count", 0),
                                     bu.get("created_at"),
-                                    bu.get("created_at")
+                                    bu.get("created_at"),
+                                    b_blocked
                                 )
                             )
+                            if b_blocked:
+                                await db.execute("UPDATE users SET is_blocked = ? WHERE id = ?", (b_blocked, b_id))
             except Exception:
                 pass
 

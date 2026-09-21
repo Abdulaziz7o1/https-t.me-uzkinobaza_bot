@@ -392,8 +392,8 @@ async def export_master_backup_json() -> str:
             channels = [{"id": r[0], "channel_id": r[1], "channel_name": r[2]} for r in await c.fetchall()]
 
         # 3. Users
-        async with db.execute("SELECT id, username, full_name, role, status, points, referrals_count, created_at, birthday, premium_until FROM users") as c:
-            users = [{"id": r[0], "username": r[1], "full_name": r[2], "role": r[3], "status": r[4], "points": r[5], "referrals_count": r[6], "created_at": r[7], "birthday": r[8], "premium_until": r[9]} for r in await c.fetchall()]
+        async with db.execute("SELECT id, username, full_name, role, status, points, referrals_count, created_at, birthday, premium_until, COALESCE(is_blocked, 0) FROM users") as c:
+            users = [{"id": r[0], "username": r[1], "full_name": r[2], "role": r[3], "status": r[4], "points": r[5], "referrals_count": r[6], "created_at": r[7], "birthday": r[8], "premium_until": r[9], "is_blocked": r[10]} for r in await c.fetchall()]
 
         # 4. Premium subscriptions
         async with db.execute("SELECT user_id, start_date, end_date, plan FROM premium_subscriptions") as c:
@@ -4253,6 +4253,15 @@ async def set_user_bot_blocked(user_id: int, is_blocked: int = 1):
         await db.execute("UPDATE users SET is_blocked = ? WHERE id = ?", (is_blocked, user_id))
         await db.commit()
 
+async def update_user_username(user_id: int, username: str):
+    """Foydalanuvchining yangilangan username'ini bazada yangilash"""
+    if not username:
+        return
+    clean_username = username.lstrip('@')
+    async with get_db() as db:
+        await db.execute("UPDATE users SET username = ? WHERE id = ?", (clean_username, user_id))
+        await db.commit()
+
 async def get_blocked_users_list(limit: int = 10, offset: int = 0):
     """Botni bloklagan foydalanuvchilar ro'yxati va umumiy soni"""
     async with get_db() as db:
@@ -4269,3 +4278,52 @@ async def get_blocked_users_list(limit: int = 10, offset: int = 0):
         ) as c:
             rows = await c.fetchall()
         return rows, total
+
+async def scan_all_users_for_blocks(bot) -> tuple[int, int, int]:
+    """
+    Barcha ro'yxatdan o'tgan foydalanuvchilarni botni bloklaganlikka real-time skanerlash.
+    Qaytaradi: (jami_tekshirildi, bloklanganlar_soni, faollar_soni)
+    """
+    from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+    async with get_db() as db:
+        async with db.execute("SELECT id FROM users") as cursor:
+            rows = await cursor.fetchall()
+    
+    if not rows:
+        return 0, 0, 0
+    
+    total = len(rows)
+    blocked_count = 0
+    active_count = 0
+    
+    for r in rows:
+        uid = r[0]
+        is_blocked = False
+        try:
+            await bot.send_chat_action(chat_id=uid, action="typing")
+            is_blocked = False
+            active_count += 1
+        except TelegramForbiddenError:
+            is_blocked = True
+            blocked_count += 1
+        except TelegramBadRequest as e:
+            if "chat not found" in str(e).lower() or "bot can't initiate" in str(e).lower():
+                is_blocked = True
+                blocked_count += 1
+            else:
+                active_count += 1
+        except Exception as e:
+            if any(w in str(e).lower() for w in ["blocked", "forbidden", "deactivated", "chat not found"]):
+                is_blocked = True
+                blocked_count += 1
+            else:
+                active_count += 1
+        
+        await set_user_bot_blocked(uid, 1 if is_blocked else 0)
+        await asyncio.sleep(0.04)  # Telegram API flood limitdan himoya
+        
+    try:
+        await export_master_backup_json()
+    except Exception:
+        pass
+    return total, blocked_count, active_count
