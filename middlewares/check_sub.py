@@ -158,30 +158,23 @@ class StateCancelMiddleware(BaseMiddleware):
             if state:
                 current_state = await state.get_state()
                 if current_state is not None:
-                    # Admin FSM holatida turgan bo'lsa, holat faqat /cancel yoki /start da tozalanadi
-                    if "AdminStates" in str(current_state):
-                        if text_clean in ["/start", "/cancel", "bekor qilish ❌", "bekor qilish"]:
+                    is_url = text_clean.startswith(("http://", "https://", "t.me/")) or "://" in text_clean
+                    if not is_url:
+                        menu_keywords = [
+                            "qidirish", "saqlanganlar", "tanlanganlar", "tasodifiy", "so'rash",
+                            "ballarim", "bonus", "reytinglar", "referal", "so'rovlari",
+                            "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
+                            "kino qo'shish", "kino o'chirish", "kino tahrirlash", "statistika", "reklama",
+                            "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",
+                            "moderatorlar", "trendlari", "shubhali", "keshni", "ommaviy", "bloklaganlar",
+                            "botni bloklaganlar", "barcha foydalanuvchilar"
+                        ]
+                        exact_cancel_cmds = ["/start", "/cancel", "/help", "/stop", "start", "cancel", "bekor qilish ❌", "bekor qilish"]
+                        if text_clean in exact_cancel_cmds or any(kw in text_clean for kw in menu_keywords):
                             await state.clear()
                             data["raw_state"] = None
                             import logging
-                            logging.info(f"Admin FSM state '{current_state}' canceled explicitly by '{text_clean}'.")
-                    else:
-                        is_url = text_clean.startswith(("http://", "https://", "t.me/")) or "://" in text_clean
-                        if not is_url:
-                            menu_keywords = [
-                                "qidirish", "saqlanganlar", "tanlanganlar", "tasodifiy", "so'rash",
-                                "ballarim", "bonus", "reytinglar", "referal", "so'rovlari",
-                                "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
-                                "kino qo'shish", "kino o'chirish", "kino tahrirlash", "statistika", "reklama",
-                                "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",
-                                "moderatorlar", "trendlari", "shubhali", "keshni", "ommaviy"
-                            ]
-                            exact_cancel_cmds = ["/start", "/cancel", "/help", "/stop", "start", "cancel"]
-                            if text_clean in exact_cancel_cmds or any(kw == text_clean for kw in menu_keywords):
-                                await state.clear()
-                                data["raw_state"] = None
-                                import logging
-                                logging.info(f"FSM state '{current_state}' cleared automatically for command/menu button '{text_clean}'.")
+                            logging.info(f"FSM state '{current_state}' cleared automatically for command/menu button '{text_clean}'.")
         return await handler(event, data)
 
 

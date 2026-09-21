@@ -4291,7 +4291,8 @@ async def perm_delete_from_trash_cb(callback: CallbackQuery):
     await callback.answer(f"Kino /{m_id} butunlay o'chirildi!", show_alert=True)
 
 
-@router.message(F.text == '🔍 Foydalanuvchi Qidirish')
+@router.message(F.text.regexp(r'(?i).*(foydalanuvchi qidirish).*'), StateFilter('*'))
+@router.message(F.text == '🔍 Foydalanuvchi Qidirish', StateFilter('*'))
 async def trigger_user_search_button(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'add_movie')):
@@ -4307,7 +4308,8 @@ async def trigger_user_search_button(message: Message, state: FSMContext):
     await message.answer(with_footer(txt), parse_mode='HTML')
 
 
-@router.message(F.text == '👥 Barcha Foydalanuvchilar')
+@router.message(F.text.regexp(r'(?i).*(barcha foydalanuvchilar).*'), StateFilter('*'))
+@router.message(F.text == '👥 Barcha Foydalanuvchilar', StateFilter('*'))
 async def show_all_users_list_handler(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
@@ -4408,7 +4410,9 @@ async def cb_admin_menu(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.message(F.text == '🚫 Botni Bloklaganlar')
+@router.message(F.text.regexp(r'(?i).*(botni bloklaganlar|bloklaganlar).*'), StateFilter('*'))
+@router.message(F.text.contains('Botni Bloklaganlar'), StateFilter('*'))
+@router.message(F.text == '🚫 Botni Bloklaganlar', StateFilter('*'))
 async def show_blocked_users_list_handler(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
