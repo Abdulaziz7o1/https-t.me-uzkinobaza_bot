@@ -207,13 +207,14 @@ def get_ban_duration_keyboard(target_user_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_premium_user_action_keyboard(target_user_id: int) -> InlineKeyboardMarkup:
+def get_premium_user_action_keyboard(target_user_id: int, username: str = None) -> InlineKeyboardMarkup:
     """Premium foydalanuvchi kartasi ostidagi inline tugmalar"""
     builder = InlineKeyboardBuilder()
     builder.button(text="⚠️ Ogohlantirish", callback_data=f"prem_warn_{target_user_id}")
     builder.button(text="🚫 Bloklash", callback_data=f"prem_ban_{target_user_id}")
     builder.button(text="❌ Premiumni O'chirish", callback_data=f"prem_remove_{target_user_id}")
-    builder.adjust(2, 1)
+    builder.button(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_open_profile_{target_user_id}")
+    builder.adjust(2, 1, 1)
     return builder.as_markup()
 
 

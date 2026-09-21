@@ -6,9 +6,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import asyncio
 import os
+import html
+import logging
 import config
 from database import requests as db_req
+from keyboards import inline
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+
+logger = logging.getLogger(__name__)
 router = Router()
 
 CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
@@ -3209,11 +3214,37 @@ async def show_premium_subscribers_panel(message: Message, state: FSMContext):
         return
     await message.answer(with_footer(f"💎 <b>FAOL PREMIUM FOYDALANUVCHILAR RO'YXATI (Jami {len(subscribers)} ta):</b>"), parse_mode='HTML')
     for sub_uid, username, full_name, start_date, end_date, plan in subscribers:
-        uname = f'@{username}' if username else 'Mavjud emas'
-        fname = full_name or 'Foydalanuvchi'
-        card = f'👑 <b>PREMIUM FOYDALANUVCHI:</b>\n\n👤 <b>Ism:</b> {fname}\n🏷 <b>Username:</b> {uname}\n🆔 <b>User ID:</b> <code>{sub_uid}</code>\n📋 <b>Reja / Narx:</b> <code>{plan or 'Premium VIP'}</code>\n📅 <b>Olingan sana:</b> <code>{start_date}</code>\n⏳ <b>Tugash sana:</b> <code>{end_date}</code>'
-        kb = inline.get_premium_user_action_keyboard(sub_uid)
-        await message.answer(with_footer(card), parse_mode='HTML', reply_markup=kb)
+        try:
+            uname = f"@{html.escape(str(username).lstrip('@'))}" if username else 'Mavjud emas'
+            fname = html.escape(str(full_name)) if full_name else 'Foydalanuvchi'
+            safe_plan = html.escape(str(plan or 'Premium VIP'))
+            card = (
+                f"👑 <b>PREMIUM FOYDALANUVCHI:</b>\n\n"
+                f"👤 <b>Ism:</b> {fname}\n"
+                f"🏷 <b>Username:</b> {uname}\n"
+                f"🆔 <b>User ID:</b> <code>{sub_uid}</code>\n"
+                f"📋 <b>Reja / Narx:</b> <code>{safe_plan}</code>\n"
+                f"📅 <b>Olingan sana:</b> <code>{start_date}</code>\n"
+                f"⏳ <b>Tugash sana:</b> <code>{end_date}</code>"
+            )
+            kb = inline.get_premium_user_action_keyboard(sub_uid, username=username)
+            await message.answer(with_footer(card), parse_mode='HTML', reply_markup=kb, disable_web_page_preview=True)
+        except Exception as e:
+            logger.error(f"Error sending premium subscriber card for {sub_uid}: {e}")
+            try:
+                raw_card = (
+                    f"👑 PREMIUM FOYDALANUVCHI:\n\n"
+                    f"👤 Ism: {full_name or 'Foydalanuvchi'}\n"
+                    f"🏷 Username: @{username if username else 'Mavjud emas'}\n"
+                    f"🆔 User ID: {sub_uid}\n"
+                    f"📋 Reja / Narx: {plan or 'Premium VIP'}\n"
+                    f"📅 Olingan sana: {start_date}\n"
+                    f"⏳ Tugash sana: {end_date}"
+                )
+                kb = inline.get_premium_user_action_keyboard(sub_uid, username=username)
+                await message.answer(raw_card, reply_markup=kb)
+            except Exception:
+                pass
 
 @router.callback_query(F.data.startswith('prem_warn_'))
 async def prem_warn_user_cb(callback: CallbackQuery):
