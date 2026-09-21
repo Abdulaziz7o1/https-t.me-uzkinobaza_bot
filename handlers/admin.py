@@ -2066,13 +2066,11 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     user_info = await db_req.get_user(u_id)
     u_username = user_info[1] if user_info and len(user_info) > 1 else None
     clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
-    prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
-    prof_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="👤 Profilni Ochish", url=prof_url),
-            InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
-        ]
-    ])
+    prof_buttons = []
+    if clean_u:
+        prof_buttons.append(InlineKeyboardButton(text="👤 Profilni Ochish", url=f"https://t.me/{clean_u}"))
+    prof_buttons.append(InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1"))
+    prof_kb = InlineKeyboardMarkup(inline_keyboard=[prof_buttons])
     if is_blocked:
         msg_text = (
             f"🔍 <b>BOT BLOKI TEKSHIRUVI NATIJASI:</b>\n\n"
@@ -2298,10 +2296,15 @@ async def process_user_direct_msg(message: Message, state: FSMContext):
             except Exception:
                 pass
             
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"tg://user?id={target_user_id}")],
-                [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
-            ])
+            user_for_btn = await db_req.get_user(target_user_id)
+            u_btn_username = user_for_btn[1] if user_for_btn and len(user_for_btn) > 1 else None
+            clean_btn_u = str(u_btn_username).strip().lstrip('@') if u_btn_username and str(u_btn_username).strip() and str(u_btn_username).strip().lower() != 'none' else None
+            
+            kb_rows = []
+            if clean_btn_u:
+                kb_rows.append([InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"https://t.me/{clean_btn_u}")])
+            kb_rows.append([InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")])
+            kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
             await message.answer(
                 with_footer(
                     f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
@@ -4462,7 +4465,10 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
             ]
         ])
         if is_edit:
-            await target_msg_obj.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+            try:
+                await target_msg_obj.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+            except Exception:
+                await target_msg_obj.answer(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
         else:
             await target_msg_obj.answer(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
         return
@@ -4482,16 +4488,19 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
     for idx, (u_id, username, full_name, last_act, c_at) in enumerate(users_list, start=offset + 1):
         uname_str = f"@{username}" if username else "—"
         name_str = (full_name[:20] if full_name else "Nomsiz").replace("<", "&lt;").replace(">", "&gt;")
+        user_link = f"<a href='tg://user?id={u_id}'>{name_str}</a>"
         lines.append(
             f"{idx}. <b>ID:</b> <code>{u_id}</code>\n"
-            f"   👤 <b>Name:</b> {name_str}\n"
+            f"   👤 <b>Ism:</b> {user_link}\n"
             f"   🔗 <b>User:</b> {uname_str}\n"
         )
         clean_u = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
-        p_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
-        inline_keyboard.append([
-            InlineKeyboardButton(text=f"👤 {idx}. {name_str[:15]} — Profilni Ochish", url=p_url)
-        ])
+        
+        row = []
+        if clean_u:
+            row.append(InlineKeyboardButton(text=f"👤 {idx}. Profil", url=f"https://t.me/{clean_u}"))
+        row.append(InlineKeyboardButton(text=f"⚙️ {idx}. Boshqarish", callback_data=f"admin_manage_user_{u_id}"))
+        inline_keyboard.append(row)
 
     full_text = "\n".join(lines)
 
@@ -4518,7 +4527,7 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
         try:
             await target_msg_obj.edit_text(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
         except Exception:
-            pass
+            await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
     else:
         await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
 
@@ -4557,3 +4566,13 @@ async def admin_scan_blocked_users_callback(callback: CallbackQuery):
         await render_blocked_users_page(callback.message, page=1, is_edit=True)
     except Exception as e:
         await status_msg.edit_text(with_footer(f"❌ Skanerlashda xatolik yuz berdi: {e}"), parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith('admin_manage_user_'))
+async def admin_manage_user_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'add_movie')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    u_id = callback.data.split('_')[-1]
+    await callback.answer()
+    await process_user_search(callback.message, u_id)
