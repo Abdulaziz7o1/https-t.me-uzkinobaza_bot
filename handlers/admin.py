@@ -4677,8 +4677,18 @@ async def admin_open_profile_callback(callback: CallbackQuery):
     except TelegramBadRequest as e:
         if any(err in str(e).lower() for err in ['button_user_privacy_restricted', 'button_user_invalid']):
             fallback_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish", callback_data=f"admin_privacy_alert_{u_id}")],
                 [InlineKeyboardButton(text="⚙️ Foydalanuvchini Boshqarish", callback_data=f"admin_manage_user_{u_id}")]
             ])
             await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=fallback_kb, disable_web_page_preview=True)
         else:
             raise
+
+
+@router.callback_query(F.data.startswith('admin_privacy_alert_'))
+async def admin_privacy_alert_callback(callback: CallbackQuery):
+    await callback.answer(
+        "⚠️ Ushbu foydalanuvchi Telegram sozlamalarida maxfiylikni yopib qo'ygan!\n\n"
+        "Profilini ochish uchun xabardagi ko'k rangli [👤 Shaxsiy Profilini Ochish] havolasini bosing.",
+        show_alert=True
+    )
