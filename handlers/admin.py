@@ -4687,8 +4687,11 @@ async def admin_open_profile_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith('admin_privacy_alert_'))
 async def admin_privacy_alert_callback(callback: CallbackQuery):
+    u_id = int(callback.data.split('_')[-1])
+    user_info = await db_req.get_user(u_id)
+    u_name = (user_info[2] if user_info and len(user_info) > 2 and user_info[2] else f"Foydalanuvchi {u_id}")
     await callback.answer(
-        "⚠️ Ushbu foydalanuvchi Telegram sozlamalarida maxfiylikni yopib qo'ygan!\n\n"
-        "Profilini ochish uchun xabardagi ko'k rangli [👤 Shaxsiy Profilini Ochish] havolasini bosing.",
+        f"⚠️ Ushbu foydalanuvchi ({u_name}) o'z Telegram sozlamalarida profilini yashirgan!\n\n"
+        f"Profilni Telegram ichida ochish uchun xabardagi ko'k rangli havola ustiga bosing.",
         show_alert=True
     )
