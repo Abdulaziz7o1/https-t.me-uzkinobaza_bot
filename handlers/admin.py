@@ -2066,11 +2066,13 @@ async def admin_check_user_blocked_callback(callback: CallbackQuery):
     user_info = await db_req.get_user(u_id)
     u_username = user_info[1] if user_info and len(user_info) > 1 else None
     clean_u = str(u_username).strip().lstrip('@') if u_username and str(u_username).strip() and str(u_username).strip().lower() != 'none' else None
-    prof_buttons = []
-    if clean_u:
-        prof_buttons.append(InlineKeyboardButton(text="👤 Profilni Ochish", url=f"https://t.me/{clean_u}"))
-    prof_buttons.append(InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1"))
-    prof_kb = InlineKeyboardMarkup(inline_keyboard=[prof_buttons])
+    prof_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
+    prof_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👤 Profilni Ochish", url=prof_url),
+            InlineKeyboardButton(text="🚫 Bloklanganlar Ro'yxati", callback_data="blocked_users_page_1")
+        ]
+    ])
     if is_blocked:
         msg_text = (
             f"🔍 <b>BOT BLOKI TEKSHIRUVI NATIJASI:</b>\n\n"
@@ -2299,12 +2301,11 @@ async def process_user_direct_msg(message: Message, state: FSMContext):
             user_for_btn = await db_req.get_user(target_user_id)
             u_btn_username = user_for_btn[1] if user_for_btn and len(user_for_btn) > 1 else None
             clean_btn_u = str(u_btn_username).strip().lstrip('@') if u_btn_username and str(u_btn_username).strip() and str(u_btn_username).strip().lower() != 'none' else None
-            
-            kb_rows = []
-            if clean_btn_u:
-                kb_rows.append([InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=f"https://t.me/{clean_btn_u}")])
-            kb_rows.append([InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")])
-            kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+            prof_url = f"https://t.me/{clean_btn_u}" if clean_btn_u else f"tg://user?id={target_user_id}"
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👤 Shaxsiy Profiliga O'tish (Telegram)", url=prof_url)],
+                [InlineKeyboardButton(text="🗑 Foydalanuvchini Bazadan O'chirish", callback_data=f"admin_deluser_{target_user_id}")]
+            ])
             await message.answer(
                 with_footer(
                     f"⚠️ <b>FOYDALANUVCHI BOTNI BLOKLAGAN!</b>\n\n"
@@ -4495,11 +4496,12 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
             f"   🔗 <b>User:</b> {uname_str}\n"
         )
         clean_u = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
+        p_url = f"https://t.me/{clean_u}" if clean_u else f"tg://user?id={u_id}"
         
-        row = []
-        if clean_u:
-            row.append(InlineKeyboardButton(text=f"👤 {idx}. Profil", url=f"https://t.me/{clean_u}"))
-        row.append(InlineKeyboardButton(text=f"⚙️ {idx}. Boshqarish", callback_data=f"admin_manage_user_{u_id}"))
+        row = [
+            InlineKeyboardButton(text=f"👤 {idx}. Profilni Ochish", url=p_url),
+            InlineKeyboardButton(text="⚙️ Boshqarish", callback_data=f"admin_manage_user_{u_id}")
+        ]
         inline_keyboard.append(row)
 
     full_text = "\n".join(lines)
