@@ -54,8 +54,6 @@ class AdminStates(StatesGroup):
     waiting_for_movie_replace_video = State()
     waiting_for_scheduled_broadcast_msg = State()
     waiting_for_scheduled_broadcast_time = State()
-    waiting_for_referral_promo_video = State()
-    waiting_for_referral_promo_caption = State()
     waiting_for_bulk_movies = State()
     waiting_for_config_value = State()
     waiting_for_bc_media = State()
@@ -411,7 +409,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Referal sozlash 👥', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar']
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar']
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -789,7 +787,7 @@ async def backup_database(message: Message, state: FSMContext):
             csv_path = 'users_list.csv'
             with open(csv_path, 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f, delimiter=';')
-                writer.writerow(['ID', 'Username', "To'liq ismi", 'Rol', 'Holati', 'Ballari', 'Taklif qilganlari', "Ro'yxatdan o'tgan sana"])
+                writer.writerow(['ID', 'Username', "To'liq ismi", 'Rol', 'Holati', 'Ballari', "Ro'yxatdan o'tgan sana"])
                 for row in users:
                     writer.writerow(row)
             excel_file = FSInputFile(csv_path, filename='users_detailed_list.csv')
@@ -1324,91 +1322,6 @@ async def scheduled_broadcast_time_invalid(message: Message):
         return
     await message.answer(with_footer('⚠️ Iltimos, faqat daqiqalardan iborat butun son kiriting!'))
 
-@router.message(F.text == 'Referal sozlash 👥')
-async def set_referral_promo_start(message: Message, state: FSMContext):
-    await state.clear()
-    if message.from_user.id not in config.ADMINS:
-        return
-    await state.set_state(AdminStates.waiting_for_referral_promo_video)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="O'tkazib yuborish ⏭", callback_data='ref_promo_skip')], [InlineKeyboardButton(text="Mediani o'chirish ❌ (Faqat matn)", callback_data='ref_promo_delete')], [InlineKeyboardButton(text='Bekor qilish 🚫', callback_data='ref_promo_cancel')]])
-    await message.answer(with_footer("👥 <b>Referal taklif qilish uchun promo video yoki rasmni yuboring:</b>\n\n<i>Bu media foydalanuvchilar o'z do'stlariga yuborganda ulashish xabari sifatida ishlatiladi.</i>"), parse_mode='HTML', reply_markup=kb)
-
-@router.callback_query(F.data == 'ref_promo_skip')
-async def callback_ref_promo_skip(callback: CallbackQuery, state: FSMContext):
-    file_id = await db_req.get_setting('ref_promo_file_id')
-    media_type = await db_req.get_setting('ref_promo_media_type')
-    await state.update_data(ref_file_id=file_id, ref_media_type=media_type)
-    await state.set_state(AdminStates.waiting_for_referral_promo_caption)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="O'tkazib yuborish ⏭ (Eski matn qolsin)", callback_data='ref_promo_caption_skip')], [InlineKeyboardButton(text='Bekor qilish 🚫', callback_data='ref_promo_cancel')]])
-    await callback.message.edit_text(with_footer("📝 <b>Eski promo media saqlandi. Endi yangi tavsif matnini yozib yuboring:</b>\n\n<i>Eslatma: Matn ostiga taklif havolasi avtomatik ravishda qo'shiladi.</i>"), parse_mode='HTML', reply_markup=kb)
-    await callback.answer()
-
-@router.callback_query(F.data == 'ref_promo_delete')
-async def callback_ref_promo_delete(callback: CallbackQuery, state: FSMContext):
-    await state.update_data(ref_file_id=None, ref_media_type=None)
-    await state.set_state(AdminStates.waiting_for_referral_promo_caption)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="O'tkazib yuborish ⏭ (Eski matn qolsin)", callback_data='ref_promo_caption_skip')], [InlineKeyboardButton(text='Bekor qilish 🚫', callback_data='ref_promo_cancel')]])
-    await callback.message.edit_text(with_footer("❌ <b>Promo media o'chirildi (Faqat matn qoladi). Endi yangi tavsif matnini yuboring:</b>"), parse_mode='HTML', reply_markup=kb)
-    await callback.answer()
-
-@router.callback_query(F.data == 'ref_promo_cancel')
-async def callback_ref_promo_cancel(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.message.edit_text(with_footer('✅ Amal bekor qilindi.'))
-    await callback.answer()
-
-@router.callback_query(F.data == 'ref_promo_caption_skip')
-async def callback_ref_promo_caption_skip(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    file_id = data.get('ref_file_id')
-    media_type = data.get('ref_media_type')
-    caption = await db_req.get_setting('ref_promo_caption')
-    await db_req.set_setting('ref_promo_file_id', file_id)
-    await db_req.set_setting('ref_promo_media_type', media_type)
-    await db_req.set_setting('ref_promo_caption', caption)
-    await state.clear()
-    await callback.message.edit_text(with_footer("✅ <b>Referal promo xabari muvaffaqiyatli saqlandi!</b>\n\nMatn o'zgarishsiz qoldirildi."), parse_mode='HTML')
-    await callback.answer()
-
-@router.message(AdminStates.waiting_for_referral_promo_video, F.video | F.photo | F.document)
-async def set_referral_promo_video(message: Message, state: FSMContext):
-    if message.video:
-        file_id = message.video.file_id
-        media_type = 'video'
-    elif message.photo:
-        file_id = message.photo[-1].file_id
-        media_type = 'photo'
-    else:
-        file_id = message.document.file_id
-        media_type = 'document'
-    await state.update_data(ref_file_id=file_id, ref_media_type=media_type)
-    await state.set_state(AdminStates.waiting_for_referral_promo_caption)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="O'tkazib yuborish ⏭ (Eski matn qolsin)", callback_data='ref_promo_caption_skip')], [InlineKeyboardButton(text='Bekor qilish 🚫', callback_data='ref_promo_cancel')]])
-    await message.answer(with_footer("📝 <b>Yangi media qabul qilindi. Endi ushbu media ostidagi tavsif matnini yuboring:</b>\n\n<i>Eslatma: Matn ostiga taklif havolasi avtomatik ravishda qo'shiladi.</i>"), parse_mode='HTML', reply_markup=kb)
-
-@router.message(AdminStates.waiting_for_referral_promo_caption, F.text, ~F.text.in_(MENU_BUTTONS))
-async def set_referral_promo_caption(message: Message, state: FSMContext):
-    caption = message.text.strip()
-    data = await state.get_data()
-    file_id = data.get('ref_file_id')
-    media_type = data.get('ref_media_type')
-    await db_req.set_setting('ref_promo_file_id', file_id)
-    await db_req.set_setting('ref_promo_media_type', media_type)
-    await db_req.set_setting('ref_promo_caption', caption)
-    await state.clear()
-    await message.answer(with_footer("✅ <b>Referal promo xabari muvaffaqiyatli saqlandi!</b>\n\nEndi foydalanuvchilar 'Takliflar (Referal)' tugmasini bosganida shu xabarni o'z taklif havolalari bilan birga olishadi."), parse_mode='HTML')
-
-@router.message(AdminStates.waiting_for_referral_promo_video)
-async def set_referral_promo_video_invalid(message: Message):
-    if message.text and message.text in MENU_BUTTONS:
-        return
-    await message.answer(with_footer('⚠️ Iltimos, video, rasm yoki hujjat yuboring!'))
-
-@router.message(AdminStates.waiting_for_referral_promo_caption)
-async def set_referral_promo_caption_invalid(message: Message):
-    if message.text and message.text in MENU_BUTTONS:
-        return
-    await message.answer(with_footer('⚠️ Iltimos, promo matnini yozib yuboring!'))
 
 @router.message(Command('cancel'))
 async def cancel_handler(message: Message, state: FSMContext):
@@ -1422,7 +1335,7 @@ async def cancel_handler(message: Message, state: FSMContext):
 @router.message(Command('leaderboard'))
 async def show_leaderboard_menu(message: Message):
     """Leaderboard menyusi"""
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 Users (Ballar)', callback_data='top_users_points'), InlineKeyboardButton(text='👥 TOP 10 Users (Referallar)', callback_data='top_users_referrals')], [InlineKeyboardButton(text='🔥 TOP 10 Users (Faollik)', callback_data='top_users_activity'), InlineKeyboardButton(text='👨\u200d💼 TOP 10 Admins', callback_data='top_admins')], [InlineKeyboardButton(text='📊 Barcha statistika', callback_data='full_stats')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='admin_menu')]])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 Users (Ballar)', callback_data='top_users_points'), InlineKeyboardButton(text='🔥 TOP 10 Users (Faollik)', callback_data='top_users_activity')], [InlineKeyboardButton(text='👨\u200d💼 TOP 10 Admins', callback_data='top_admins')], [InlineKeyboardButton(text='📊 Barcha statistika', callback_data='full_stats')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='admin_menu')]])
     await message.answer(with_footer("📊 <b>Leaderboard - Reytinglar</b>\n\nQuyidagi bo'limlardan birini tanlang:"), parse_mode='HTML', reply_markup=keyboard)
 
 @router.callback_query(F.data == 'top_users_points')
@@ -1431,30 +1344,13 @@ async def show_top_users_points(callback: CallbackQuery):
     top_users = await db_req.get_top_users_by_points(10)
     text = "🏆 <b>TOP 10 Foydalanuvchilar (Ballar bo'yicha)</b>\n\n"
     medals = ['🥇', '🥈', '🥉']
-    for i, (user_id, username, full_name, points, referrals_count) in enumerate(top_users, 1):
+    for i, user_row in enumerate(top_users, 1):
+        user_id, username, full_name, points = user_row[0], user_row[1], user_row[2], user_row[3]
         medal = medals[i - 1] if i <= 3 else f'#{i}'
         username_display = username or full_name or f'User {user_id}'
         text += f'{medal} <b>{username_display}</b>\n'
-        text += f'   💰 Ball: {points:,} | 👥 Referallar: {referrals_count}\n\n'
+        text += f'   💰 Ball: {points:,} 💎\n\n'
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔄 Yangilash', callback_data='top_users_points')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='leaderboard')]])
-    try:
-        await callback.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
-    except Exception:
-        await callback.message.answer(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
-    await callback.answer()
-
-@router.callback_query(F.data == 'top_users_referrals')
-async def show_top_users_referrals(callback: CallbackQuery):
-    """Referallar bo'yicha TOP 10 foydalanuvchilar"""
-    top_users = await db_req.get_top_users_by_referrals(10)
-    text = "👥 <b>TOP 10 Foydalanuvchilar (Referallar bo'yicha)</b>\n\n"
-    medals = ['🥇', '🥈', '🥉']
-    for i, (user_id, username, full_name, referrals_count, points) in enumerate(top_users, 1):
-        medal = medals[i - 1] if i <= 3 else f'#{i}'
-        username_display = username or full_name or f'User {user_id}'
-        text += f'{medal} <b>{username_display}</b>\n'
-        text += f'   👥 Referallar: {referrals_count} | 💰 Ball: {points:,}\n\n'
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔄 Yangilash', callback_data='top_users_referrals')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='leaderboard')]])
     try:
         await callback.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
     except Exception:
@@ -1505,7 +1401,6 @@ async def show_full_stats(callback: CallbackQuery):
     total_users = await db_req.get_total_users_count()
     premium_users = await db_req.get_premium_users_count()
     total_movies = await db_req.get_total_movies_count()
-    total_referrals = await db_req.get_total_referrals_count()
     admins = await db_req.get_all_admins()
     text = "📊 <b>To'liq Statistika</b>\n\n"
     text += '👥 <b>Foydalanuvchilar:</b>\n'
@@ -1515,8 +1410,6 @@ async def show_full_stats(callback: CallbackQuery):
     text += '🎬 <b>Kinolar:</b>\n'
     text += f'   📊 Jami: {total_movies:,}\n'
     text += f'   🔥 Trending: {len(await db_req.get_trending_movies())}\n\n'
-    text += '👥 <b>Referallar:</b>\n'
-    text += f'   📊 Jami: {total_referrals:,}\n\n'
     text += '👨\u200d💼 <b>Adminlar:</b>\n'
     text += f'   📊 Jami: {len(admins)}\n\n'
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔄 Yangilash', callback_data='full_stats')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='leaderboard')]])
@@ -1529,7 +1422,7 @@ async def show_full_stats(callback: CallbackQuery):
 @router.callback_query(F.data == 'leaderboard')
 async def back_to_leaderboard(callback: CallbackQuery):
     """Leaderboard menyusiga qaytish"""
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 Users (Ballar)', callback_data='top_users_points'), InlineKeyboardButton(text='👥 TOP 10 Users (Referallar)', callback_data='top_users_referrals')], [InlineKeyboardButton(text='🔥 TOP 10 Users (Faollik)', callback_data='top_users_activity'), InlineKeyboardButton(text='👨\u200d💼 TOP 10 Admins', callback_data='top_admins')], [InlineKeyboardButton(text='📊 Barcha statistika', callback_data='full_stats')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='admin_menu')]])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 Users (Ballar)', callback_data='top_users_points'), InlineKeyboardButton(text='🔥 TOP 10 Users (Faollik)', callback_data='top_users_activity')], [InlineKeyboardButton(text='👨\u200d💼 TOP 10 Admins', callback_data='top_admins')], [InlineKeyboardButton(text='📊 Barcha statistika', callback_data='full_stats')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='admin_menu')]])
     try:
         await callback.message.edit_text(with_footer("📊 <b>Leaderboard - Reytinglar</b>\n\nQuyidagi bo'limlardan birini tanlang:"), parse_mode='HTML', reply_markup=keyboard)
     except Exception:
@@ -1560,7 +1453,6 @@ async def show_admin_config_panel(message: Message, state: FSMContext):
     if message.from_user.id not in config.ADMINS:
         await message.answer(with_footer('❌ Bu amal faqat Bosh Adminlar uchun ruxsat etilgan.'))
         return
-    pts_ref = await db_req.get_config_int('points_referral', 10)
     pts_rat = await db_req.get_config_int('points_rating', 2)
     pts_com = await db_req.get_config_int('points_comment', 3)
     daily_pts = await db_req.get_config_int('daily_points_limit', 40)
@@ -1577,7 +1469,6 @@ async def show_admin_config_panel(message: Message, state: FSMContext):
         f"⚙️ <b>BOT TIZIM SOZLAMALARI:</b>\n\n"
         f"🛠 <b>Texnik ishlar rejimi:</b> {maint_str}\n"
         f"🎁 <b>VIP Xarid Keshbeki:</b> {cb_pct}%\n"
-        f"💎 <b>Referal balli:</b> {pts_ref} 💎\n"
         f"⭐️ <b>Baholash balli:</b> {pts_rat} 💎\n"
         f"💬 <b>Izoh yozish balli:</b> {pts_com} 💎\n"
         f"📊 <b>Kunlik ball limiti:</b> {daily_pts} 💎\n"
@@ -1588,10 +1479,9 @@ async def show_admin_config_panel(message: Message, state: FSMContext):
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"🛠 Texnik Rejim: {('🔴 ON' if is_maint else '🟢 OFF')}", callback_data='cfg_toggle_maintenance'), InlineKeyboardButton(text=f'🎁 VIP Keshbek: {cb_pct}% ✏️', callback_data='cfg_vip_cashback_pct')],
-        [InlineKeyboardButton(text=f'💎 Referal: {pts_ref} ✏️', callback_data='cfg_points_referral'), InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating')],
-        [InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment'), InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit')],
-        [InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit'), InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown')],
-        [InlineKeyboardButton(text=f'🛡 Moderatsiya: {("ON ✅" if mod_on == 1 else "OFF ❌")}', callback_data='cfg_toggle_moderation')]
+        [InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating'), InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment')],
+        [InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit'), InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit')],
+        [InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown'), InlineKeyboardButton(text=f'🛡 Moderatsiya: {("ON ✅" if mod_on == 1 else "OFF ❌")}', callback_data='cfg_toggle_moderation')]
     ])
     await message.answer(with_footer(text), parse_mode='HTML', reply_markup=kb)
 
@@ -1604,7 +1494,6 @@ async def toggle_maintenance_callback(callback: CallbackQuery):
     txt = "yoqildi 🔴 (Oddiy a'zolarga profilaktika xabari chiqadi)" if new_state else "o'chirildi 🟢 (Bot barcha a'zolar uchun ochildi)"
     await callback.answer(f"Texnik ishlar rejimi {txt}!", show_alert=True)
     
-    pts_ref = await db_req.get_config_int('points_referral', 10)
     pts_rat = await db_req.get_config_int('points_rating', 2)
     pts_com = await db_req.get_config_int('points_comment', 3)
     daily_pts = await db_req.get_config_int('daily_points_limit', 40)
@@ -1621,7 +1510,6 @@ async def toggle_maintenance_callback(callback: CallbackQuery):
         f"⚙️ <b>BOT TIZIM SOZLAMALARI:</b>\n\n"
         f"🛠 <b>Texnik ishlar rejimi:</b> {maint_str}\n"
         f"🎁 <b>VIP Xarid Keshbeki:</b> {cb_pct}%\n"
-        f"💎 <b>Referal balli:</b> {pts_ref} 💎\n"
         f"⭐️ <b>Baholash balli:</b> {pts_rat} 💎\n"
         f"💬 <b>Izoh yozish balli:</b> {pts_com} 💎\n"
         f"📊 <b>Kunlik ball limiti:</b> {daily_pts} 💎\n"
@@ -1632,10 +1520,9 @@ async def toggle_maintenance_callback(callback: CallbackQuery):
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"🛠 Texnik Rejim: {('🔴 ON' if is_maint else '🟢 OFF')}", callback_data='cfg_toggle_maintenance'), InlineKeyboardButton(text=f'🎁 VIP Keshbek: {cb_pct}% ✏️', callback_data='cfg_vip_cashback_pct')],
-        [InlineKeyboardButton(text=f'💎 Referal: {pts_ref} ✏️', callback_data='cfg_points_referral'), InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating')],
-        [InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment'), InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit')],
-        [InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit'), InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown')],
-        [InlineKeyboardButton(text=f'🛡 Moderatsiya: {("ON ✅" if mod_on == 1 else "OFF ❌")}', callback_data='cfg_toggle_moderation')]
+        [InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating'), InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment')],
+        [InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit'), InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit')],
+        [InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown'), InlineKeyboardButton(text=f'🛡 Moderatsiya: {("ON ✅" if mod_on == 1 else "OFF ❌")}', callback_data='cfg_toggle_moderation')]
     ])
     try:
         await callback.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=kb)
@@ -1652,15 +1539,14 @@ async def toggle_moderation_callback(callback: CallbackQuery):
     await db_req.set_setting('comment_moderation', str(new_val))
     status_str = 'yoqildi ✅' if new_val == 1 else "o'chirildi ❌"
     await callback.answer(f'Izohlar moderatsiyasi {status_str}', show_alert=True)
-    pts_ref = await db_req.get_config_int('points_referral', 10)
     pts_rat = await db_req.get_config_int('points_rating', 2)
     pts_com = await db_req.get_config_int('points_comment', 3)
     daily_pts = await db_req.get_config_int('daily_points_limit', 40)
     daily_rat = await db_req.get_config_int('daily_ratings_limit', 10)
     cooldown = await db_req.get_config_int('comment_cooldown', 30)
     mod_status_str = 'Yoqilgan ✅' if new_val == 1 else "O'chirilgan ❌"
-    text = f"⚙️ <b>Bot Tizim Sozlamalari (Inline Config):</b>\n\n💎 <b>Referal balli:</b> {pts_ref} 💎\n⭐️ <b>Baholash balli:</b> {pts_rat} 💎\n💬 <b>Izoh yozish balli:</b> {pts_com} 💎\n📊 <b>Kunlik ball limiti:</b> {daily_pts} 💎\n⭐ <b>Kunlik baholash limiti:</b> {daily_rat} ta\n⏱ <b>Izoh cooldown vaqti:</b> {cooldown} soniya\n🛡 <b>Izohlar moderatsiyasi:</b> {mod_status_str}\n\n<i>Tugmalarni bosib qiymatlarni o'zgartirishingiz mumkin:</i>"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f'💎 Referal: {pts_ref} ✏️', callback_data='cfg_points_referral'), InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating')], [InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment'), InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit')], [InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit'), InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown')], [InlineKeyboardButton(text=f'🛡 Moderatsiya: {('ON ✅' if new_val == 1 else 'OFF ❌')}', callback_data='cfg_toggle_moderation')]])
+    text = f"⚙️ <b>Bot Tizim Sozlamalari (Inline Config):</b>\n\n⭐️ <b>Baholash balli:</b> {pts_rat} 💎\n💬 <b>Izoh yozish balli:</b> {pts_com} 💎\n📊 <b>Kunlik ball limiti:</b> {daily_pts} 💎\n⭐ <b>Kunlik baholash limiti:</b> {daily_rat} ta\n⏱ <b>Izoh cooldown vaqti:</b> {cooldown} soniya\n🛡 <b>Izohlar moderatsiyasi:</b> {mod_status_str}\n\n<i>Tugmalarni bosib qiymatlarni o'zgartirishingiz mumkin:</i>"
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f'⭐️ Baho: {pts_rat} ✏️', callback_data='cfg_points_rating'), InlineKeyboardButton(text=f'💬 Izoh: {pts_com} ✏️', callback_data='cfg_points_comment')], [InlineKeyboardButton(text=f'📊 Max ball: {daily_pts} ✏️', callback_data='cfg_daily_points_limit'), InlineKeyboardButton(text=f'⭐ Max baho: {daily_rat} ✏️', callback_data='cfg_daily_ratings_limit')], [InlineKeyboardButton(text=f'⏱ Cooldown: {cooldown}s ✏️', callback_data='cfg_comment_cooldown')], [InlineKeyboardButton(text=f'🛡 Moderatsiya: {('ON ✅' if new_val == 1 else 'OFF ❌')}', callback_data='cfg_toggle_moderation')]])
     try:
         await callback.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=kb)
     except Exception:
@@ -1673,7 +1559,6 @@ async def config_edit_start(callback: CallbackQuery, state: FSMContext):
         return
     key = callback.data[len('cfg_'):]
     labels = {
-        'points_referral': 'Referal uchun beriladigan ball',
         'points_rating': 'Kinoni baholash uchun ball',
         'points_comment': 'Izoh yozish uchun ball',
         'daily_points_limit': 'Kunlik maksimal ball limiti',
@@ -1982,7 +1867,7 @@ async def process_user_search(message: Message, query: str):
     if not user:
         await message.answer(with_footer(f"❌ <code>{query}</code> bo'yicha foydalanuvchi topilmadi."), parse_mode='HTML')
         return
-    u_id, username, full_name, role, status, points, referrals_count, created_at, birthday = user
+    u_id, username, full_name, role, status, points, created_at, birthday = user
     clean_u = str(username).strip().lstrip('@') if username and str(username).strip() and str(username).strip().lower() != 'none' else None
     if clean_u:
         name_display = f"@{clean_u}"
@@ -1991,7 +1876,7 @@ async def process_user_search(message: Message, query: str):
         name_display = f"<a href='tg://user?id={u_id}'>{fn_safe}</a>"
     level_name, level_emoji, _ = db_req.get_user_level(points)
     bday_display = birthday if birthday else 'Kiritilmagan ❌'
-    txt = f"👤 <b>FOYDALANUVCHI MA'LUMOTLARI:</b>\n\n🆔 <b>ID:</b> <code>{u_id}</code>\n👤 <b>Ismi / Profil:</b> {name_display}\n🎭 <b>Rol:</b> <code>{role}</code> | <b>Holati:</b> <code>{status}</code>\n💎 <b>Ballari:</b> <code>{points}</code> 💎 ({level_emoji} {level_name})\n👥 <b>Referallari:</b> {referrals_count} ta\n🎂 <b>Tug'ilgan kuni:</b> {bday_display}\n📅 <b>Ro'yxatdan o'tgan:</b> {created_at}\n\n<i>Boshqarish uchun tugmalardan foydalaning:</i>"
+    txt = f"👤 <b>FOYDALANUVCHI MA'LUMOTLARI:</b>\n\n🆔 <b>ID:</b> <code>{u_id}</code>\n👤 <b>Ismi / Profil:</b> {name_display}\n🎭 <b>Rol:</b> <code>{role}</code> | <b>Holati:</b> <code>{status}</code>\n💎 <b>Ballari:</b> <code>{points}</code> 💎 ({level_emoji} {level_name})\n🎂 <b>Tug'ilgan kuni:</b> {bday_display}\n📅 <b>Ro'yxatdan o'tgan:</b> {created_at}\n\n<i>Boshqarish uchun tugmalardan foydalaning:</i>"
     try:
         await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_user_manage_keyboard(u_id, username), disable_web_page_preview=True)
     except TelegramBadRequest as e:
@@ -2969,62 +2854,6 @@ async def process_promo_uses_text(message: Message, state: FSMContext):
     else:
         await message.answer(with_footer("❌ Xatolik yuz berdi. Ushbu kod allaqachon mavjud bo'lishi mumkin."))
 
-@router.message(F.text == '2X Referal ⚡')
-async def show_2x_referral_panel(message: Message, state: FSMContext):
-    await state.clear()
-    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'send_broadcast')):
-        await message.answer(with_footer("❌ Bu amal uchun sizda ruxsat yo'q."))
-        return
-    status = await db_req.get_setting('referral_2x_event')
-    is_on = status == '1'
-    base_pts = await db_req.get_config_int('points_referral', 5)
-    double_pts = base_pts * 2
-    status_txt = f'FAOL ✅ (+{double_pts} 💎 ball)' if is_on else f"O'CHIRILGAN ❌ (Standart +{base_pts} 💎 ball)"
-    txt = f"⚡ <b>2X REFERAL BALLARI EVENTI:</b>\n\n📊 <b>Hozirgi holat:</b> {status_txt}\n💎 <b>Sozlamadagi ball:</b> +{base_pts} 💎 → Eventda 2X: <b>+{double_pts} 💎 ball</b>\n\n<i>Eslatma: Event yoqilganda do'stini taklif qilib, u majburiy kanallarga obuna bo'lib tekshirgach 2X baravar (+{double_pts} 💎) ball beriladi!</i>"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='⚡ Eventni Yoqish (2X)', callback_data='toggle_2x_event_on'), InlineKeyboardButton(text="🔕 Eventni O'chirish", callback_data='toggle_2x_event_off')], [InlineKeyboardButton(text='📢 Shoshilinch 2X Xabar Yuborish', callback_data='broadcast_2x_event_msg')]])
-    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
-
-@router.callback_query(F.data == 'toggle_2x_event_on')
-async def toggle_2x_event_on_cb(callback: CallbackQuery):
-    if callback.from_user.id not in config.ADMINS:
-        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
-        return
-    base_pts = await db_req.get_config_int('points_referral', 5)
-    double_pts = base_pts * 2
-    await db_req.set_setting('referral_2x_event', '1')
-    await callback.answer(f'⚡ 2X Referal Event yoqildi! (+{double_pts} 💎)', show_alert=True)
-    await callback.message.edit_text(with_footer(f'⚡ <b>2X Referal Event muvaffaqiyatli yoqildi! (Har bir referal uchun +{double_pts} 💎 ball beriladi)</b>\n\nFoydalanuvchilarga bildirishnoma yuborishingiz mumkin.'), parse_mode='HTML')
-
-@router.callback_query(F.data == 'toggle_2x_event_off')
-async def toggle_2x_event_off_cb(callback: CallbackQuery):
-    if callback.from_user.id not in config.ADMINS:
-        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
-        return
-    base_pts = await db_req.get_config_int('points_referral', 5)
-    await db_req.set_setting('referral_2x_event', '0')
-    await callback.answer("🔕 2X Referal Event o'chirildi!", show_alert=True)
-    await callback.message.edit_text(with_footer(f"🔕 <b>2X Referal Event o'chirildi. Standart +{base_pts} 💎 ball rejimiga qaytildi.</b>"), parse_mode='HTML')
-
-@router.callback_query(F.data == 'broadcast_2x_event_msg')
-async def broadcast_2x_event_msg_cb(callback: CallbackQuery):
-    if callback.from_user.id not in config.ADMINS:
-        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
-        return
-    await callback.answer('📢 Shoshilinch 2X Xabar yuborish boshlandi...', show_alert=True)
-    base_pts = await db_req.get_config_int('points_referral', 5)
-    double_pts = base_pts * 2
-    users = await db_req.get_all_users()
-    alert_msg = f"🚨 <b>SHOSHILINCH SUPER EVENT! 2X REFERAL BALLARI!</b> ⚡\n\nHurmatli foydalanuvchilar! Hozirdan boshlab taklif qilingan har bir do'stingiz uchun <b>2X BARAVAR KO'PROQ BALL (+{double_pts} 💎)</b> beriladi! 🚀\n<i>(Standart +{base_pts} 💎 ball o'rniga aynan bugun 2X: +{double_pts} 💎 ball!)</i>\n\n📌 <i>Eslatma: Ballar faqat do'stingiz taklif havolangiz orqali kirib, majburiy kanallarga to'liq obuna bo'lib va tasdiqlangach beriladi! Imkoniyatni boy bermang!</i> 🍿"
-    sent_cnt = 0
-    for uid in users:
-        try:
-            await callback.bot.send_message(uid, with_footer(alert_msg), parse_mode='HTML')
-            sent_cnt += 1
-            import asyncio
-            await asyncio.sleep(0.04)
-        except Exception:
-            pass
-    await callback.message.edit_text(with_footer(f'✅ <b>Shoshilinch 2X Xabar {sent_cnt} ta foydalanuvchiga muvaffaqiyatli yetkazildi!</b>'), parse_mode='HTML')
 
 @router.message(F.text == 'Audit Log 🛡️')
 async def show_audit_logs_panel(message: Message, state: FSMContext):
@@ -3972,85 +3801,6 @@ async def cb_delete_bad_movie(callback: CallbackQuery):
     await callback.answer(msg, show_alert=True)
     await cb_show_bad_movies_75(callback)
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  📩 A13: REFERAL OBUNA BO'LMAGANLARGA ESLATMA YUBORISH
-# ═══════════════════════════════════════════════════════════════════════════════
-@router.message(F.text == 'Referal sozlash 👥')
-async def admin_referral_reminder_menu(message: Message, state: FSMContext):
-    await state.clear()
-    if message.from_user.id not in config.ADMINS:
-        return
-    from keyboards.inline import get_admin_referral_reminder_keyboard
-    txt = (
-        "📩 <b>REFERAL TUGALLANMAGAN ESLATMA PANELI</b>\n\n"
-        "Referal orqali botga kirgan, lekin homiy kanallarga obuna bo'lmagan "
-        "foydalanuvchilar uchun referal egasiga eslatma yuboriladi.\n\n"
-        "<i>Anti-spam: 1 xabar 1 marta dan ko'p yuborilmaydi.</i>"
-    )
-    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_referral_reminder_keyboard())
-
-
-@router.callback_query(F.data == 'ref_reminder_send_all')
-async def cb_ref_reminder_send_all(callback: CallbackQuery):
-    if callback.from_user.id not in config.ADMINS:
-        await callback.answer("❌ Faqat Bosh Adminlar!", show_alert=True)
-        return
-    await callback.answer("⏳ Eslatmalar yuborilmoqda...")
-    bot = callback.bot
-
-    async with db_req.get_db() as db:
-        async with db.execute("""
-            SELECT DISTINCT u.referred_by
-            FROM users u
-            WHERE u.referred_by IS NOT NULL
-              AND u.referral_rewarded = 0
-        """) as c:
-            referrer_rows = await c.fetchall()
-
-    sent_count = 0
-    failed = 0
-    for (referrer_id,) in referrer_rows:
-        if not referrer_id:
-            continue
-        pending = await db_req.get_referrals_with_incomplete_sub(referrer_id)
-        if not pending:
-            continue
-        pending_display = []
-        for p in pending[:10]:
-            pid, puname, pfname, t = p
-            d = f"@{puname}" if puname else (pfname or f"User {pid}")
-            pending_display.append(f"• {d}")
-        if not pending_display:
-            continue
-        msg_txt = (
-            "📩 <b>REFERAL ESLATMA!</b>\n\n"
-            f"Sizning {len(pending)} ta referalingiz hali homiy kanallarga obuna bo'lmagan:\n"
-            + "\n".join(pending_display)
-            + "\n\n<i>Ularga eslating: Obuna bo'lsalar, siz darhol sovg'a olishingiz mumkin! 🎁</i>"
-        )
-        try:
-            await bot.send_message(
-                referrer_id,
-                with_footer(msg_txt),
-                parse_mode='HTML'
-            )
-            sent_count += 1
-        except Exception:
-            failed += 1
-
-    txt = (
-        f"✅ <b>REFERAL ESLATMA YUBORISH TUGALLANDI!</b>\n\n"
-        f"📤 Muvaffaqiyatli yuborilgan: <b>{sent_count}</b> ta referal egasiga\n"
-        f"❌ Xatolik bilan: <b>{failed}</b> ta\n\n"
-        f"<i>Keyingi eslatmalar keyingi kunda yuboriladi (spamning oldini olish uchun).</i>"
-    )
-    from keyboards.inline import get_admin_referral_reminder_keyboard
-    try:
-        await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_referral_reminder_keyboard())
-    except Exception:
-        await callback.message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_admin_referral_reminder_keyboard())
-    await callback.answer(f"✅ {sent_count} ta eslatma yuborildi!", show_alert=True)
 
 
 @router.callback_query(F.data == 'admin_flash_sale_start')

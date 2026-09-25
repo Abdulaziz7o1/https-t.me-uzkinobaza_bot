@@ -29,8 +29,7 @@ def get_admin_menu():
                 KeyboardButton(text="Moderatorlarni boshqarish ⚙️")
             ],
             [
-                KeyboardButton(text="Kino Trendlari 📈"),
-                KeyboardButton(text="Referal sozlash 👥")
+                KeyboardButton(text="Kino Trendlari 📈")
             ],
             [
                 KeyboardButton(text="Ballar 💎"),
@@ -57,8 +56,7 @@ def get_admin_menu():
                 KeyboardButton(text="Kassa 💰")
             ],
             [
-                KeyboardButton(text="Promo Kodlar 🎁"),
-                KeyboardButton(text="2X Referal ⚡")
+                KeyboardButton(text="Promo Kodlar 🎁")
             ],
             [
                 KeyboardButton(text="Audit Log 🛡️"),
@@ -174,7 +172,6 @@ def get_user_menu():
                 KeyboardButton(text="🏆 Reytinglar")
             ],
             [
-                KeyboardButton(text="👥 Referal"),
                 KeyboardButton(text="🗳️ Kino so'rovlari")
             ],
             [

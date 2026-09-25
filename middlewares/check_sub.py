@@ -162,7 +162,7 @@ class StateCancelMiddleware(BaseMiddleware):
                     if not is_url:
                         menu_keywords = [
                             "qidirish", "saqlanganlar", "tanlanganlar", "tasodifiy", "so'rash",
-                            "ballarim", "bonus", "reytinglar", "referal", "so'rovlari",
+                            "ballarim", "bonus", "reytinglar", "so'rovlari",
                             "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
                             "kino qo'shish", "kino o'chirish", "kino tahrirlash", "statistika", "reklama",
                             "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",

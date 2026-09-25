@@ -262,7 +262,6 @@ def get_profile_extended_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="💳 To'lovlar Tarixim", callback_data="show_payment_history")
     builder.button(text="🔥 Haftalik Top 10", callback_data="show_weekly_top")
     builder.button(text="🎯 Sizga Tavsiya", callback_data="show_recommendation")
-    builder.button(text="👥 Referallarim Batafsil", callback_data="show_my_referrals_detailed")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -282,15 +281,6 @@ def get_admin_gift_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🎁 Hozir 75 Ball Sovg'a Ber (Top 10)", callback_data="gift_top_10_75pts")
     builder.button(text="♻️ Barchaning ballarini 0 ga tenglash", callback_data="reset_all_points_confirm")
-    builder.button(text="🔙 Orqaga", callback_data="admin_menu")
-    builder.adjust(1)
-    return builder.as_markup()
-
-
-def get_admin_referral_reminder_keyboard() -> InlineKeyboardMarkup:
-    """Referal eslatma tugmalari"""
-    builder = InlineKeyboardBuilder()
-    builder.button(text="📩 Obuna Bo'lmaganlar Eslatmasini Yuborish", callback_data="ref_reminder_send_all")
     builder.button(text="🔙 Orqaga", callback_data="admin_menu")
     builder.adjust(1)
     return builder.as_markup()

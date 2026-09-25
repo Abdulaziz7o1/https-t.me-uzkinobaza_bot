@@ -35,8 +35,8 @@ async def sync_user_to_mongodb(user_id: int, username: str = None, full_name: st
     except Exception:
         pass
 
-async def add_user(user_id: int, username: str, full_name: str, referred_by: int = None):
-    """Foydalanuvchini bazaga qo'shish, rolini tekshirish va referalni bog'lash"""
+async def add_user(user_id: int, username: str, full_name: str):
+    """Foydalanuvchini bazaga qo'shish va rolini tekshirish"""
     role = 'admin' if user_id in config.ADMINS else 'member'
     from datetime import datetime, timedelta, timezone
     uzb_tz = timezone(timedelta(hours=5))
@@ -48,19 +48,11 @@ async def add_user(user_id: int, username: str, full_name: str, referred_by: int
             user_exists = await cursor.fetchone() is not None
             
         if not user_exists:
-            # Agar yangi foydalanuvchi bo'lsa va referal orqali kelgan bo'lsa
-            valid_ref = None
-            if referred_by and referred_by != user_id:
-                async with db.execute("SELECT id FROM users WHERE id = ?", (referred_by,)) as ref_cursor:
-                    if await ref_cursor.fetchone():
-                        valid_ref = referred_by
-                        
             await db.execute(
-                """INSERT INTO users (id, username, full_name, role, referred_by, created_at, last_active_at, referral_rewarded) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 0)""",
-                (user_id, username, full_name, role, valid_ref, now_str, now_str)
+                """INSERT INTO users (id, username, full_name, role, created_at, last_active_at) 
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (user_id, username, full_name, role, now_str, now_str)
             )
-            # Mukofot obuna tekshiruvidan so'ng check_and_reward_referral funksiyasida beriladi
         else:
             # Mavjud bo'lsa, faqat ma'lumotlarini va faolligini yangilash
             await db.execute(
@@ -1443,14 +1435,6 @@ async def update_movie_video(movie_id: int, file_id: str) -> bool:
         await db.commit()
         return True
 
-# --- REFERRALS (REFERAL TIZIMI) ---
-async def get_top_referrers():
-    """Eng ko'p referal taklif qilgan top 10 foydalanuvchini olish"""
-    async with get_db() as db:
-        async with db.execute(
-            "SELECT id, username, full_name, referrals_count FROM users WHERE referrals_count > 0 ORDER BY referrals_count DESC LIMIT 10"
-        ) as cursor:
-            return await cursor.fetchall()
 
 async def set_setting(key: str, value: str):
     """Bot sozlamalarini o'rnatish"""
@@ -1618,7 +1602,7 @@ async def get_random_movie():
 async def get_users_detailed_list():
     """Barcha foydalanuvchilar haqida batafsil ma'lumotni olish"""
     async with get_db() as db:
-        async with db.execute("SELECT id, username, full_name, role, status, points, referrals_count, created_at FROM users") as cursor:
+        async with db.execute("SELECT id, username, full_name, role, status, points, created_at FROM users") as cursor:
             return await cursor.fetchall()
 
 async def get_all_movie_titles():
@@ -1758,32 +1742,6 @@ async def get_daily_ratings_count(user_id: int) -> int:
                 row = await cursor.fetchone()
                 return row[0] if row else 0
 
-async def check_and_reward_referral(user_id: int, bot) -> bool:
-    """Foydalanuvchi kanallarga muvaffaqiyatli a'zo bo'lganida taklif qilgan odamga ball berish"""
-    async with get_db() as db:
-        # Foydalanuvchining refererini olish va mukofot berilmaganligini tekshirish
-        async with db.execute(
-            "SELECT referred_by, referral_rewarded, username, full_name FROM users WHERE id = ?",
-            (user_id,)
-        ) as cursor:
-            row = await cursor.fetchone()
-
-        if row and row[0] and not row[1]:
-            referred_by = row[0]
-            # Refererga 10 ball berish
-            await db.execute(
-                "UPDATE users SET points = points + 10 WHERE id = ?",
-                (referred_by,)
-            )
-            # Mukofot berilganligini belgilash
-            await db.execute(
-                "UPDATE users SET referral_rewarded = 1 WHERE id = ?",
-                (user_id,)
-            )
-            await db.commit()
-            await check_notify_150pts_reward(bot, referred_by)
-            return True
-        return False
 
 async def check_notify_150pts_reward(bot, user_id: int):
     """Foydalanuvchi 150 ballga yetganda professional taklif xabarini yuborish"""
@@ -2024,14 +1982,6 @@ async def get_total_movies_count():
             return result[0] if result else 0
 
 
-async def get_total_referrals_count():
-    """Jami referallar soni"""
-    async with get_db() as db:
-        async with db.execute("SELECT SUM(referral_count) FROM users") as cursor:
-            result = await cursor.fetchone()
-            return result[0] if result and result[0] else 0
-
-
 async def get_today_users_count():
     """Bugun qo'shilgan foydalanuvchilar soni"""
     from datetime import date
@@ -2059,24 +2009,10 @@ async def get_top_users_by_points(limit: int = 10):
     """Ballar bo'yicha TOP 10 foydalanuvchilarni olish"""
     async with get_db() as db:
         async with db.execute(
-            """SELECT id, username, full_name, points, referrals_count
+            """SELECT id, username, full_name, points
                FROM users
                WHERE role != 'admin'
                ORDER BY points DESC
-               LIMIT ?""",
-            (limit,)
-        ) as cursor:
-            return await cursor.fetchall()
-
-
-async def get_top_users_by_referrals(limit: int = 10):
-    """Referallar soni bo'yicha TOP 10 foydalanuvchilarni olish"""
-    async with get_db() as db:
-        async with db.execute(
-            """SELECT id, username, full_name, referrals_count, points
-               FROM users
-               WHERE role != 'admin'
-               ORDER BY referrals_count DESC
                LIMIT ?""",
             (limit,)
         ) as cursor:
@@ -2750,14 +2686,14 @@ async def search_user_by_query(query: str):
     async with get_db() as db:
         if query.isdigit():
             async with db.execute(
-                "SELECT id, username, full_name, role, status, points, referrals_count, created_at, birthday FROM users WHERE id = ?",
+                "SELECT id, username, full_name, role, status, points, created_at, birthday FROM users WHERE id = ?",
                 (int(query),)
             ) as cursor:
                 return await cursor.fetchone()
         else:
             uname = query.lstrip("@")
             async with db.execute(
-                "SELECT id, username, full_name, role, status, points, referrals_count, created_at, birthday FROM users WHERE username = ?",
+                "SELECT id, username, full_name, role, status, points, created_at, birthday FROM users WHERE username = ?",
                 (uname,)
             ) as cursor:
                 return await cursor.fetchone()
@@ -3484,84 +3420,6 @@ async def auto_expire_movies() -> int:
         return cursor.rowcount
 
 
-# ─── REFERAL TEKSHIRUV VA MUKOFOTLASH (2X EVENT COLLAB) ──────────────────────
-async def check_and_reward_referral(bot, user_id: int):
-    """
-    Foydalanuvchi majburiy kanallarga a'zo bo'lib tekshiruvdan o'tganida chaqiriladi.
-    Agar u referal link orqali kelgan va hali mukofot berilmagan bo'lsa:
-    - 2X event tekshiriladi
-    - Referal egasiga ball beriladi (+10 yoki +20 💎)
-    - Referal egasiga o'zbekcha bildirishnoma yuboriladi
-    - referral_rewarded = 1 ga yangilanadi
-    """
-    async with get_db() as db:
-        async with db.execute(
-            "SELECT referred_by, referral_rewarded, username, full_name FROM users WHERE id = ?",
-            (user_id,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            if not row:
-                return
-            referred_by, referral_rewarded, new_username, new_fullname = row
-            
-        if referred_by and referral_rewarded == 0:
-            # 2X event faolligini tekshirish
-            event_active = await get_setting("referral_2x_event")
-            is_2x = (event_active == "1")
-            
-            base_pts = await get_config_int("points_referral", 5)
-            reward_pts = (base_pts * 2) if is_2x else base_pts
-            
-            # Referal egasiga ball berish va count oshirish
-            await add_points(referred_by, reward_pts)
-            async with get_db() as db:
-                await db.execute(
-                    "UPDATE users SET referrals_count = COALESCE(referrals_count, 0) + 1 WHERE id = ?",
-                    (referred_by,)
-                )
-                await db.execute(
-                    "UPDATE users SET referral_rewarded = 1 WHERE id = ?",
-                    (user_id,)
-                )
-                await db.commit()
-                
-            # Referal egasiga xabar yuborish
-            uname_disp = f"@{new_username}" if new_username else new_fullname or f"User {user_id}"
-            try:
-                if is_2x:
-                    notify_text = (
-                        f"⚡ <b>2X REFERAL EVENT MUKOFOTI!</b>\n\n"
-                        f"Sizning do'stingiz <b>{uname_disp}</b> taklif havolangiz orqali kirdi va majburiy kanallarga to'liq obuna bo'ldi! 🎉\n\n"
-                        f"🎁 2X Event sababli sizga 2 baravar ko'proq: <b>+{reward_pts} 💎 ball</b> berildi!"
-                    )
-                else:
-                    notify_text = (
-                        f"🎉 <b>YANGI REFERAL!</b>\n\n"
-                        f"Sizning do'stingiz <b>{uname_disp}</b> taklif havolangiz orqali kirdi va majburiy kanallarga to'liq obuna bo'ldi!\n\n"
-                        f"🎁 Sizga <b>+{reward_pts} 💎 ball</b> taqdim etildi!"
-                    )
-                await bot.send_message(referred_by, notify_text, parse_mode="HTML")
-            except Exception:
-                pass
-
-            # 10 ta referal bo'lganda (10, 20, 30...) 1 HAFTALIK PREMIUM BERISH
-            async with get_db() as db:
-                async with db.execute("SELECT referrals_count FROM users WHERE id = ?", (referred_by,)) as cursor:
-                    r_row = await cursor.fetchone()
-                    total_refs = r_row[0] if r_row else 0
-                    
-            if total_refs > 0 and total_refs % 10 == 0:
-                await set_user_premium(referred_by, days=7)
-                try:
-                    milestone_msg = (
-                        f"🎉 <b>TABRIKLAYMIZ! POG'ONAVIY BONUS (10 REFERAL)!</b> 🎁\n\n"
-                        f"Siz <b>{total_refs} ta</b> do'stingizni taklif qilganingiz uchun sizga <b>1 HAFTALIK PREMIUM (VIP) OBUNA</b> bepul berildi! 👑\n\n"
-                        f"🍿 Do'stlaringizni taklif qilishda davom eting va yana bepul Premiumlar oling!"
-                    )
-                    await bot.send_message(referred_by, milestone_msg, parse_mode="HTML")
-                except Exception:
-                    pass
-
 
 # ─── KINO REAKSIYALARI (👍 👎 🔥) FUNKSIYALARI ──────────────────────────────
 async def add_movie_reaction(movie_id: int, user_id: int, reaction: str) -> tuple[int, int, int]:
@@ -3845,19 +3703,6 @@ async def give_daily_gift_top_active(points: int = 75, limit: int = 10) -> list:
     return awarded
 
 
-# ─── A13: REFERAL OBUNA BO'LMAGANLARGA ESLATMA ────────────────────────────────
-async def get_referrals_with_incomplete_sub(user_id: int) -> list:
-    """Men taklif qilgan lekin hali homiy kanallarga obuna bo'lmagan (va Premium bo'lmagan) referallar ro'yxati"""
-    from datetime import datetime, timedelta
-    cutoff = (config.get_uzb_now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
-    async with get_db() as db:
-        async with db.execute("""
-            SELECT id, username, full_name, created_at
-            FROM users
-            WHERE referred_by = ? AND referral_rewarded = 0 AND created_at >= ?
-            ORDER BY created_at DESC
-        """, (user_id, cutoff)) as cursor:
-            return await cursor.fetchall()
 
 
 # ─── U1: JANR KUZATUV + TAVSIYA ───────────────────────────────────────────────
@@ -4020,28 +3865,6 @@ async def get_user_payment_history(user_id: int, limit: int = 20) -> list:
             return await cursor.fetchall()
 
 
-# ─── U13: REFERALLAR RO'YXATI BATAFSIL ────────────────────────────────────────
-async def get_user_referrals_detailed(user_id: int, limit: int = 50, page: int = 1, per_page: int = 20) -> tuple:
-    """User referallarini batafsil ko'rsatish (pagination bilan).
-    Qaytaradi: (items_list, total_count, total_pages)
-    """
-    offset = (page - 1) * per_page
-    async with get_db() as db:
-        async with db.execute("SELECT COUNT(*) FROM users WHERE referred_by = ?", (user_id,)) as c:
-            total_row = await c.fetchone()
-            total_count = total_row[0] if total_row else 0
-        total_pages = (total_count + per_page - 1) // per_page if per_page > 0 else 1
-        async with db.execute("""
-            SELECT u.id, u.username, u.full_name, u.created_at,
-                   u.referrals_count, u.points, u.role,
-                   u.referral_rewarded, u.is_premium
-            FROM users u
-            WHERE u.referred_by = ?
-            ORDER BY u.created_at DESC
-            LIMIT ? OFFSET ?
-        """, (user_id, per_page, offset)) as cursor:
-            items = await cursor.fetchall()
-    return items, total_count, max(1, total_pages)
 
 
 # ─── U8: TUG'ILGAN KUN LOCK (1 MARTA) ─────────────────────────────────────────

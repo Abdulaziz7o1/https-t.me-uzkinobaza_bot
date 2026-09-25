@@ -116,7 +116,6 @@ USER_MENU_BUTTONS = [
     "Kino so'rash 🎬", "Kino so'rash 📥", "Kino so'rash",
     '💎 Mening Ballarim', 'Mening Ballarim 💎', 'Mening Ballarim', 'Ballar 💎',
     '🏆 Reytinglar', 'Reytinglar 🏆', 'Reytinglar',
-    '👥 Referal', 'Referal 👥', 'Takliflar (Referal) 👥', 'Referal',
     "🗳️ Kino so'rovlari", "Kino so'rovlari 📥", "Kino so'rovlari 🗳️", "Kino so'rovlari",
     '👑 Profilim', 'Profilim 👑', 'Profilim',
     '🔝 TOP Kinolar', 'TOP Kinolar 🔝', 'TOP Kinolar',
@@ -143,17 +142,7 @@ async def execute_start_logic(message: Message, state: FSMContext):
     user_id = message.from_user.id
     user = message.from_user
     name_to_show = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
-    args = message.text.split(maxsplit=1)
-    referred_by = None
-    if len(args) > 1:
-        start_arg = args[1]
-        if start_arg.isdigit():
-            referred_id = int(start_arg)
-            if referred_id != user_id:
-                existing_user = await db_req.get_user(user_id)
-                if not existing_user:
-                    referred_by = referred_id
-    await db_req.add_user(user_id, user.username or '', user.full_name, referred_by)
+    await db_req.add_user(user_id, user.username or '', user.full_name)
     db_admins = await db_req.get_all_admins()
     if user_id in config.ADMINS:
         await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Bosh Admin {name_to_show}!</b>\n\n🛠 <b>Bot boshqaruv paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:'), parse_mode='HTML', reply_markup=get_admin_menu())
@@ -296,7 +285,6 @@ async def check_subscription_callback(callback: CallbackQuery):
     if not_subscribed:
         await callback.answer("❌ Hali barcha homiy kanallarga a'zo bo'lmadingiz! Iltimos, a'zo bo'lib qayta bosing.", show_alert=True)
         return
-    await db_req.check_and_reward_referral(callback.bot, user_id)
     await callback.message.edit_text(with_footer("✅ <b>Rahmat! Barcha homiy kanallarga muvaffaqiyatli a'zo bo'ldingiz.</b>\n\nEndi kino nomini yoki kodini yuborishingiz mumkin! 🍿"), parse_mode='HTML')
     await callback.answer("A'zolik tasdiqlandi! ✅", show_alert=True)
 
@@ -991,7 +979,7 @@ async def random_movie(message: Message, state: FSMContext):
 async def show_user_leaderboard(message: Message, state: FSMContext):
     """Foydalanuvchilar uchun leaderboard"""
     await state.clear()
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 (Ballar)', callback_data='user_top_points'), InlineKeyboardButton(text='👥 TOP 10 (Referallar)', callback_data='user_top_referrals')], [InlineKeyboardButton(text='🔥 TOP 10 (Faollik)', callback_data='user_top_activity')]])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 (Ballar)', callback_data='user_top_points'), InlineKeyboardButton(text='🔥 TOP 10 (Faollik)', callback_data='user_top_activity')]])
     await message.answer(with_footer("🏆 <b>Reytinglar - Leaderboard</b>\n\nQuyidagi bo'limlardan birini tanlang:"), parse_mode='HTML', reply_markup=keyboard)
 
 @router.callback_query(F.data == 'user_top_points')
@@ -1000,30 +988,13 @@ async def user_top_points(callback: CallbackQuery):
     top_users = await db_req.get_top_users_by_points(10)
     text = "🏆 <b>TOP 10 Foydalanuvchilar (Ballar bo'yicha)</b>\n\n"
     medals = ['🥇', '🥈', '🥉']
-    for i, (user_id, username, full_name, points, referrals_count) in enumerate(top_users, 1):
+    for i, user_row in enumerate(top_users, 1):
+        user_id, username, full_name, points = user_row[0], user_row[1], user_row[2], user_row[3]
         medal = medals[i - 1] if i <= 3 else f'#{i}'
         username_display = username or full_name or f'User {user_id}'
         text += f'{medal} <b>{username_display}</b>\n'
-        text += f'   💰 Ball: {points:,} | 👥 Referallar: {referrals_count}\n\n'
+        text += f'   💰 Ball: {points:,} 💎\n\n'
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔄 Yangilash', callback_data='user_top_points')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='user_leaderboard')]])
-    try:
-        await callback.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
-    except Exception:
-        await callback.message.answer(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
-    await callback.answer()
-
-@router.callback_query(F.data == 'user_top_referrals')
-async def user_top_referrals(callback: CallbackQuery):
-    """Referallar bo'yicha TOP 10"""
-    top_users = await db_req.get_top_users_by_referrals(10)
-    text = "👥 <b>TOP 10 Foydalanuvchilar (Referallar bo'yicha)</b>\n\n"
-    medals = ['🥇', '🥈', '🥉']
-    for i, (user_id, username, full_name, referrals_count, points) in enumerate(top_users, 1):
-        medal = medals[i - 1] if i <= 3 else f'#{i}'
-        username_display = username or full_name or f'User {user_id}'
-        text += f'{medal} <b>{username_display}</b>\n'
-        text += f'   👥 Referallar: {referrals_count} | 💰 Ball: {points:,}\n\n'
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔄 Yangilash', callback_data='user_top_referrals')], [InlineKeyboardButton(text='🔙 Orqaga', callback_data='user_leaderboard')]])
     try:
         await callback.message.edit_text(with_footer(text), parse_mode='HTML', reply_markup=keyboard)
     except Exception:
@@ -1052,7 +1023,7 @@ async def user_top_activity(callback: CallbackQuery):
 @router.callback_query(F.data == 'user_leaderboard')
 async def back_user_leaderboard(callback: CallbackQuery):
     """User leaderboard menyusiga qaytish"""
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 (Ballar)', callback_data='user_top_points'), InlineKeyboardButton(text='👥 TOP 10 (Referallar)', callback_data='user_top_referrals')], [InlineKeyboardButton(text='🔥 TOP 10 (Faollik)', callback_data='user_top_activity')]])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏆 TOP 10 (Ballar)', callback_data='user_top_points'), InlineKeyboardButton(text='🔥 TOP 10 (Faollik)', callback_data='user_top_activity')]])
     try:
         await callback.message.edit_text(with_footer("🏆 <b>Reytinglar - Leaderboard</b>\n\nQuyidagi bo'limlardan birini tanlang:"), parse_mode='HTML', reply_markup=keyboard)
     except Exception:
@@ -1074,43 +1045,7 @@ async def process_movie_request(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(with_footer(f"✅ <b>So'rov qabul qilindi!</b>\n\n🎬 Kino: {movie_name}\n📊 Adminlar tez orada ko'rib chiqishadi.\n\n⏰ Kino qo'shilganda sizga xabar beramiz."), parse_mode='HTML')
 
-@router.message(F.text.regexp('(?i).*(referal).*'))
-async def show_referral_stats(message: Message, state: FSMContext):
-    await state.clear()
-    user_id = message.from_user.id
-    bot_clean = config.BOT_USERNAME.lstrip('@')
-    ref_link = f'https://t.me/{bot_clean}?start={user_id}'
-    user_db = await db_req.get_user(user_id)
-    referrals_count = user_db[5] if user_db and len(user_db) > 5 else 0
-    top_referrers = await db_req.get_top_referrers()
-    top_text = ''
-    if top_referrers:
-        top_text = "\n🏆 <b>Eng ko'p taklif qilgan TOP 10 a'zo:</b>\n"
-        for idx, (uid, username, full_name, count) in enumerate(top_referrers, 1):
-            name = f'@{username}' if username else full_name or str(uid)
-            top_text += f"{idx}. 👤 {name} — <code>{count}</code> ta do'st\n"
-    stats_text = f"📊 <b>Sizning referal statistikangiz:</b>\n\n👥 <b>Taklif qilingan a'zolar:</b> <code>{referrals_count}</code> ta\n🔗 <b>Sizning taklif havolangiz:</b>\n<code>{ref_link}</code>\n{top_text}\n👇 <b>Do'stlaringizga ulashish uchun:</b>\n\n🚀 Quyidagi tugmani bosing va do'stingizga yuboring!"
-    import urllib.parse
-    share_text = "🚀 Kino bot - ko'p kino, bepul, qulay!\n\nQuyidagi havola orqali kiring:"
-    share_url = f'https://t.me/share/url?url={urllib.parse.quote(ref_link)}&text={urllib.parse.quote(share_text)}'
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🚀 Botni boshlash', url=ref_link), InlineKeyboardButton(text='📤 Ulashish', url=share_url)]])
-    await message.answer(with_footer(stats_text), parse_mode='HTML', reply_markup=keyboard)
-
-@router.callback_query(F.data == 'ref_my_stats')
-async def show_ref_stats_callback(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    user_db = await db_req.get_user(user_id)
-    referrals_count = user_db[5] if user_db and len(user_db) > 5 else 0
-    top_referrers = await db_req.get_top_referrers()
-    top_text = ''
-    if top_referrers:
-        top_text = '\n\n🏆 TOP 10 taklif qilganlar:\n'
-        for idx, (uid, username, full_name, count) in enumerate(top_referrers[:5], 1):
-            name = f'@{username}' if username else full_name or str(uid)
-            top_text += f'{idx}. {name} — {count} ta\n'
-    alert_text = f"📊 Sizning referal statistikangiz:\n\n👥 Taklif qilingan a'zolar: {referrals_count} ta{top_text}"
-    await callback.answer(alert_text, show_alert=True)
-USER_MENU_BUTTONS = [' Kino qidirish', 'Tanlanganlar ⭐️', 'Tasodifiy Kino 🎲', "Kino so'rash 🎬", '💎 Mening Ballarim', '🏆 Reytinglar', '👥 Referal', "🗳️ Kino so'rovlari", '⚙️ Sozlamalar']
+USER_MENU_BUTTONS = [' Kino qidirish', 'Tanlanganlar ⭐️', 'Tasodifiy Kino 🎲', "Kino so'rash 🎬", '💎 Mening Ballarim', '🏆 Reytinglar', "🗳️ Kino so'rovlari", '⚙️ Sozlamalar']
 
 @router.message(F.text.regexp('(?i).*(mening ballarim|ballarim).*'))
 async def my_points(message: Message, state: FSMContext):
@@ -1126,7 +1061,7 @@ async def my_points(message: Message, state: FSMContext):
         if uid == user_id:
             user_rank = idx
     rank_text = f"\n🏅 <b>Sizning o'rningiz:</b> {user_rank}-o'rin" if user_rank else ''
-    text = f"💎 <b>Sizning ballaringiz: <code>{points}</code> 💎</b>\n\n📌 <b>Ball qanday yig'iladi?</b>\n⭐ Kino baholash → +2 💎\n💬 Izoh yozish → +3 💎\n👥 Do'st taklif qilish → +10 💎\n{rank_text}\n"
+    text = f"💎 <b>Sizning ballaringiz: <code>{points}</code> 💎</b>\n\n📌 <b>Ball qanday yig'iladi?</b>\n⭐ Kino baholash → +2 💎\n💬 Izoh yozish → +3 💎\n{rank_text}\n"
     kb = None
     if points >= 150:
         text += f'\n🎁 <b>MAXSUS TAKLIF (PROFFESIONAL REJIM):</b>\nSizda <b>{points} ball</b> bor! <b>150 ball</b> evaziga <b>👑 2 OYLIK PREMIUM VIP</b> maqomini ishga tushirishingiz mumkin!\n'
@@ -1191,7 +1126,7 @@ async def show_settings(message: Message, state: FSMContext):
     notify_pts = await db_req.get_user_notify_points(user_id)
     status_icon = '✅ Yoqilgan' if notify_pts else "❌ O'chirilgan"
     toggle_text = "🔕 O'chirish" if notify_pts else '🔔 Yoqish'
-    text = f"⚙️ <b>Shaxsiy Sozlamalar</b>\n\n🔔 <b>Ball bildirishnomalari:</b> {status_icon}\n<i>(Kino baholash, izoh yozish va referal uchun olgan ballaringiz haqida xabar)</i>\n\nSozlamani o'zgartirish uchun quyidagi tugmani bosing:"
+    text = f"⚙️ <b>Shaxsiy Sozlamalar</b>\n\n🔔 <b>Ball bildirishnomalari:</b> {status_icon}\n<i>(Kino baholash va izoh yozish uchun olgan ballaringiz haqida xabar)</i>\n\nSozlamani o'zgartirish uchun quyidagi tugmani bosing:"
     builder = InlineKeyboardBuilder()
     builder.button(text=f'{toggle_text} — Ball bildirishnomalari', callback_data='toggle_notify_points')
     await message.answer(with_footer(text), reply_markup=builder.as_markup(), parse_mode='HTML')
@@ -1202,7 +1137,7 @@ async def toggle_notify_points_cb(callback: CallbackQuery):
     new_state = await db_req.toggle_user_notify_points(user_id)
     status_icon = '✅ Yoqilgan' if new_state else "❌ O'chirilgan"
     toggle_text = "🔕 O'chirish" if new_state else '🔔 Yoqish'
-    text = f"⚙️ <b>Shaxsiy Sozlamalar</b>\n\n🔔 <b>Ball bildirishnomalari:</b> {status_icon}\n<i>(Kino baholash, izoh yozish va referal uchun olgan ballaringiz haqida xabar)</i>\n\nSozlamani o'zgartirish uchun quyidagi tugmani bosing:"
+    text = f"⚙️ <b>Shaxsiy Sozlamalar</b>\n\n🔔 <b>Ball bildirishnomalari:</b> {status_icon}\n<i>(Kino baholash va izoh yozish uchun olgan ballaringiz haqida xabar)</i>\n\nSozlamani o'zgartirish uchun quyidagi tugmani bosing:"
     builder = InlineKeyboardBuilder()
     builder.button(text=f'{toggle_text} — Ball bildirishnomalari', callback_data='toggle_notify_points')
     await callback.message.edit_text(with_footer(text), reply_markup=builder.as_markup(), parse_mode='HTML')
@@ -1381,38 +1316,11 @@ async def add_comment_exec(message: Message, state: FSMContext):
 @router.inline_query()
 async def inline_query_handler(inline_query: InlineQuery):
     query = inline_query.query.strip()
-    if query.isdigit():
-        ref_user_id = int(query)
-    else:
-        ref_user_id = inline_query.from_user.id
-    bot_clean = config.BOT_USERNAME.lstrip('@')
-    ref_link = f'https://t.me/{bot_clean}?start={ref_user_id}'
-    file_id = await db_req.get_setting('ref_promo_file_id')
-    media_type = await db_req.get_setting('ref_promo_media_type')
-    promo_caption = await db_req.get_setting('ref_promo_caption')
-    if not promo_caption:
-        promo_caption = '🚀 <b>Bizning bot orqali eng sara kinolarni tomosha qiling!</b>\n\n🍿 Har kuni yangi va qiziqarli filmlar!\n⚡ Botdan bepul foydalanish va qulay izlash.'
-    caption = f'{promo_caption}\n\n🚀 {ref_link}'
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='📍 Boshlash:', url=f'https://t.me/{bot_clean}')]])
-    inline_results = []
-    if file_id and media_type:
-        if media_type == 'video':
-            inline_results.append(InlineQueryResultCachedVideo(id='promo', video_file_id=file_id, title='Taklif xabarini yuborish 🚀', caption=caption, reply_markup=keyboard, parse_mode='HTML'))
-        elif media_type == 'photo':
-            from aiogram.types import InlineQueryResultCachedPhoto
-            inline_results.append(InlineQueryResultCachedPhoto(id='promo', photo_file_id=file_id, title='Taklif xabarini yuborish 🚀', caption=caption, reply_markup=keyboard, parse_mode='HTML'))
-        else:
-            from aiogram.types import InlineQueryResultCachedDocument
-            inline_results.append(InlineQueryResultCachedDocument(id='promo', document_file_id=file_id, title='Taklif xabarini yuborish 🚀', caption=caption, reply_markup=keyboard, parse_mode='HTML'))
-    else:
-        from aiogram.types import InlineQueryResultArticle, InputTextMessageContent
-        inline_results.append(InlineQueryResultArticle(id='promo', title='Taklif xabarini yuborish 🚀', input_message_content=InputTextMessageContent(message_text=caption, parse_mode='HTML'), reply_markup=keyboard, description="Taklif havolasini do'stlaringizga yuboring"))
-    await inline_query.answer(with_footer(inline_results), cache_time=5, is_personal=True)
-    return
     if not query:
         results = await db_req.get_trending_movies()
     else:
         results = await db_req.search_movies_by_name(query)
+    from aiogram.types import InlineQueryResultCachedVideo
     inline_results = []
     for idx, item in enumerate(results):
         movie_id = item[0]
@@ -1420,12 +1328,12 @@ async def inline_query_handler(inline_query: InlineQuery):
         movie = await db_req.get_movie(movie_id)
         if not movie:
             continue
-        file_id, movie_caption = movie
+        file_id, movie_caption = movie[0], movie[1]
         avg_rating, votes = await db_req.get_movie_rating(movie_id)
         rating_text = f' | ⭐ {avg_rating:.1f} ({votes} ta ovoz)' if avg_rating > 0 else ''
-        shared_caption = f'{movie_caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
-        inline_results.append(InlineQueryResultCachedVideo(id=str(movie_id), video_file_id=file_id, title=f'Kino kodi: {movie_id}', description=f'{(caption[:100] if caption else 'Tavsifsiz')}{rating_text}', caption=shared_caption, parse_mode='HTML'))
-    await inline_query.answer(with_footer(inline_results), cache_time=10, is_personal=True)
+        shared_caption = f"{movie_caption or ''}\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href=\"{config.ADMIN_CONTACT_URL}\">@Abdulaziz7o1</a>"
+        inline_results.append(InlineQueryResultCachedVideo(id=str(movie_id), video_file_id=file_id, title=f'Kino kodi: {movie_id}', description=f"{(caption[:100] if caption else 'Tavsifsiz')}{rating_text}", caption=shared_caption, parse_mode='HTML'))
+    await inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
 @router.message(F.text == '🎁 Kunlik Bonus')
 async def user_daily_bonus(message: Message, state: FSMContext):
@@ -1525,7 +1433,6 @@ async def user_profile_card(message: Message, state: FSMContext):
         await message.answer(with_footer('Foydalanuvchi topilmadi.'))
         return
     pts = user[6] if len(user) > 6 and user[6] is not None else 0
-    ref_count = user[5] if len(user) > 5 and user[5] is not None else 0
     level_name, level_emoji, next_limit = db_req.get_user_level(pts)
     is_premium = await db_req.is_user_premium(user_id)
     status_str = '👑 VIP / Premium' if is_premium else 'Standard Foydalanuvchi'
@@ -1534,7 +1441,7 @@ async def user_profile_card(message: Message, state: FSMContext):
     birthday = await db_req.get_user_birthday(user_id)
     bday_str = birthday if birthday else 'Kiritilmagan ❌'
     next_info = f'\n🎯 Keyingi daraja (VIP) uchun: <code>{next_limit - pts}</code> ball qoldi.' if next_limit is not None else ''
-    txt = f"👑 <b>SHAXSIY PROFILINGIZ:</b>\n\n👤 <b>Foydalanuvchi:</b> {message.from_user.full_name}\n🆔 <b>ID:</b> <code>{user_id}</code>\n🌟 <b>Darajangiz:</b> {level_emoji} <b>{level_name}</b>\n💎 <b>To'plangan Ballar:</b> <code>{pts}</code> 💎{next_info}\n👥 <b>Chaqirgan Referallaringiz:</b> <code>{ref_count}</code> ta\n⭐️ <b>Saqlangan Kinolaringiz:</b> <code>{fav_count}</code> ta\n🎂 <b>Tug'ilgan Kuningiz:</b> <code>{bday_str}</code>\n🛡 <b>Maqomingiz:</b> {status_str}"
+    txt = f"👑 <b>SHAXSIY PROFILINGIZ:</b>\n\n👤 <b>Foydalanuvchi:</b> {message.from_user.full_name}\n🆔 <b>ID:</b> <code>{user_id}</code>\n🌟 <b>Darajangiz:</b> {level_emoji} <b>{level_name}</b>\n💎 <b>To'plangan Ballar:</b> <code>{pts}</code> 💎{next_info}\n⭐️ <b>Saqlangan Kinolaringiz:</b> <code>{fav_count}</code> ta\n🎂 <b>Tug'ilgan Kuningiz:</b> <code>{bday_str}</code>\n🛡 <b>Maqomingiz:</b> {status_str}"
     from keyboards.inline import get_profile_extended_keyboard
     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=get_profile_extended_keyboard())
 
@@ -1831,7 +1738,7 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
     text_clean = query.lower().replace('️', '').strip()
     menu_keywords = [
         'qidirish', 'saqlanganlar', 'tanlanganlar', 'tasodifiy', "so'rash",
-        'ballarim', 'bonus', 'reytinglar', 'referal', "so'rovlari", 'sozlamalar',
+        'ballarim', 'bonus', 'reytinglar', "so'rovlari", 'sozlamalar',
         'profilim', 'top kinolar', "tug'ilgan kun", 'yordam', 'murojaat',
         "kino qo'shish", "kino o'chirish", 'kino tahrirlash', 'statistika',
         'reklama', 'kassa', 'audit', 'tahlili', 'bot rejimi', 'nofaollarga',
@@ -1840,36 +1747,7 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
     ]
     if any((kw in text_clean for kw in menu_keywords)):
         return
-    import re, urllib.parse as _up
-    ref_match = re.match('^@\\w+\\s+\\d+$', query.lower())
-    ref_link_match = re.search('t\\.me/\\w+\\?start=(\\d+)', query)
-    if ref_match or ref_link_match:
-        sender_id = message.from_user.id
-        if ref_link_match:
-            ref_owner_id = int(ref_link_match.group(1))
-        else:
-            ref_owner_id = sender_id
-        _bot_clean = config.BOT_USERNAME.lstrip('@')
-        _ref_link = f'https://t.me/{_bot_clean}?start={sender_id}'
-        _share_text = "🚀 Kino bot - ko'p kino, bepul, qulay!\n\nQuyidagi havola orqali kiring:"
-        _share_url = f'https://t.me/share/url?url={_up.quote(_ref_link)}&text={_up.quote(_share_text)}'
-        _file_id = await db_req.get_setting('ref_promo_file_id')
-        _mtype = await db_req.get_setting('ref_promo_media_type')
-        _caption_txt = await db_req.get_setting('ref_promo_caption')
-        if not _caption_txt:
-            _caption_txt = '🚀 <b>Bizning bot orqali eng sara kinolarni tomosha qiling!</b>\n\n🍿 Har kuni yangi va qiziqarli filmlar!\n⚡ Botdan bepul foydalanish va qulay izlash.'
-        _cap = f'{_caption_txt}\n\n🚀 {_ref_link}'
-        _kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='📍 Boshlash:', url=f'https://t.me/{_bot_clean}')], [InlineKeyboardButton(text="Do'stlarga ulashish 🚀", url=_share_url)]])
-        try:
-            if _file_id and _mtype == 'video':
-                await message.answer_video(video=_file_id, caption=with_footer(_cap), reply_markup=_kb, parse_mode='HTML')
-            elif _file_id and _mtype == 'photo':
-                await message.answer_photo(photo=_file_id, caption=with_footer(_cap), reply_markup=_kb, parse_mode='HTML')
-            else:
-                await message.answer(with_footer(_cap), reply_markup=_kb, parse_mode='HTML')
-        except Exception:
-            pass
-        return
+    import re
     inline_match = re.match('^@\\w+\\s+(\\d+)$', query)
     if inline_match:
         movie_id = int(inline_match.group(1))
@@ -2041,68 +1919,6 @@ async def cb_show_payment_history(callback: CallbackQuery):
     await callback.message.answer(with_footer(txt), parse_mode='HTML')
     await callback.answer()
 
-
-# ─── 👥 U13: REFERALLAR BATAFSIL (PAGINATION) ─────────────────────────────────
-@router.callback_query(F.data == 'show_my_referrals_detailed')
-async def cb_show_my_referrals(callback: CallbackQuery):
-    await _render_referrals_page(callback, page=1, is_callback=True)
-
-@router.callback_query(F.data.startswith('refs_page_'))
-async def cb_referrals_page(callback: CallbackQuery):
-    try:
-        page = int(callback.data.split('_')[2])
-    except Exception:
-        page = 1
-    await _render_referrals_page(callback, page=page, is_callback=True)
-
-async def _render_referrals_page(event, page: int = 1, is_callback: bool = False):
-    uid = event.from_user.id if hasattr(event, 'from_user') else event.message.from_user.id
-    rows, total_count, total_pages = await db_req.get_user_referrals_detailed(uid, page=page, per_page=20)
-    pending = await db_req.get_referrals_with_incomplete_sub(uid)
-    page = max(1, min(page, total_pages))
-    txt = f"👥 <b>Mening referallarim (Jami: {total_count} ta)</b>\n<i>Sahifa {page}/{total_pages}</i>\n\n"
-    builder = InlineKeyboardBuilder()
-    if rows:
-        start_idx = (page - 1) * 20 + 1
-        for idx, ref in enumerate(rows, start_idx):
-            if len(ref) >= 9:
-                rid, uname, fname, cat, rcount, pts, role, rewarded, prem = ref
-            else:
-                rid, uname, fname, cat, rcount, pts, role, rewarded = ref
-                prem = None
-            display = f"@{uname}" if uname else (fname or f"User {rid}")
-            mark = "✅" if rewarded else "⏳"
-            prem_mark = "👑" if prem else ""
-            txt += f"{idx}. {display} {prem_mark} {mark}\n   📅 {cat} | 👥 ref: {rcount or 0} | 💎 pts: {pts or 0}\n"
-    else:
-        txt += "Hali referallingiz yo'q. Do'stlaringizni taklif qiling va sovg'alar oling! 🎁\n"
-    if pending:
-        txt += f"\n📩 <b>Obuna bo'lmaganlar ({len(pending)} ta):</b>\n"
-        for p in pending[:5]:
-            pid, puname, pfname, t = p
-            d = f"@{puname}" if puname else (pfname or f"User {pid}")
-            txt += f"  ⏳ {d} — {t}\n"
-    if total_pages > 1:
-        if page > 1:
-            builder.button(text="⬅️ Oldingi", callback_data=f'refs_page_{page-1}')
-        builder.button(text=f"📄 {page}/{total_pages}", callback_data='refs_page_dummy')
-        if page < total_pages:
-            builder.button(text="Keyingi ➡️", callback_data=f'refs_page_{page+1}')
-        builder.adjust(3)
-    builder.row(
-        InlineKeyboardButton(text='🏠 Bosh menyu', callback_data='home_menu')
-    )
-    kb = builder.as_markup()
-    msg_txt = with_footer(txt)
-    target_msg = event.message if is_callback else event
-    if is_callback:
-        try:
-            await target_msg.edit_text(msg_txt, parse_mode='HTML', reply_markup=kb)
-        except Exception:
-            await target_msg.answer(msg_txt, parse_mode='HTML', reply_markup=kb)
-        await event.answer()
-    else:
-        await target_msg.answer(msg_txt, parse_mode='HTML', reply_markup=kb)
 
 
 # ─── 🕒 KO'RILGAN KINOLAR GA JANR TRACK QO'SHISH ────────────────────────────
