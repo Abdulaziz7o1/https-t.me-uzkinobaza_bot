@@ -70,11 +70,20 @@ async def broadcast_scheduler(bot: Bot):
                     # Kanallarga ham yuborish
                     try:
                         db_channels = await db_req.get_sponsor_channels()
-                        all_ch = list(config.CHANNELS) + [c[1] for c in db_channels]
-                        for ch in all_ch:
+                        unique_channels = {}
+                        for ch in config.CHANNELS:
+                            norm = db_req.normalize_channel_identifier(ch)
+                            if norm:
+                                unique_channels[str(norm).lower()] = norm
+                        for c in db_channels:
+                            norm = db_req.normalize_channel_identifier(c[1])
+                            if norm:
+                                unique_channels[str(norm).lower()] = norm
+
+                        for target_ch in unique_channels.values():
                             try:
                                 await bot.copy_message(
-                                    chat_id=ch,
+                                    chat_id=target_ch,
                                     from_chat_id=chat_id,
                                     message_id=message_id
                                 )

@@ -837,9 +837,10 @@ async def restore_from_mongodb_cloud() -> bool:
                 sp_count = 0
                 async with get_db() as local_db:
                     async for s_doc in sponsors_coll.find({}):
-                        ch_id = s_doc.get("channel_id")
-                        ch_name = s_doc.get("channel_name", str(ch_id))
-                        if ch_id:
+                        raw_id = s_doc.get("channel_id")
+                        if raw_id:
+                            ch_id = str(normalize_channel_identifier(raw_id))
+                            ch_name = s_doc.get("channel_name", str(ch_id))
                             await local_db.execute(
                                 "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
                                 (ch_id, ch_name)
@@ -1127,9 +1128,10 @@ async def restore_sponsor_channels_backup_on_startup():
             return
         async with get_db() as db:
             for ch in data:
-                ch_id = ch.get("channel_id")
-                ch_name = ch.get("channel_name") or ch_id
-                if ch_id:
+                raw_id = ch.get("channel_id")
+                if raw_id:
+                    ch_id = str(normalize_channel_identifier(raw_id))
+                    ch_name = ch.get("channel_name") or ch_id
                     await db.execute(
                         "INSERT OR IGNORE INTO sponsor_channels (channel_id, channel_name) VALUES (?, ?)",
                         (ch_id, ch_name)
@@ -3502,11 +3504,24 @@ async def save_broadcast_message(broadcast_id: str, message_id: int, chat_id: in
         )
         await db.commit()
 
+async def save_broadcast_messages_batch(records: list):
+    """Yuborilgan reklamalar paketini o'chirish uchun to'plab saqlash.
+    records: list of tuples (broadcast_id, message_id, chat_id)
+    """
+    if not records:
+        return
+    async with get_db() as db:
+        await db.executemany(
+            "INSERT INTO broadcast_messages (broadcast_id, message_id, chat_id) VALUES (?, ?, ?)",
+            records
+        )
+        await db.commit()
+
 async def get_recent_broadcast_batches(limit: int = 10) -> list:
     """So'nggi yuborilgan reklamalar paketlarini olish"""
     async with get_db() as db:
         async with db.execute(
-            """SELECT broadcast_id, COUNT(*) as cnt, MIN(created_at) as created_at
+            """SELECT broadcast_id, COUNT(*) as cnt, MAX(created_at) as created_at
                FROM broadcast_messages
                GROUP BY broadcast_id
                ORDER BY created_at DESC LIMIT ?""",

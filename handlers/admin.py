@@ -1032,32 +1032,40 @@ async def bc_send_confirm_callback(callback: CallbackQuery, state: FSMContext):
     sent_count = 0
     failed_count = 0
     cleaned_count = 0
+    import uuid
+    broadcast_id = str(uuid.uuid4())[:8]
+    broadcast_records = []
+
     for user_id in users:
+        sent_msg = None
         try:
             if media_id and media_type == 'photo':
                 try:
-                    await bot.send_photo(chat_id=user_id, photo=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
+                    sent_msg = await bot.send_photo(chat_id=user_id, photo=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
                 except Exception:
-                    await bot.send_photo(chat_id=user_id, photo=media_id, caption=with_footer(final_caption), reply_markup=ad_kb)
+                    sent_msg = await bot.send_photo(chat_id=user_id, photo=media_id, caption=with_footer(final_caption), reply_markup=ad_kb)
             elif media_id and media_type == 'video':
                 try:
-                    await bot.send_video(chat_id=user_id, video=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
+                    sent_msg = await bot.send_video(chat_id=user_id, video=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
                 except Exception:
-                    await bot.send_video(chat_id=user_id, video=media_id, caption=with_footer(final_caption), reply_markup=ad_kb)
+                    sent_msg = await bot.send_video(chat_id=user_id, video=media_id, caption=with_footer(final_caption), reply_markup=ad_kb)
             elif media_id and media_type == 'animation':
                 try:
-                    await bot.send_animation(chat_id=user_id, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode='HTML')
+                    sent_msg = await bot.send_animation(chat_id=user_id, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode='HTML')
                 except Exception:
-                    await bot.send_animation(chat_id=user_id, animation=media_id, caption=final_caption, reply_markup=ad_kb)
+                    sent_msg = await bot.send_animation(chat_id=user_id, animation=media_id, caption=final_caption, reply_markup=ad_kb)
             elif media_id and media_type == 'sticker':
-                await bot.send_sticker(chat_id=user_id, sticker=media_id, reply_markup=ad_kb)
+                sent_msg = await bot.send_sticker(chat_id=user_id, sticker=media_id, reply_markup=ad_kb)
                 if final_caption:
                     await bot.send_message(chat_id=user_id, text=final_caption)
             else:
                 try:
-                    await bot.send_message(chat_id=user_id, text=final_caption, reply_markup=ad_kb, parse_mode='HTML')
+                    sent_msg = await bot.send_message(chat_id=user_id, text=final_caption, reply_markup=ad_kb, parse_mode='HTML')
                 except Exception:
-                    await bot.send_message(chat_id=user_id, text=final_caption, reply_markup=ad_kb)
+                    sent_msg = await bot.send_message(chat_id=user_id, text=final_caption, reply_markup=ad_kb)
+            
+            if sent_msg:
+                broadcast_records.append((broadcast_id, sent_msg.message_id, user_id))
             sent_count += 1
             await asyncio.sleep(0.05)
         except Exception as e:
@@ -1066,34 +1074,71 @@ async def bc_send_confirm_callback(callback: CallbackQuery, state: FSMContext):
             if any((kw in err_str for kw in ['forbidden', 'blocked', 'deactivated', 'chat not found'])):
                 await db_req.delete_user(user_id)
                 cleaned_count += 1
+
     channel_report = []
     try:
         db_channels = await db_req.get_sponsor_channels()
-        all_ch = list(config.CHANNELS)
+        
+        # Kanallarni normallashtirish va takroriylikni oldini olish
+        unique_channels = {}
+        for ch in config.CHANNELS:
+            norm = db_req.normalize_channel_identifier(ch)
+            if norm:
+                key = str(norm).lower()
+                unique_channels[key] = norm
+
         for _, ch_id, ch_name in db_channels:
-            if ch_id not in all_ch:
-                all_ch.append(ch_id)
-        for ch in all_ch:
-            ch_display = ch
+            norm = db_req.normalize_channel_identifier(ch_id)
+            if norm:
+                key = str(norm).lower()
+                if key not in unique_channels:
+                    unique_channels[key] = norm
+
+        for target_ch in unique_channels.values():
+            ch_display = str(target_ch)
             try:
-                chat_info = await bot.get_chat(ch)
-                ch_display = f'@{chat_info.username}' if chat_info.username else chat_info.title or str(ch)
+                chat_info = await bot.get_chat(target_ch)
+                ch_display = f'@{chat_info.username}' if chat_info.username else (chat_info.title or str(target_ch))
             except Exception:
                 pass
+
             try:
+                ch_msg = None
                 if media_id and media_type == 'photo':
-                    await bot.send_photo(chat_id=ch, photo=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
+                    ch_msg = await bot.send_photo(chat_id=target_ch, photo=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
                 elif media_id and media_type == 'video':
-                    await bot.send_video(chat_id=ch, video=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
+                    ch_msg = await bot.send_video(chat_id=target_ch, video=media_id, caption=with_footer(final_caption), reply_markup=ad_kb, parse_mode='HTML')
                 elif media_id and media_type == 'animation':
-                    await bot.send_animation(chat_id=ch, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode='HTML')
+                    ch_msg = await bot.send_animation(chat_id=target_ch, animation=media_id, caption=final_caption, reply_markup=ad_kb, parse_mode='HTML')
                 else:
-                    await bot.send_message(chat_id=ch, text=final_caption, reply_markup=ad_kb, parse_mode='HTML')
+                    ch_msg = await bot.send_message(chat_id=target_ch, text=final_caption, reply_markup=ad_kb, parse_mode='HTML')
+
+                if ch_msg:
+                    target_int_id = ch_msg.chat.id if hasattr(ch_msg, 'chat') and ch_msg.chat else None
+                    if target_int_id:
+                        broadcast_records.append((broadcast_id, ch_msg.message_id, target_int_id))
+
                 channel_report.append(f'✅ <b>{ch_display}</b> — Muvaffaqiyatli')
+                await asyncio.sleep(0.1)
             except Exception as e:
-                channel_report.append(f'❌ <b>{ch_display}</b> — Xato (Admin emas)')
+                err_text = str(e).lower()
+                if 'not enough rights' in err_text or 'admin' in err_text or 'chat_admin_required' in err_text:
+                    reason = 'Admin emas'
+                elif 'chat not found' in err_text:
+                    reason = 'Kanal topilmadi'
+                else:
+                    reason = 'Xato'
+                channel_report.append(f'❌ <b>{ch_display}</b> — {reason}')
     except Exception as e:
         print(f'Channel broadcast error: {e}')
+
+    # Reklamalarni bazaga yozish (tarix va ommaviy o'chirish uchun)
+    if broadcast_records:
+        try:
+            await db_req.save_broadcast_messages_batch(broadcast_records)
+        except Exception as e:
+            print(f'Save broadcast records error: {e}')
+
     ch_report_str = '\n'.join(channel_report) if channel_report else '<i>Tizimda kanallar topilmadi.</i>'
     summary_text = f'📢 <b>Reklama yuborish yakunlandi:</b>\n\n✅ <b>Muvaffaqiyatli yuborildi:</b> {sent_count} ta\n❌ <b>Yuborilmaganlar:</b> {failed_count} ta\n🧹 <b>Bloklagani uchun tozalanganlar:</b> {cleaned_count} ta\n\n📢 <b>Homiy kanallarga yuborilish holati:</b>\n{ch_report_str}'
     await callback.message.answer(with_footer(summary_text), parse_mode='HTML')
