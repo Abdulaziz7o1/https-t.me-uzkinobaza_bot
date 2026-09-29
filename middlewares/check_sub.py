@@ -1,24 +1,29 @@
 from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 import config
 from keyboards.inline import get_subscription_keyboard
-from database.requests import add_user, is_banned, get_sponsor_channels
+from database.requests import add_user, is_banned, get_sponsor_channels, normalize_channel_identifier
 
 class CheckSubMiddleware(BaseMiddleware):
     async def __call__(
         self,
-        handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        handler: Callable[[Any, Dict[str, Any]], Awaitable[Any]],
+        event: Any,
         data: Dict[str, Any]
     ) -> Any:
-        # Faqat matnli xabarlar va buyruqlarni tekshiramiz
-        if not isinstance(event, Message):
+        is_msg = isinstance(event, Message)
+        is_cb = isinstance(event, CallbackQuery)
+        if not is_msg and not is_cb:
+            return await handler(event, data)
+
+        user = event.from_user
+        if not user:
             return await handler(event, data)
             
-        user_id = event.from_user.id
-        username = event.from_user.username or ""
-        full_name = event.from_user.full_name or ""
+        user_id = user.id
+        username = user.username or ""
+        full_name = user.full_name or ""
         
         # 1. Foydalanuvchi bloklanganini tekshirish (doimiy va vaqtincha)
         from database.requests import is_user_temp_banned
@@ -31,16 +36,15 @@ class CheckSubMiddleware(BaseMiddleware):
         except Exception:
             is_banned_flag, rem_str = False, ""
         if is_banned_flag:
-            if rem_str and rem_str != "Doimiy":
-                await event.answer(f"🚫 <b>Sizning hisobingiz vaqtincha bloklangan!</b>\n\n⏰ <b>Qolgan ban muddati:</b> {rem_str}\n<i>Muddat tugagach botdan qayta foydalanishingiz mumkin.</i>", parse_mode="HTML")
-            else:
-                await event.answer("🚫 <b>Siz botdan foydalanishdan bloklangansiz!</b>\n\n<i>Murojaat uchun adminga bog'laning.</i>", parse_mode="HTML")
+            msg_text = f"🚫 <b>Sizning hisobingiz vaqtincha bloklangan!</b>\n\n⏰ <b>Qolgan ban muddati:</b> {rem_str}\n<i>Muddat tugagach botdan qayta foydalanishingiz mumkin.</i>" if (rem_str and rem_str != "Doimiy") else "🚫 <b>Siz botdan foydalanishdan bloklangansiz!</b>\n\n<i>Murojaat uchun adminga bog'laning.</i>"
+            if is_msg:
+                await event.answer(msg_text, parse_mode="HTML")
+            elif is_cb:
+                await event.answer("🚫 Siz bloklangansiz!", show_alert=True)
             return
             
-        # Foydalanuvchini bazaga qo'shish
+        # Foydalanuvchini bazaga qo'shish va faollik vaqtini yangilash
         await add_user(user_id, username, full_name)
-        
-        # Faollik vaqtini yangilash
         from database.requests import update_user_activity, get_all_admins, is_user_premium
         await update_user_activity(user_id)
         
@@ -62,22 +66,30 @@ class CheckSubMiddleware(BaseMiddleware):
         m_mode = await get_setting("bot_maintenance_mode")
         if m_mode == "1":
             if not is_admin_user:
-                await event.answer(
+                m_txt = (
                     "🛠️ <b>BOT YANGILANMOQDA!</b> 🚀\n\n"
                     "Hurmatli foydalanuvchi, botimizga siz uchun yanada ko'p qulayliklar va yangi va zo'r funksiyalar qo'shilmoqda! ✨\n\n"
-                    "🕒 <i>Juda tez orada botimiz yangi imkoniyatlar bilan ishga tushadi. Sabringiz uchun rahmat!</i> 🍿",
-                    parse_mode="HTML"
+                    "🕒 <i>Juda tez orada botimiz yangi imkoniyatlar bilan ishga tushadi. Sabringiz uchun rahmat!</i> 🍿"
                 )
+                if is_msg:
+                    await event.answer(m_txt, parse_mode="HTML")
+                elif is_cb:
+                    await event.answer("🛠️ Bot yangilanmoqda!", show_alert=True)
                 return
+
+        # Obunani tekshirish va to'lov tugmalarini o'tkazib yuborish
+        if is_cb:
+            if event.data in ["check_sub", "sub_buy_premium"] or (event.data and event.data.startswith("sub_")):
+                return await handler(event, data)
 
         # Premium to'lov cheki yuborayotgan foydalanuvchilar obuna tekshiruvidan ozod qilinadi
         if curr_state and ("waiting_for_payment" in str(curr_state) or "payment" in str(curr_state).lower()):
             return await handler(event, data)
 
-        # VIP / Premium tariflarini ko'rish va xarid qilish tugmalari kanallarga majburiy obuna talab qilmaydi
-        if event.text:
+        # VIP / Premium tariflarini ko'rish va xarid qilish buyruqlari obuna talab qilmaydi
+        if is_msg and event.text:
             text_low = event.text.lower().replace("\ufe0f", "").strip()
-            if any(p_cmd in text_low for p_cmd in ["/premium", "vip premium", "premium obuna", "/promo", "promo kod"]):
+            if any(p_cmd in text_low for p_cmd in ["/premium", "vip premium", "premium obuna", "/promo", "promo kod", "/test_sub"]):
                 return await handler(event, data)
 
         # Premium/VIP foydalanuvchilar obuna tekshiruvidan ozod qilinadi (Whitelist)
@@ -105,42 +117,46 @@ class CheckSubMiddleware(BaseMiddleware):
 
         for ch_tuple in formatted_channels:
             ch_id = ch_tuple[0]
-            ch_target = str(ch_id).strip()
-            
-            # Link shaklida bo'lsa chat_id ni tozalash (masalan: https://t.me/kanal_nomi -> @kanal_nomi)
-            if "t.me/" in ch_target:
-                parts = ch_target.split("t.me/")[1].strip("/")
-                if not parts.startswith("+") and not parts.startswith("joinchat/") and not parts.startswith("c/"):
-                    ch_target = "@" + parts.split("/")[0]
-
-            # Agar raqamli ID bo'lsa (-100...), int formatiga o'tkazamiz
-            target_id = int(ch_target) if (ch_target.startswith("-") and ch_target.lstrip("-").isdigit()) else ch_target
+            target_id = normalize_channel_identifier(ch_id)
+            if isinstance(target_id, str) and target_id.startswith("-") and target_id.lstrip("-").isdigit():
+                target_id = int(target_id)
 
             try:
                 member = await bot.get_chat_member(chat_id=target_id, user_id=user_id)
                 if member.status not in ["creator", "administrator", "member"]:
                     not_subscribed_channels.append(ch_tuple)
             except Exception as e:
-                # Agar bot kanal admini bo'lmasa yoki kanal topilmasa, tekshirishdan o'tkazib yuborish (bloklanib qolmasligi uchun)
-                print(f"Kanal tekshirishda xato ({target_id}): {e}")
-                # Agar bot kanalda admin bo'lmasa (ChatNotFound, MemberNotFound va h.k.), userlarni asossiz to'xtatmaymiz
                 err_str = str(e).lower()
-                if "chat not found" in err_str or "bot is not a member" in err_str or "not enough rights" in err_str:
+                print(f"Kanal tekshirishda xato ({target_id}): {e}")
+                # Agar bot kanalda a'zo bo'lmasa yoki kanal topilmasa, foydalanuvchini bloklamaymiz
+                if "chat not found" in err_str or "bot is not a member" in err_str:
                     pass
                 else:
                     not_subscribed_channels.append(ch_tuple)
 
         if not_subscribed_channels:
-            try:
-                await event.answer(
-                    "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
-                    parse_mode="HTML",
-                    reply_markup=get_subscription_keyboard(not_subscribed_channels)
-                )
+            if is_msg:
+                try:
+                    await event.answer(
+                        "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
+                        parse_mode="HTML",
+                        reply_markup=get_subscription_keyboard(not_subscribed_channels)
+                    )
+                except Exception as sub_err:
+                    print(f"Obuna klaviaturasi xatosi: {sub_err}")
                 return
-            except Exception as sub_err:
-                print(f"Obuna klaviaturasi xatosi: {sub_err}")
-                return await handler(event, data)
+            elif is_cb:
+                try:
+                    await event.answer("⚠️ Botdan foydalanish uchun homiy kanallarga a'zo bo'ling!", show_alert=True)
+                    if event.message:
+                        await event.message.answer(
+                            "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
+                            parse_mode="HTML",
+                            reply_markup=get_subscription_keyboard(not_subscribed_channels)
+                        )
+                except Exception:
+                    pass
+                return
 
         return await handler(event, data)
 

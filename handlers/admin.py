@@ -2938,6 +2938,63 @@ async def refresh_activity_stats_cb(callback: CallbackQuery):
         pass
     await callback.answer('Statistika yangilandi 🔄')
 
+@router.message(Command('test_sub'))
+async def cmd_test_sub(message: Message):
+    """Admin uchun majburiy obuna tekshiruvi diagnostikasi"""
+    if message.from_user.id not in config.ADMINS:
+        return
+    
+    args = message.text.split()
+    target_user_id = message.from_user.id
+    if len(args) > 1 and args[1].isdigit():
+        target_user_id = int(args[1])
+        
+    db_channels = await db_req.get_sponsor_channels()
+    formatted_channels = []
+    for ch in config.CHANNELS:
+        formatted_channels.append((ch, ch))
+    for db_ch in db_channels:
+        formatted_channels.append((db_ch[1], db_ch[2] or db_ch[1]))
+        
+    bot = message.bot
+    lines = [f"🔍 <b>MAJBURIY OBUNA DIAGNOSTIKASI:</b>\n\n👤 <b>Tekshirilayotgan user ID:</b> <code>{target_user_id}</code>"]
+    if target_user_id in config.ADMINS:
+        lines.append("👑 <b>Eslatma:</b> Ushbu user <b>Bosh Admin</b> bo'lgani uchun oddiy foydalanishda obuna tekshiruvidan 100% ozod qilingan (whitelist).\n")
+    else:
+        lines.append("👤 <b>Foydalanuvchi turi:</b> Oddiy foydalanuvchi (Majburiy obuna tekshiriladi).\n")
+        
+    if not formatted_channels:
+        lines.append("⚠️ Tizimda hech qanday homiy kanal sozlanmagan!")
+        await message.answer(with_footer("\n".join(lines)), parse_mode="HTML")
+        return
+        
+    not_sub_count = 0
+    lines.append("📢 <b>Kanallardagi holati:</b>")
+    for idx, ch_tuple in enumerate(formatted_channels, 1):
+        ch_id = ch_tuple[0]
+        ch_name = ch_tuple[1]
+        target_id = db_req.normalize_channel_identifier(ch_id)
+        if isinstance(target_id, str) and target_id.startswith("-") and target_id.lstrip("-").isdigit():
+            target_id = int(target_id)
+        try:
+            member = await bot.get_chat_member(chat_id=target_id, user_id=target_user_id)
+            status = member.status
+            if status in ["creator", "administrator", "member"]:
+                status_emoji = "✅ (A'zo bo'lgan)"
+            else:
+                status_emoji = f"❌ ({status} - A'zo emas)"
+                not_sub_count += 1
+            lines.append(f"{idx}. <b>{ch_name}</b> (<code>{target_id}</code>): {status_emoji}")
+        except Exception as e:
+            lines.append(f"{idx}. <b>{ch_name}</b> (<code>{target_id}</code>): ⚠️ Xato: {e}")
+            
+    if not_sub_count == 0:
+        lines.append("\n✅ <b>Xulosa:</b> Foydalanuvchi barcha kanallarga to'liq a'zo bo'lgan! Shu sababli bot unga ortiqcha obuna so'rovini ko'rsatmaydi.")
+    else:
+        lines.append(f"\n❌ <b>Xulosa:</b> Foydalanuvchi {not_sub_count} ta kanalga a'zo emas! Bot unga obuna bo'lish oynasini ko'rsatadi.")
+        
+    await message.answer(with_footer("\n".join(lines)), parse_mode="HTML")
+
 @router.message(F.text == 'Yuborilgan reklamalar 📢')
 async def show_broadcasts_history_panel(message: Message, state: FSMContext):
     await state.clear()

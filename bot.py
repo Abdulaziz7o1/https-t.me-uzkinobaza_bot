@@ -566,10 +566,11 @@ async def main():
     # Start up hookni ulash
     dp.startup.register(on_startup)
     
-    # Middleware'larni ulash (Faqat xabarlar uchun obunani tekshirish)
+    # Middleware'larni ulash (Xabarlar va tugmalar uchun to'liq obunani tekshirish)
     dp.message.outer_middleware(StateCancelMiddleware())
     dp.message.outer_middleware(AntiFloodMiddleware())
-    dp.message.middleware(CheckSubMiddleware())
+    dp.message.outer_middleware(CheckSubMiddleware())
+    dp.callback_query.outer_middleware(CheckSubMiddleware())
     
     # Routerlarni ulash
     # Eslatma: admin router user routerdan oldin qo'shilishi kerak,
