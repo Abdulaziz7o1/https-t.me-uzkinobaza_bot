@@ -191,7 +191,9 @@ async def cmd_start(message: Message, state: FSMContext):
         movie = await db_req.get_movie(movie_id, user_id=user_id)
         if movie:
             file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
-            if is_prem_only and not (await db_req.is_premium_user(user_id)):
+            _db_admins = await db_req.get_all_admins()
+            _is_admin = user_id in config.ADMINS or user_id in [int(a) for a in _db_admins]
+            if is_prem_only and not _is_admin and not (await db_req.is_premium_user(user_id)):
                 trial_claimed = await db_req.has_claimed_vip_trial(user_id)
                 kb_rows = [[InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]]
                 if not trial_claimed:
@@ -306,7 +308,9 @@ async def search_movie_by_code(message: Message):
     movie = await db_req.get_movie(movie_id, user_id=user_id)
     if movie:
         file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
-        if is_prem_only and not (await db_req.is_premium_user(user_id)):
+        _db_admins2 = await db_req.get_all_admins()
+        _is_admin2 = user_id in config.ADMINS or user_id in [int(a) for a in _db_admins2]
+        if is_prem_only and not _is_admin2 and not (await db_req.is_premium_user(user_id)):
             trial_claimed = await db_req.has_claimed_vip_trial(user_id)
             kb_rows = [[InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]]
             if not trial_claimed:
@@ -1615,7 +1619,9 @@ async def show_movie_callback(callback: CallbackQuery):
     movie = await db_req.get_movie(movie_id, user_id=user_id)
     if movie:
         file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
-        if is_prem_only and not (await db_req.is_premium_user(user_id)):
+        _db_admins3 = await db_req.get_all_admins()
+        _is_admin3 = user_id in config.ADMINS or user_id in [int(a) for a in _db_admins3]
+        if is_prem_only and not _is_admin3 and not (await db_req.is_premium_user(user_id)):
             trial_claimed = await db_req.has_claimed_vip_trial(user_id)
             kb_rows = [[InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]]
             if not trial_claimed:
