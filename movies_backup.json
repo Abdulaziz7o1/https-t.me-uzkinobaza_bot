@@ -1,16 +1,357 @@
-[
-  {
-    "id": 1,
-    "file_id": "BAACAgIAAxkBAAIZ1Gp1gUw3Mr0CZOEgDXbMV9d-adwHAAK9pAACYjwBSYJVaaaDP8WHPQQ",
-    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Qimorda Yutilgan Sevgi | 1-Qism (O'zbek Kino)",
-    "views_count": 1,
-    "is_premium_only": 0
+{
+  "movies": [
+    {
+      "id": 1,
+      "file_id": "BAACAgIAAxkBAAIZ1Gp1gUw3Mr0CZOEgDXbMV9d-adwHAAK9pAACYjwBSYJVaaaDP8WHPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Qimorda Yutilgan Sevgi | 1-Qism (O'zbek Kino)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 2,
+      "file_id": "BAACAgIAAxkBAAIZ2Wp1gWQX1ESnySYV_vd_ZmMdfftGAAKslwACeDDZSkj0QMvAQJ4TPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Qimorda Yutilgan Sevgi | 2-Qism (O'zbek Kino)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 3,
+      "file_id": "BAACAgIAAxkBAAIZ3mp1gWyVInMgCfulaoFfE8fRexA9AAKZdQACUNiZS3zBNGV90uNZPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Uch Qahramon | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 4,
+      "file_id": "BAACAgIAAxkBAAIZ42p1gXZXFjXPAxvVyPGPCzSQ9SSAAALxnQAC0jSRS_TaPPfUdQlWPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Amerika Josus 2 | Tarjima Kino (HD)",
+      "views_count": 2,
+      "is_premium_only": 0
+    },
+    {
+      "id": 5,
+      "file_id": "BAACAgIAAxkBAAIbW2p60k2bTFOsU8_QZ-EuBzJrT3ePAAKmrwAC4g5ISqs1oDihpRt2PQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Maktab | O'zbek Kino (HD)",
+      "views_count": 2,
+      "is_premium_only": 0
+    },
+    {
+      "id": 6,
+      "file_id": "BAACAgIAAxkBAAIbdGp6-K9eyiskfDfKH7V5XDoaHfnXAAK_ogACyl_ASyLF_gSQzSG6PQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chempion | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 7,
+      "file_id": "BAACAgIAAxkBAAIbgWp6-p-7Ouh33XTtPTGidR1MOASFAAJalQACmMVJS1OtPZm8ZoATPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Guvoh | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 8,
+      "file_id": "BAACAgIAAxkBAAIbhmp6-xyipF2A59jIze-KNWWRyuzSAAKjkQAC4HJYSUdf9S_-krV4PQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Qashshoq Millionerlar | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 9,
+      "file_id": "BAACAgIAAxkBAAIfw2qAMS4uM_w-elqJgG1XwXwj5UKmAAKCnAACPnJQSgvCVWfuk8BnPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Kutilmagan Kelin | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 10,
+      "file_id": "BAACAgQAAxkBAAIiimqNDAuKrndS97f_kKhwl3tpflIJAAJwCgAChS6IUQSEzBWXy1_gPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chegarasizlar 1  | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 11,
+      "file_id": "BAACAgQAAxkBAAIikmqNDCyqsy21NQaEKKksRAyPtgN6AALOCQACXtGZURH6R5IcHnb6PQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chegarasizlar 2  | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 12,
+      "file_id": "BAACAgQAAxkBAAIilWqNDDryUa-Jk7vthCsVmCktcCc4AAI3CQACYWk5UJTtZ9N-KWu3PQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chegarasizlar 3  | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 1
+    },
+    {
+      "id": 13,
+      "file_id": "BAACAgEAAxkBAAIimGqNDEdneSc-VC0bitEZG_16CcNvAAKmHAACtOBYRXXl5uoZa3djPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chegarasizlar 4  | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 1
+    },
+    {
+      "id": 14,
+      "file_id": "BAACAgIAAxkBAAImNWqqa0ezcIPjh0dgoP2UOJ4f8bZBAAK9oQACijMBSSQqa1StRhlQPQQ",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Xudo Asrasin | O'zbek Kino (HD)",
+      "views_count": 1,
+      "is_premium_only": 0
+    },
+    {
+      "id": 15,
+      "file_id": "BAACAgIAAxkBAAIqoWq8-75mKdD1-GvfbEXVwO5Pk80UAAJYmgACeQIoSpuLdxhNSAAB4T0E",
+      "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 PUL VA KO'NGIL | O'zbek Kino (HD)",
+      "views_count": 0,
+      "is_premium_only": 0
+    }
+  ],
+  "sponsor_channels": [
+    {
+      "id": 40,
+      "channel_id": "@qalbkozgusi_uz",
+      "channel_name": "Qalb Ko'zgusi 🫰🫰🫰"
+    },
+    {
+      "id": 41,
+      "channel_id": "@uzkinobaza_official",
+      "channel_name": "KINO KODLARI ❤️❤️❤️"
+    },
+    {
+      "id": 43,
+      "channel_id": "@MadridPrimee",
+      "channel_name": "REAL MADRID 🤍🤍🤍"
+    }
+  ],
+  "users": [
+    {
+      "id": 1356851382,
+      "username": "Abdulaziiz701",
+      "full_name": ".",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-07-18 07:53:22",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    },
+    {
+      "id": 5911459785,
+      "username": "Abdulbosit7570",
+      "full_name": "Abdulbosit",
+      "role": "member",
+      "status": "active",
+      "points": 40,
+      "referrals_count": 0,
+      "created_at": "2026-09-08 14:00:52",
+      "birthday": null,
+      "premium_until": "2026-09-19 17:07:29",
+      "is_blocked": 0
+    },
+    {
+      "id": 6609442606,
+      "username": "nasritdinov_A_175",
+      "full_name": "Азизбек",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-09-21 17:12:04",
+      "birthday": null,
+      "premium_until": "2026-09-28 17:19:26",
+      "is_blocked": 0
+    },
+    {
+      "id": 7140599182,
+      "username": "Abdulazizbee_701",
+      "full_name": "ABDULAZIZ",
+      "role": "admin",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-08-15 07:11:38",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    },
+    {
+      "id": 7458702074,
+      "username": "Flutterch1",
+      "full_name": "Muhammadsodiq",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-09-19 13:04:15",
+      "birthday": null,
+      "premium_until": "2026-09-19 13:37:19",
+      "is_blocked": 0
+    },
+    {
+      "id": 7548567478,
+      "username": "Madvaliyev_Sherzodbek",
+      "full_name": ".",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-09-09 22:31:24",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    },
+    {
+      "id": 7574587864,
+      "username": "",
+      "full_name": "Hojiakbar",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-09-15 23:41:42",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    },
+    {
+      "id": 8099982256,
+      "username": "",
+      "full_name": "Azamat",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-09-12 00:40:03",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    },
+    {
+      "id": 8245305906,
+      "username": "Abdulaziz7o1",
+      "full_name": "ABDULAZIZ",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-08-15 07:42:48",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    },
+    {
+      "id": 8352596257,
+      "username": "MadridPrimee_reklama",
+      "full_name": "MadridPrimee",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-07-18 08:40:56",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    },
+    {
+      "id": 8707335153,
+      "username": "Fozilbek_7777",
+      "full_name": "_fazelkhan_",
+      "role": "member",
+      "status": "active",
+      "points": 0,
+      "referrals_count": 0,
+      "created_at": "2026-09-10 11:18:29",
+      "birthday": null,
+      "premium_until": null,
+      "is_blocked": 0
+    }
+  ],
+  "premium_subscriptions": [
+    {
+      "user_id": 6609442606,
+      "start_date": "2026-09-21 17:19:26",
+      "end_date": "2026-09-28 17:19:26",
+      "plan": "1 haftalik"
+    }
+  ],
+  "payment_records": [],
+  "settings": {
+    "admin_card_number": "9860 1606 4391 1615 AYUBKHON GANIYEV",
+    "last_biweekly_premium_run": "2026-09-12 16:58:51",
+    "bot_maintenance_mode": "0",
+    "flash_sale_until": "2026-09-18 16:43:21",
+    "flash_sale_discount": "50",
+    "kassa_total": "0",
+    "last_daily_kassa_report_date": "2026-09-21",
+    "last_daily_activity_gift_date": "2026-08-17",
+    "last_biyearly_global_unban": "2026-08-16 15:42:13",
+    "last_inactive_cleanup_check": "2026-08-16 15:42:13",
+    "latest_backup_file_id": "BQACAgIAAxkDAAImN2qqa1WUrYtMF2K-Rdvox7HtFGtTAAIjqQACWYFRSUjPYTi-InnxPQQ",
+    "ref_promo_file_id": "AgACAgIAAxkBAAICT2pbkU-uA-sFtRB2yFL5vF99_aHeAALMG2sbForYSmae4Hz9OSKYAQADAgADeAADPQQ",
+    "ref_promo_media_type": "photo",
+    "ref_promo_caption": "Abdulaziz",
+    "comment_moderation": "1",
+    "points_referral": "20",
+    "referral_2x_event": "0",
+    "premium_price_1m": "20000",
+    "premium_price_3m": "55000"
   },
-  {
-    "id": 2,
-    "file_id": "BAACAgIAAxkBAAIZ2Wp1gWQX1ESnySYV_vd_ZmMdfftGAAKslwACeDDZSkj0QMvAQJ4TPQQ",
-    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Qimorda Yutilgan Sevgi | 2-Qism (O'zbek Kino)",
-    "views_count": 1,
-    "is_premium_only": 0
-  }
-]
+  "promo_codes": [],
+  "requests": [],
+  "tickets": [
+    {
+      "id": 1,
+      "user_id": 8245305906,
+      "message_text": "SAlom",
+      "status": "pending",
+      "reply_text": null,
+      "admin_id": null,
+      "created_at": "2026-08-04 05:37:36"
+    },
+    {
+      "id": 2,
+      "user_id": 8245305906,
+      "message_text": "Salom",
+      "status": "replied",
+      "reply_text": "(Media / Rasm / Stiker javob)",
+      "admin_id": 7140599182,
+      "created_at": "2026-08-04 05:51:57"
+    }
+  ],
+  "favorites": [
+    {
+      "user_id": 8352596257,
+      "movie_id": 1
+    },
+    {
+      "user_id": 7140599182,
+      "movie_id": 1
+    }
+  ],
+  "ratings": [],
+  "comments": [],
+  "movie_reactions": [],
+  "abuse_logs": [
+    {
+      "id": 39,
+      "user_id": 8245305906,
+      "type": "FLOOD_SPAM",
+      "details": "Tugmalarni/xabarlarni ketma-ket juda tez yubordi (Anti-Flood).",
+      "created_at": "2026-09-29 15:13:51"
+    }
+  ],
+  "moderator_permissions": [
+    {
+      "user_id": 1356851382,
+      "add_movie": 1,
+      "delete_movie": 0,
+      "view_stats": 0,
+      "send_broadcast": 0,
+      "manage_sponsors": 0,
+      "view_trends": 0,
+      "backup_db": 0
+    }
+  ]
+}

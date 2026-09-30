@@ -1,4 +1,6 @@
 import random
+import asyncio
+import logging
 from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultCachedVideo, InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, LabeledPrice, ChatMemberUpdated
 from aiogram.filters import CommandStart, Command, StateFilter, Filter
@@ -218,7 +220,9 @@ async def cmd_start(message: Message, state: FSMContext):
             if avg_rating > 0:
                 cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
             cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
-            await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating))
+            trailer_file_id = await db_req.get_movie_trailer(movie_id)
+            has_trailer = bool(trailer_file_id)
+            await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, has_trailer=has_trailer))
         else:
             await message.answer(with_footer(f'❌ <b>{movie_id}</b> kodli kino topilmadi.'), parse_mode='HTML')
 
@@ -310,6 +314,12 @@ async def search_movie_by_code(message: Message):
         file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
         _db_admins2 = await db_req.get_all_admins()
         _is_admin2 = user_id in config.ADMINS or user_id in [int(a) for a in _db_admins2]
+
+        # Feature 9: Kunlik bepul kino tekshiruvi
+        daily_free = await db_req.get_setting('daily_free_movie', '0')
+        if daily_free and daily_free.isdigit() and int(daily_free) == movie_id:
+            is_prem_only = 0  # Bugun bepul!
+
         if is_prem_only and not _is_admin2 and not (await db_req.is_premium_user(user_id)):
             trial_claimed = await db_req.has_claimed_vip_trial(user_id)
             kb_rows = [[InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]]
@@ -350,8 +360,16 @@ async def search_movie_by_code(message: Message):
         if avg_rating > 0:
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
-        await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires))
+
+        # Feature 2: Treyler tekshiruvi
+        trailer_file_id = await db_req.get_movie_trailer(movie_id)
+        has_trailer = bool(trailer_file_id)
+
+        await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer))
         await _movie_watched_extra(user_id, caption)
+
+        # Feature 6: O'xshash kinolar tavsiyasi
+        asyncio.create_task(suggest_similar_movies(message, movie_id, caption or ""))
     else:
         await message.answer(with_footer(f"❌ <b>Kino topilmadi!</b>\n\nKino kodi <code>{movie_id}</code> bo'yicha kino mavjud emas.\nIltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning."), parse_mode='HTML')
         return
@@ -365,7 +383,8 @@ async def movie_reaction_cb(callback: CallbackQuery):
     likes, dislikes, fires = await db_req.add_movie_reaction(movie_id, user_id, react_type)
     avg_rating, votes = await db_req.get_movie_rating(movie_id)
     is_fav = await db_req.is_favorite(user_id, movie_id)
-    kb = get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires)
+    trailer_file_id = await db_req.get_movie_trailer(movie_id)
+    kb = get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=bool(trailer_file_id))
     try:
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception:
@@ -1663,7 +1682,8 @@ async def show_movie_callback(callback: CallbackQuery):
             rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
             cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
         cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
-        await callback.message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires))
+        trailer_file_id = await db_req.get_movie_trailer(movie_id)
+        await callback.message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=bool(trailer_file_id)))
         await _movie_watched_extra(user_id, caption)
         await callback.answer()
     else:
@@ -1943,3 +1963,124 @@ async def cb_clear_watch_history(callback: CallbackQuery):
     await callback.message.edit_text(with_footer("✅ <b>Ko'rilgan kinolar tarixingiz muvaffaqiyatli tozalandi!</b>"), parse_mode='HTML')
     await callback.answer()
 
+
+# ─── FEATURE 2: Treyler Ko'rish ──────────────────────────────────────────────
+@router.callback_query(F.data.startswith("watch_trailer_"))
+async def watch_trailer_callback(callback: CallbackQuery):
+    """Kino treylerini ko'rish"""
+    movie_id = int(callback.data.split("_")[2])
+    trailer_fid = await db_req.get_movie_trailer(movie_id)
+    if not trailer_fid:
+        await callback.answer("⚠️ Bu kino uchun treyler mavjud emas!", show_alert=True)
+        return
+    await callback.answer()
+    # Feature 14: Treyler ko'rishlar sonini oshirish
+    asyncio.create_task(db_req.increment_trailer_views(movie_id))
+    await callback.message.answer_video(
+        video=trailer_fid,
+        caption=f"🎬 <b>Kino #{movie_id} treyleri</b>\n\n🤖 {config.BOT_USERNAME}",
+        parse_mode='HTML'
+    )
+
+
+# ─── FEATURE 6: O'xshash Kinolar Tavsiyasi ───────────────────────────────────
+async def suggest_similar_movies(message: Message, movie_id: int, caption: str):
+    """Shu kinoga o'xshash kinolarni tavsiya qilish"""
+    try:
+        await asyncio.sleep(2)  # Asosiy kino yuborilgandan keyin kuting
+        similar = await db_req.get_similar_movies(movie_id, caption, limit=5)
+        if not similar:
+            return
+        txt = "🎭 <b>Shunga o'xshash kinolar:</b>\n\n"
+        for s_id, s_cap, s_views in similar:
+            s_name = (s_cap or '?')[:35]
+            txt += f"🎬 /{s_id} — <i>{s_name}</i>\n"
+        await message.answer(txt, parse_mode='HTML')
+    except Exception:
+        pass
+
+
+# ─── FEATURE 11: Watchlist ───────────────────────────────────────────────────
+@router.callback_query(F.data.startswith("watchlist_add_"))
+async def watchlist_add_callback(callback: CallbackQuery):
+    """Kino kuzatuv ro'yxatiga qo'shish"""
+    movie_id = int(callback.data.split("_")[2])
+    user_id = callback.from_user.id
+    movie = await db_req.get_movie(movie_id)
+    if not movie:
+        await callback.answer("Kino topilmadi!", show_alert=True)
+        return
+    movie_name = (movie[1] or f"Kino #{movie_id}")[:100]
+    async with db_req.get_db() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO watchlist (user_id, movie_name) VALUES (?, ?)",
+            (user_id, movie_name)
+        )
+        await db.commit()
+    await callback.answer(f"✅ '{movie_name[:30]}' kuzatuv ro'yxatiga qo'shildi!", show_alert=True)
+
+
+# ─── FEATURE 12: Teg bo'yicha qidirish ──────────────────────────────────────
+@router.message(F.text.startswith('#'), StateFilter(None))
+async def search_by_tag(message: Message):
+    """# bilan boshlanadigan xabarlarni teg qidiruvi sifatida qabul qilish"""
+    tag = message.text.lstrip('#').strip().split()[0]
+    if not tag:
+        return
+    results = await db_req.search_movies_by_tag(tag)
+    if not results:
+        await message.answer(with_footer(f"🔍 <b>#{tag}</b> tegi bo'yicha hech narsa topilmadi."), parse_mode='HTML')
+        return
+    txt = f"🏷️ <b>#{tag}</b> tegli kinolar:\n\n"
+    for m_id, m_cap, m_views in results:
+        txt += f"🎬 /{m_id} — <i>{(m_cap or '?')[:35]}</i>\n"
+    await message.answer(with_footer(txt), parse_mode='HTML')
+
+
+# ─── FEATURE 13: Guruh uchun Kino Qidirish ───────────────────────────────────
+@router.message(F.chat.type.in_({'group', 'supergroup'}), Command('kino'))
+async def group_kino_search(message: Message):
+    """Guruh chatlarida /kino [kod] orqali kino qidirish"""
+    args = message.text.split()
+    if len(args) < 2:
+        await message.reply("Ishlatish: /kino [kino_kodi]\nMasalan: /kino 1")
+        return
+    raw = args[1].lstrip('/')
+    if not raw.isdigit():
+        await message.reply("⚠️ Raqamdan iborat kino kodi kiriting!")
+        return
+    movie_id = int(raw)
+    movie = await db_req.get_movie(movie_id)
+    if not movie:
+        await message.reply(f"❌ /{movie_id} kodli kino topilmadi!")
+        return
+    file_id, caption, views, is_prem = movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0
+    bot_clean = config.BOT_USERNAME.lstrip('@')
+    if is_prem:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💎 Premium olish", url=f"https://t.me/{bot_clean}")]
+        ])
+        await message.reply(f"🔒 Bu kino faqat premium a'zolar uchun!\n\nPremium olish uchun: {config.BOT_USERNAME}", reply_markup=kb)
+        return
+    watch_url = f"https://t.me/{bot_clean}?start=kino_{movie_id}"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🍿 Kinoni Ko'rish", url=watch_url)]
+    ])
+    cap_short = (caption or '')[:100]
+    await message.reply(f"🎬 <b>/{movie_id}</b>\n{cap_short}\n\n👁 {views:,} ko'rishlar", parse_mode='HTML', reply_markup=kb)
+
+
+# ─── FEATURE 8: Kolleksiya Ko'rish (foydalanuvchi) ───────────────────────────
+@router.callback_query(F.data.startswith("show_collection_"))
+async def show_collection_callback(callback: CallbackQuery):
+    """Kolleksiya kinolarini ko'rish"""
+    collection_id = int(callback.data.split("_")[2])
+    movies = await db_req.get_collection_movies(collection_id)
+    if not movies:
+        await callback.answer("Bu kolleksiyada hozircha kinolar yo'q!", show_alert=True)
+        return
+    await callback.answer()
+    txt = "📁 <b>Kolleksiya kinolari:</b>\n\n"
+    for m_id, m_cap, m_views in movies:
+        txt += f"🎬 /{m_id} — <i>{(m_cap or '?')[:40]}</i>\n"
+    await callback.message.answer(with_footer(txt), parse_mode='HTML')

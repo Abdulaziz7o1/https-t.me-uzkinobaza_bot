@@ -48,7 +48,7 @@ def get_subscription_keyboard(channels: list) -> InlineKeyboardMarkup:
     builder.adjust(1)
     return builder.as_markup()
 
-def get_movie_action_keyboard(movie_id: int, is_fav: bool, avg_rating: float, likes: int = 0, dislikes: int = 0, fires: int = 0) -> InlineKeyboardMarkup:
+def get_movie_action_keyboard(movie_id: int, is_fav: bool, avg_rating: float, likes: int = 0, dislikes: int = 0, fires: int = 0, has_trailer: bool = False) -> InlineKeyboardMarkup:
     """Kino ostidagi harakatlar (Reaksiyalar, Tanlanganlar, Ulashish, Reyting)"""
     builder = InlineKeyboardBuilder()
     
@@ -78,8 +78,18 @@ def get_movie_action_keyboard(movie_id: int, is_fav: bool, avg_rating: float, li
     
     # 5. Faylda nuqson borligi haqida shikoyat
     builder.button(text="⚠️ Faylda nuqson bor", callback_data=f"report_movie_{movie_id}")
+
+    # 6. Feature 2: Treyler Ko'rish (agar treyler mavjud bo'lsa)
+    if has_trailer:
+        builder.button(text="▶️ Treyler Ko'rish", callback_data=f"watch_trailer_{movie_id}")
+
+    # 7. Feature 11: Watchlist ga qo'shish
+    builder.button(text="🔔 Kuzatuv ro'yxatiga qo'shish", callback_data=f"watchlist_add_{movie_id}")
     
-    builder.adjust(3, 1, 1, 1, 1, 1, 1)
+    if has_trailer:
+        builder.adjust(3, 1, 1, 1, 1, 1, 1, 1)
+    else:
+        builder.adjust(3, 1, 1, 1, 1, 1, 1)
     return builder.as_markup()
 
 def get_comments_keyboard(movie_id: int) -> InlineKeyboardMarkup:

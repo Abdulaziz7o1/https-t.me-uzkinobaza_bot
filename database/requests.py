@@ -4165,3 +4165,166 @@ async def scan_all_users_for_blocks(bot) -> tuple[int, int, int]:
     except Exception:
         pass
     return total, blocked_count, active_count
+
+
+# ─── FEATURE 1: Kinoga Treyler Biriktirish ───────────────────────────────────
+
+async def set_movie_trailer(movie_id: int, trailer_file_id: str) -> bool:
+    """Kinoga treyler biriktirish"""
+    async with get_db() as db:
+        await db.execute("UPDATE movies SET trailer_file_id = ? WHERE id = ?", (trailer_file_id, movie_id))
+        await db.commit()
+    from database.connection import cache
+    cache.delete(f"movie_{movie_id}")
+    return True
+
+async def get_movie_trailer(movie_id: int):
+    """Kinoning treyler file_id sini olish"""
+    async with get_db() as db:
+        async with db.execute("SELECT trailer_file_id FROM movies WHERE id = ?", (movie_id,)) as cursor:
+            row = await cursor.fetchone()
+    return row[0] if row and row[0] else None
+
+async def remove_movie_trailer(movie_id: int) -> bool:
+    """Kinoning treylerini o'chirish"""
+    async with get_db() as db:
+        await db.execute("UPDATE movies SET trailer_file_id = NULL WHERE id = ?", (movie_id,))
+        await db.commit()
+    from database.connection import cache
+    cache.delete(f"movie_{movie_id}")
+    return True
+
+
+# ─── FEATURE 4: Top Kinolar ──────────────────────────────────────────────────
+
+async def get_top_movies_by_views(limit: int = 10) -> list:
+    """Ko'rishlar bo'yicha top kinolarni qaytaradi"""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT id, caption, views_count, is_premium_only FROM movies ORDER BY views_count DESC LIMIT ?",
+            (limit,)
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── FEATURE 5: Yangi Kino Bildirishnomasi ───────────────────────────────────
+
+async def get_all_user_ids() -> list:
+    """Barcha aktiv foydalanuvchilarning ID larini qaytaradi"""
+    async with get_db() as db:
+        async with db.execute("SELECT id FROM users WHERE status != 'blocked'") as cursor:
+            rows = await cursor.fetchall()
+    return [row[0] for row in rows]
+
+
+# ─── FEATURE 6: O'xshash kinolar tavsiyasi ───────────────────────────────────
+
+async def get_similar_movies(movie_id: int, caption: str, limit: int = 5) -> list:
+    """Caption kalit so'zlariga asoslanib o'xshash kinolar topish"""
+    if not caption:
+        return []
+    words = [w for w in caption.split()[:3] if len(w) > 3]
+    if not words:
+        return []
+    like_clauses = " OR ".join([f"caption LIKE ?" for _ in words])
+    params = [f"%{w}%" for w in words] + [movie_id, limit]
+    async with get_db() as db:
+        query = f"SELECT id, caption, views_count FROM movies WHERE id != ? AND ({like_clauses}) ORDER BY views_count DESC LIMIT ?"
+        # Reorder params: movie_id and limit go AFTER the LIKE params
+        like_params = [f"%{w}%" for w in words]
+        async with db.execute(
+            f"SELECT id, caption, views_count FROM movies WHERE id != ? AND ({like_clauses}) ORDER BY views_count DESC LIMIT ?",
+            [movie_id] + like_params + [limit]
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── FEATURE 7: Kino statistikasi ────────────────────────────────────────────
+
+async def get_movie_comments_count(movie_id: int) -> int:
+    """Kinodagi izohlar sonini qaytaradi"""
+    async with get_db() as db:
+        async with db.execute("SELECT COUNT(*) FROM comments WHERE movie_id = ?", (movie_id,)) as cursor:
+            row = await cursor.fetchone()
+    return row[0] if row else 0
+
+
+# ─── FEATURE 8: Kolleksiya / Playlist ────────────────────────────────────────
+
+async def create_collection(name: str, description: str, created_by: int) -> int:
+    """Yangi kolleksiya yaratish"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "INSERT INTO collections (name, description, created_by) VALUES (?, ?, ?)",
+            (name, description, created_by)
+        )
+        await db.commit()
+        return cursor.lastrowid
+
+async def add_movie_to_collection(collection_id: int, movie_id: int) -> bool:
+    """Kolleksiyaga kino qo'shish"""
+    async with get_db() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO collection_movies (collection_id, movie_id) VALUES (?, ?)",
+            (collection_id, movie_id)
+        )
+        await db.commit()
+    return True
+
+async def get_all_collections() -> list:
+    """Barcha kolleksiyalarni qaytaradi"""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT id, name, description, created_by FROM collections ORDER BY id DESC"
+        ) as cursor:
+            return await cursor.fetchall()
+
+async def get_collection_movies(collection_id: int) -> list:
+    """Kolleksiya kinolarini qaytaradi"""
+    async with get_db() as db:
+        async with db.execute(
+            """SELECT m.id, m.caption, m.views_count FROM movies m
+               JOIN collection_movies cm ON m.id = cm.movie_id
+               WHERE cm.collection_id = ? ORDER BY cm.added_at""",
+            (collection_id,)
+        ) as cursor:
+            return await cursor.fetchall()
+
+async def delete_collection(collection_id: int) -> bool:
+    """Kolleksiyani o'chirish"""
+    async with get_db() as db:
+        await db.execute("DELETE FROM collection_movies WHERE collection_id = ?", (collection_id,))
+        await db.execute("DELETE FROM collections WHERE id = ?", (collection_id,))
+        await db.commit()
+    return True
+
+
+# ─── FEATURE 12: Kino Teglari ────────────────────────────────────────────────
+
+async def set_movie_tags(movie_id: int, tags: str) -> bool:
+    """Kinoga teglar o'rnatish"""
+    async with get_db() as db:
+        await db.execute("UPDATE movies SET tags = ? WHERE id = ?", (tags, movie_id))
+        await db.commit()
+    return True
+
+async def search_movies_by_tag(tag: str, limit: int = 10) -> list:
+    """Teg bo'yicha kino qidirish"""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT id, caption, views_count FROM movies WHERE tags LIKE ? ORDER BY views_count DESC LIMIT ?",
+            (f"%{tag}%", limit)
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+# ─── FEATURE 14: Treyler Ko'rishlar Statistikasi ─────────────────────────────
+
+async def increment_trailer_views(movie_id: int):
+    """Treyler ko'rishlar sonini oshirish"""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE movies SET trailer_views = COALESCE(trailer_views, 0) + 1 WHERE id = ?",
+            (movie_id,)
+        )
+        await db.commit()

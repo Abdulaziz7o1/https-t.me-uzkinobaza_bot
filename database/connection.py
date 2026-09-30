@@ -711,6 +711,54 @@ async def init_db():
             )
         """)
 
+        # Feature 1: Kinoga treyler biriktirish
+        try:
+            await db.execute("ALTER TABLE movies ADD COLUMN trailer_file_id TEXT DEFAULT NULL;")
+        except Exception:
+            pass
+
+        # Feature 14: Treyler ko'rishlar statistikasi
+        try:
+            await db.execute("ALTER TABLE movies ADD COLUMN trailer_views INTEGER DEFAULT 0;")
+        except Exception:
+            pass
+
+        # Feature 12: Kino teglari
+        try:
+            await db.execute("ALTER TABLE movies ADD COLUMN tags TEXT DEFAULT NULL;")
+        except Exception:
+            pass
+
+        # Feature 8: Kolleksiya / Playlist jadvallar
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS collections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS collection_movies (
+                collection_id INTEGER,
+                movie_id INTEGER,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (collection_id, movie_id)
+            )
+        """)
+
+        # Feature 11: Watchlist jadvali
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS watchlist (
+                user_id INTEGER,
+                movie_name TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                notified INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, movie_name)
+            )
+        """)
+
         await db.commit()
 
 

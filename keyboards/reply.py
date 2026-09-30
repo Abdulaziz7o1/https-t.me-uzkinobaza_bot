@@ -84,6 +84,10 @@ def get_admin_menu():
             ],
             [
                 KeyboardButton(text="🔍 Foydalanuvchi Qidirish")
+            ],
+            [
+                KeyboardButton(text="📁 Kolleksiyalar"),
+                KeyboardButton(text="📊 Dashboard")
             ]
         ],
         resize_keyboard=True
