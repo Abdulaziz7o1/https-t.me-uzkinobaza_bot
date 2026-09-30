@@ -3974,41 +3974,22 @@ async def start_trailer_post_flow(message: Message, state: FSMContext):
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'send_broadcast')):
         await message.answer(with_footer("❌ Bu amal faqat Bosh Admin yoki ruxsat berilgan moderatorlar uchun!"))
         return
-    await state.set_state(AdminStates.waiting_for_trailer_video)
-    txt = (
-        "🎬 <b>KANAL VA GURUHLARGA TREYLER POST YUBORISH:</b>\n\n"
-        "1️⃣ <b>Iltimos, treyler videosini yuboring:</b>\n"
-        "<i>(Kino uchun qisqa lavha, treyler yoki reklama video faylini yuboring)</i>\n\n"
-        "Bekor qilish uchun: /cancel"
-    )
-    await message.answer(with_footer(txt), parse_mode='HTML')
-
-
-@router.message(AdminStates.waiting_for_trailer_video, F.video | F.animation)
-async def process_trailer_video(message: Message, state: FSMContext):
-    file_id = message.video.file_id if message.video else message.animation.file_id
-    await state.update_data(trailer_file_id=file_id)
     await state.set_state(AdminStates.waiting_for_trailer_movie_id)
     txt = (
-        "✅ <b>Treyler videosi qabul qilindi!</b>\n\n"
-        "2️⃣ <b>Ushbu treyler qaysi kinoga tegishli?</b>\n"
+        "🎬 <b>KANAL VA GURUHLARGA POST CHIQARISH:</b>\n\n"
+        "Qaysi kino uchun post chiqarmoqchisiz?\n"
         "Iltimos, <b>Kino kodini</b> yozib yuboring:\n"
-        "<i>Masalan: 12 yoki 1</i>\n\n"
+        "<i>(Masalan: <code>12</code> yoki <code>1</code>)</i>\n\n"
         "Bekor qilish uchun: /cancel"
     )
     await message.answer(with_footer(txt), parse_mode='HTML')
-
-
-@router.message(AdminStates.waiting_for_trailer_video, F.text, ~F.text.in_(MENU_BUTTONS))
-async def invalid_trailer_video(message: Message):
-    await message.answer(with_footer("⚠️ <b>Iltimos, video fayl yuboring!</b>\nTreyler formati video bo'lishi kerak."))
 
 
 @router.message(AdminStates.waiting_for_trailer_movie_id, F.text, ~F.text.in_(MENU_BUTTONS))
 async def process_trailer_movie_id(message: Message, state: FSMContext):
     raw_id = message.text.strip().lstrip('/')
     if not raw_id.isdigit():
-        await message.answer(with_footer("⚠️ <b>Iltimos, faqat raqamdan iborat kino kodini kiriting!</b>\n<i>Masalan: 12</i>"))
+        await message.answer(with_footer("⚠️ <b>Iltimos, faqat musbat sonlardan iborat kino kodini kiriting!</b>\n<i>Masalan: 12</i>"))
         return
 
     movie_id = int(raw_id)
@@ -4020,146 +4001,76 @@ async def process_trailer_movie_id(message: Message, state: FSMContext):
     file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
     prem_badge = " [👑 VIP]" if is_prem_only else ""
     access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+    cap_display = caption[:50] if caption else f"Kino #{movie_id}"
 
-    bot_username = config.BOT_USERNAME.lstrip('@')
-    # Deep-link to direct movie
-    watch_url = f"https://t.me/{bot_username}?start=kino_{movie_id}"
+    existing_trailer = await db_req.get_movie_trailer(movie_id)
+    
+    rows = []
+    if existing_trailer:
+        rows.append([InlineKeyboardButton(text="⚡️ Mavjud treylerni chiqarish (Oddiy)", callback_data=f'post_choice_saved_normal_{movie_id}')])
+        rows.append([InlineKeyboardButton(text="⚡️ Mavjud treylerni chiqarish (Spoyler)", callback_data=f'post_choice_saved_spoiler_{movie_id}')])
+    
+    rows.append([InlineKeyboardButton(text="📹 Yangi treyler yuborish (Oddiy)", callback_data=f'post_choice_trailer_normal_{movie_id}')])
+    rows.append([InlineKeyboardButton(text="🔞 Yangi treyler yuborish (Spoyler)", callback_data=f'post_choice_trailer_spoiler_{movie_id}')])
+    rows.append([InlineKeyboardButton(text="🎭 Treylersiz Intrigali post (1)", callback_data=f'post_choice_intrigue_text_{movie_id}_0')])
+    rows.append([InlineKeyboardButton(text="⏭ Bekor qilish", callback_data=f'post_choice_skip_{movie_id}')])
 
-    # Sarlavhadagi bot brendi takrorlanmasligi uchun caption ichidagi mavjud sarlavhani tozalash
-    import re
-    clean_desc = caption or "🔥 Yangi Premyera Kinoni Tomosha Qiling!"
-    clean_desc = re.sub(r'🎬\s*<b>?@?' + re.escape(bot_username) + r'[^<\n]*</b>?\s*🍿?', '', clean_desc, flags=re.IGNORECASE)
-    clean_desc = re.sub(r'🎬\s*@?' + re.escape(bot_username) + r'[^<\n]*🍿?', '', clean_desc, flags=re.IGNORECASE)
-    clean_desc = re.sub(r'Eng sara kinolar( bazasi)?\s*🍿?', '', clean_desc, flags=re.IGNORECASE).strip()
-    if not clean_desc:
-        clean_desc = "🔥 Yangi Premyera Kinoni Tomosha Qiling!"
+    kb = InlineKeyboardMarkup(inline_keyboard=rows)
 
-    post_caption = (
-        f"🎬 <b>@{bot_username} — Eng sara kinolar</b> 🍿\n\n"
-        f"{clean_desc}\n\n"
-        f"🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n"
-        f"{access_status}\n"
-        f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n"
-        f"📥 <b>Yuklashlar:</b> {views_count:,} marta\n\n"
-        f"🤖 @{bot_username}\n"
-        f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
+    txt = (
+        f"🎬 <b>KINO TANLANDI:</b>\n\n"
+        f"📌 <b>Nomi:</b> <i>{cap_display}</i>\n"
+        f"🔢 <b>Kodi:</b> <code>/{movie_id}</code>\n"
+        f"🔒 <b>Turi:</b> {access_status}\n"
+        f"🎬 <b>Treyler holati:</b> {'✅ Bazada mavjud' if existing_trailer else '❌ Hali yuklanmagan'}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📢 <b>KANALGA QANDAY POST CHIQARASIZ?</b> 🎬\n\n"
+        f"<i>Quyidagi variantlardan birini tanlang:</i>"
     )
-
-    data = await state.get_data()
-    trailer_file_id = data.get("trailer_file_id")
-
-    await state.update_data(
-        final_trailer_file_id=trailer_file_id,
-        final_post_caption=post_caption,
-        final_watch_url=watch_url,
-        final_movie_id=movie_id
-    )
-
-    # Preview keyboard
-    preview_btn_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🍿 Kinoni tomosha qilish 🚀", url=watch_url)]
-    ])
-
-    confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🚀 Kanallar va Guruhlarga Yuborish", callback_data="trailer_broadcast_confirm")],
-        [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="bc_cancel")]
-    ])
-
-    await message.answer("👁 <b>Treyler Post Tayyor! Oldindan ko'rish (Preview):</b>", parse_mode='HTML')
-    await message.answer_video(
-        video=trailer_file_id,
-        caption=post_caption,
-        parse_mode='HTML',
-        reply_markup=preview_btn_kb
-    )
-    await message.answer(
-        "⚠️ <b>Ushbu treyler posti barcha homiy/ulangan kanallar va guruhlarga yuborilsinmi?</b>",
-        parse_mode='HTML',
-        reply_markup=confirm_kb
-    )
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
 
-@router.callback_query(F.data == 'trailer_broadcast_confirm')
-async def trailer_broadcast_confirm_cb(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'send_broadcast')):
-        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+@router.callback_query(F.data.startswith('post_choice_saved_normal_'))
+async def post_choice_saved_normal_cb(callback: CallbackQuery, state: FSMContext):
+    movie_id = int(callback.data.split('_')[-1])
+    trailer_fid = await db_req.get_movie_trailer(movie_id)
+    if not trailer_fid:
+        await callback.answer("⚠️ Treyler topilmadi. Yangi treyler yuboring.", show_alert=True)
         return
-
-    data = await state.get_data()
-    trailer_file_id = data.get("final_trailer_file_id")
-    post_caption = data.get("final_post_caption")
-    watch_url = data.get("final_watch_url")
-    movie_id = data.get("final_movie_id")
-
-    if not trailer_file_id or not post_caption:
-        await callback.answer("⚠️ Ma'lumotlar topilmadi. Qaytadan urinib ko'ring.", show_alert=True)
-        await state.clear()
-        return
-
-    await callback.message.edit_text("🚀 <b>Treyler kanallar va guruhlarga yuborilmoqda. Iltimos kuting...</b>", parse_mode='HTML')
-    await callback.answer("Yuborilmoqda... ⏳")
-
-    post_btn_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🍿 Kinoni tomosha qilish 🚀", url=watch_url)]
-    ])
-
-    bot = callback.bot
-    channel_report = []
-
-    try:
-        db_channels = await db_req.get_sponsor_channels()
-        all_ch = list(config.CHANNELS)
-        for _, ch_id, ch_name in db_channels:
-            if ch_id not in all_ch:
-                all_ch.append(ch_id)
-
-        # Backup channel ham qo'shilsin agar bo'lsa
-        backup_ch = await db_req.get_backup_channel_id()
-        if backup_ch and backup_ch not in all_ch:
-            all_ch.append(backup_ch)
-
-        for ch in all_ch:
-            target_chat = db_req.normalize_channel_identifier(ch)
-            ch_display = str(target_chat)
-            try:
-                chat_info = await bot.get_chat(target_chat)
-                ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(target_chat))
-            except Exception:
-                ch_display = str(target_chat)
-
-            try:
-                await bot.send_video(
-                    chat_id=target_chat,
-                    video=trailer_file_id,
-                    caption=post_caption,
-                    reply_markup=post_btn_kb,
-                    parse_mode='HTML'
-                )
-                channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli yuborildi 🚀")
-                await asyncio.sleep(0.2)
-            except Exception as err:
-                err_text = str(err)
-                if "chat not found" in err_text.lower():
-                    tip = "Bot ushbu kanalda admin emas yoki kanal mavjud emas"
-                elif "not enough rights" in err_text.lower() or "administrator rights" in err_text.lower():
-                    tip = "Botga kanalda xabar yozish (Post Messages) ruxsati berilmagan"
-                elif "bot is not a member" in err_text.lower():
-                    tip = "Bot kanalga a'zo yoki admin qilinmagan"
-                else:
-                    tip = err_text
-                channel_report.append(f"❌ <b>{ch_display}</b> — Yuborilmadi ({tip})")
-
-    except Exception as e:
-        channel_report.append(f"⚠️ Xatolik: {e}")
-
+    await callback.message.edit_text("🚀 <b>Mavjud treyler kanallarga yuborilmoqda, kuting...</b>", parse_mode='HTML')
+    report = await send_trailer_post_to_channels(callback.bot, movie_id, trailer_fid, is_spoiler=False)
     await state.clear()
-    ch_report_str = "\n".join(channel_report) if channel_report else "<i>Tizimda kanallar topilmadi.</i>"
-    summary_txt = (
-        f"🎬 <b>TREYLER POSTI MUVAFFAQIYATLI YUBORILDI!</b> 🚀\n\n"
-        f"📌 <b>Kino kodi:</b> /{movie_id}\n\n"
-        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{ch_report_str}"
+    report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
+    txt = (
+        f"🎬 <b>TREYLER MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
+        f"📌 <b>Kino kodi:</b> /{movie_id}\n"
+        f"✨ <b>Rejim:</b> 📹 Oddiy rejimda\n\n"
+        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}"
     )
-    await callback.message.answer(with_footer(summary_txt), parse_mode='HTML')
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML')
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('post_choice_saved_spoiler_'))
+async def post_choice_saved_spoiler_cb(callback: CallbackQuery, state: FSMContext):
+    movie_id = int(callback.data.split('_')[-1])
+    trailer_fid = await db_req.get_movie_trailer(movie_id)
+    if not trailer_fid:
+        await callback.answer("⚠️ Treyler topilmadi. Yangi treyler yuboring.", show_alert=True)
+        return
+    await callback.message.edit_text("🚀 <b>Mavjud treyler spoyler bilan kanallarga yuborilmoqda, kuting...</b>", parse_mode='HTML')
+    report = await send_trailer_post_to_channels(callback.bot, movie_id, trailer_fid, is_spoiler=True)
+    await state.clear()
+    report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
+    txt = (
+        f"🎬 <b>TREYLER MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
+        f"📌 <b>Kino kodi:</b> /{movie_id}\n"
+        f"✨ <b>Rejim:</b> 🔞 Spoyler effekti bilan\n\n"
+        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}"
+    )
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML')
+    await callback.answer()
+
 
 
 INTRIGUE_TEMPLATES = [
