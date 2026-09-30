@@ -376,10 +376,10 @@ async def trash_cleanup_scheduler(bot: Bot):
             logging.error(f"Trash cleanup scheduler xatosi: {e}")
 
 async def periodic_mongodb_sync(bot: Bot):
-    """Har 5 daqiqada barcha kinolar va bazani MongoDB Atlas bulutga sinxronlaydi"""
+    """Har 8 soatda (kuniga 3 marta) barcha kinolar va bazani MongoDB Atlas bulutga sinxronlaydi"""
     import database.requests as db_req
     while True:
-        await asyncio.sleep(300)  # 5 daqiqa
+        await asyncio.sleep(28800)  # 8 soat (kuniga 3 marta)
         try:
             await db_req.export_master_backup_json()
             logging.info("Periodic MongoDB sync: barcha ma'lumotlar bulutga saqlandi ☁️")
@@ -457,7 +457,7 @@ async def on_startup(bot: Bot):
     except Exception as e:
         logging.warning(f"Master backup tiklashda xato: {e}")
     
-    # Har 5 daqiqada MongoDB ga sinxronlash (kinolar yo'qolmasin)
+    # Har 8 soatda MongoDB ga sinxronlash (kuniga 3 marta, trafikni tejash uchun)
     asyncio.create_task(periodic_mongodb_sync(bot))
     logging.info("Barcha schedulerlar va 24/7 Render Keep-Alive Auto-Ping muvaffaqiyatli ishga tushdi.")
 
@@ -500,10 +500,9 @@ async def start_health_web_server():
         logging.warning(f"Web serverni ishga tushirishda ogohlantirish: {e}")
 
 async def keep_alive_self_ping():
-    """Render Free Web Service 15 daqiqada uyquga ketmasligi uchun har 2 daqiqada uzluksiz ping yuborish"""
-    await asyncio.sleep(10)
+    """Render Free Web Service 15 daqiqada uyquga ketmasligi uchun har 10 daqiqada tejamkor ping yuborish"""
+    await asyncio.sleep(15)
     render_url = os.getenv("RENDER_EXTERNAL_URL", "https://uzkinobaza-bot.onrender.com/health")
-    root_url = "https://uzkinobaza-bot.onrender.com/"
     local_port = os.getenv("PORT")
     
     import aiohttp
@@ -514,8 +513,6 @@ async def keep_alive_self_ping():
             async with aiohttp.ClientSession() as session:
                 async with session.get(render_url, timeout=ClientTimeout(total=10)) as resp:
                     logging.info(f"Keep-Alive ping /health: {resp.status}")
-                async with session.get(root_url, timeout=ClientTimeout(total=10)) as resp:
-                    logging.info(f"Keep-Alive ping /: {resp.status}")
         except Exception:
             if local_port:
                 try:
@@ -524,7 +521,7 @@ async def keep_alive_self_ping():
                             logging.info(f"Local Keep-Alive ping: {resp.status}")
                 except Exception:
                     pass
-        await asyncio.sleep(120)
+        await asyncio.sleep(600)  # Har 10 daqiqada (trafikni tejaydi)
 
 async def main():
     # Database yaratish va sozlash
