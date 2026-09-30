@@ -454,7 +454,10 @@ async def set_movie_audience_callback(callback: CallbackQuery, state: FSMContext
     next_free = await db_req.get_next_available_movie_id()
     
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⏭ O'tkazib yuborish (Treylersiz)", callback_data=f'skip_trailer_{movie_id}')],
+        [InlineKeyboardButton(text="📹 Treyler yuborish (Oddiy)", callback_data=f'post_choice_trailer_normal_{movie_id}')],
+        [InlineKeyboardButton(text="🔞 Xiralashtirib yuborish (Spoyler)", callback_data=f'post_choice_trailer_spoiler_{movie_id}')],
+        [InlineKeyboardButton(text="🎭 Treylersiz Intrigali post (1)", callback_data=f'post_choice_intrigue_text_{movie_id}_0')],
+        [InlineKeyboardButton(text="⏭ O'tkazib yuborish", callback_data=f'post_choice_skip_{movie_id}')],
         [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]
     ])
     
@@ -468,10 +471,8 @@ async def set_movie_audience_callback(callback: CallbackQuery, state: FSMContext
         f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
         f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 <b>USHBU KINO UCHUN TREYLER BORMI?</b> 🎬\n\n"
-        f"<i>Agar treyler bo'lsa, <b>shu yerga video faylini yuboring!</b>\n"
-        f"Bot uni bazaga biriktiradi va darhol kanallarga post qilib yuboradi. 🚀</i>\n\n"
-        f"<i>(Agar treyler bo'lmasa, quyidagi «O'tkazib yuborish» tugmasini bosing)</i>"
+        f"📢 <b>KANALGA POST VA TREYLER TANLOVI:</b> 🎬\n\n"
+        f"<i>Ushbu kino uchun kanallarga qanday post chiqarmoqchisiz? Quyidagi variantlardan birini tanlang:</i>"
     )
     
     try:
@@ -4161,8 +4162,24 @@ async def trailer_broadcast_confirm_cb(callback: CallbackQuery, state: FSMContex
     await callback.message.answer(with_footer(summary_txt), parse_mode='HTML')
 
 
-async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str) -> list[str]:
-    """Kinoning treylerini barcha homiy va ulangan kanallarga chiroyli post qilib yuborish"""
+INTRIGUE_TEMPLATES = [
+    "😱 <b>Dunyo bo'yicha eng yuqori baholangan ushbu psixologik trillerni ko'rganmisiz?</b>\n\nOxirgi 5 daqiqagacha nima bo'lishini umuman taxmin qila olmaysiz... Miyangizni portlatadigan kutilmagan yakun!\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun pastdagi tugmani bosing:</i>",
+    "🔥 <b>Boshidan oxirigacha bir soniya ham tinch qo'ymaydigan shiddatli jangari film!</b>\n\nAdrenalin, xavf-xatar va haqiqiy adolat yo'lidagi shafqatsiz kurash. Bugun kechqurun tomosha qilish uchun 1-o'rindagi tavsiya!\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "🤫 <b>Haqiqiy voqealarga asoslangan eng sirli va vahimali voqea...</b>\n\nUshbu sirni ko'pchilik bilmaydi. Tunda asabi bo'shlarga yolg'iz ko'rish mutlaqo tavsiya etilmaydi!\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "🤯 <b>IMDb va kinotanqidchilar tomonidan rekord darajadagi 10/10 ball olgan asar!</b>\n\nBosh qahramonning aqlbovar qilmas taqdiri va kutilmagan sirlar sizni chuqur hayratga soladi.\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "⚡️ <b>Ushbu kinoni ko'rmagan bo'lsangiz, demak kinolardan hali hech narsa ko'rmabsiz!</b>\n\nBir nafasda ko'riladigan, zerikishga zarracha fursat qoldirmaydigan ajoyib premyera!\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "🎭 <b>Daxshatli aqliy o'yinlar, chalkash jumboqlar va aldovlar girdobi...</b>\n\nKim do'st, kim dushman ekanligini eng so'nggi sekundgacha ajrata olmaysiz!\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "🎬 <b>Ushbu yildagi eng shov-shuvli va kutilgan premyera nihoyat chiqdi!</b>\n\nQiziqarli voqealar rivoji, yuqori sifat va professional o'zbekcha dublyajda.\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "💔 <b>Hatto eng toshbag'ir insonni ham larzaga keltiruvchi ta'sirli hayotiy film...</b>\n\nHaqiqiy muhabbat, sadoqat va og'ir hayotiy sinovlar haqidagi unutilmas asar.\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "⏳ <b>Vaqt bilan poyga! Har bir soniya hal qiluvchi ahamiyatga ega...</b>\n\nQahramonlar tirik qolish uchun aqlbovar qilmas qadamlar tashlashga majbur.\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "🕵️‍♂️ <b>Mukammal jinoyat mavjud emas, lekin bu jinoyatchi hammadan ayyor chiqdi!</b>\n\nPolitsiya va daho o'rtasidagi shafqatsiz intellektual jang.\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "🚀 <b>Kelajak va koinot sirlari haqidagi eng qimmatbaho fantastik blokbaster!</b>\n\nVizual effektlar va musiqalari sizni boshqa olamga olib ketadi.\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>",
+    "🎪 <b>Kayfiyatingizni bir zumda 100% ga ko'taradigan ajoyib komediya!</b>\n\nOilangiz yoki do'stlaringiz bilan mazza qilib kulib tomosha qiladigan eng sara film.\n\n🍿 <i>Kinoni tomosha qilish va nomini bilish uchun:</i>"
+]
+
+
+async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str, is_spoiler: bool = False) -> list[str]:
+    """Kinoning treylerini barcha homiy va ulangan kanallarga post qilib yuborish (oddiy yoki spoyler)"""
     movie = await db_req.get_movie(movie_id)
     if not movie:
         return ["❌ Kino ma'lumotlari topilmadi"]
@@ -4182,16 +4199,28 @@ async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str
     if not clean_desc:
         clean_desc = "🔥 Yangi Premyera Kinoni Tomosha Qiling!"
 
-    post_caption = (
-        f"🎬 <b>@{bot_username} — Yangi Premyera Treyleri!</b> 🍿\n\n"
-        f"{clean_desc}\n\n"
-        f"🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n"
-        f"{access_status}\n"
-        f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n"
-        f"📥 <b>Yuklashlar:</b> {views_count:,} marta\n\n"
-        f"🤖 @{bot_username}\n"
-        f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
-    )
+    if is_spoiler:
+        post_caption = (
+            f"🔞 <b>DIQQAT! Kutilmagan va hayratlanarli sahnalar!</b> ⚠️\n\n"
+            f"<i>(Videoni ko'rish uchun ustiga bosing)</i>\n\n"
+            f"🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n"
+            f"{access_status}\n"
+            f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n"
+            f"📥 <b>Yuklashlar:</b> {views_count:,} marta\n\n"
+            f"🤖 @{bot_username}\n"
+            f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
+        )
+    else:
+        post_caption = (
+            f"🎬 <b>@{bot_username} — Yangi Premyera Treyleri!</b> 🍿\n\n"
+            f"{clean_desc}\n\n"
+            f"🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n"
+            f"{access_status}\n"
+            f"🖥 <b>Sifati:</b> 1080p Full HD 🍿\n"
+            f"📥 <b>Yuklashlar:</b> {views_count:,} marta\n\n"
+            f"🤖 @{bot_username}\n"
+            f'📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
+        )
 
     post_btn_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🍿 Kinoni tomosha qilish 🚀", url=watch_url)]
@@ -4223,6 +4252,7 @@ async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str
                     chat_id=target_chat,
                     video=trailer_file_id,
                     caption=post_caption,
+                    has_spoiler=is_spoiler,
                     reply_markup=post_btn_kb,
                     parse_mode='HTML'
                 )
@@ -4245,6 +4275,162 @@ async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str
     return channel_report
 
 
+async def send_intrigue_text_post_to_channels(bot, movie_id: int, text_content: str) -> list[str]:
+    """Treylersiz intrigali matnli postni kanallarga chiqarish"""
+    bot_username = config.BOT_USERNAME.lstrip('@')
+    watch_url = f"https://t.me/{bot_username}?start=kino_{movie_id}"
+
+    post_caption = (
+        f"{text_content}\n\n"
+        f"🤖 @{bot_username}\n"
+        f'📩 <b>Murojaat:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
+    )
+
+    post_btn_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🍿 Kinoni ko'rish va nomini bilish 🚀", url=watch_url)]
+    ])
+
+    channel_report = []
+    try:
+        db_channels = await db_req.get_sponsor_channels()
+        all_ch = list(config.CHANNELS)
+        for _, ch_id, ch_name in db_channels:
+            if ch_id not in all_ch:
+                all_ch.append(ch_id)
+
+        backup_ch = await db_req.get_backup_channel_id()
+        if backup_ch and backup_ch not in all_ch:
+            all_ch.append(backup_ch)
+
+        for ch in all_ch:
+            target_chat = db_req.normalize_channel_identifier(ch)
+            ch_display = str(target_chat)
+            try:
+                chat_info = await bot.get_chat(target_chat)
+                ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(target_chat))
+            except Exception:
+                ch_display = str(target_chat)
+
+            try:
+                await bot.send_message(
+                    chat_id=target_chat,
+                    text=post_caption,
+                    reply_markup=post_btn_kb,
+                    parse_mode='HTML'
+                )
+                channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli yuborildi 🚀")
+                await asyncio.sleep(0.2)
+            except Exception as err:
+                err_text = str(err)
+                if "chat not found" in err_text.lower():
+                    tip = "Bot ushbu kanalda admin emas"
+                elif "not enough rights" in err_text.lower() or "administrator rights" in err_text.lower():
+                    tip = "Botga post yozish ruxsati berilmagan"
+                else:
+                    tip = err_text[:40]
+                channel_report.append(f"❌ <b>{ch_display}</b> ({tip})")
+    except Exception as e:
+        channel_report.append(f"⚠️ Xatolik: {e}")
+
+    return channel_report
+
+
+# ─── 4 TA TANLOVNING CALLBACK HANDLERLARI ───
+
+@router.callback_query(F.data.startswith('post_choice_trailer_normal_'))
+async def post_choice_trailer_normal_cb(callback: CallbackQuery, state: FSMContext):
+    movie_id = int(callback.data.split('_')[-1])
+    await state.set_state(AdminStates.waiting_for_trailer_attach_video)
+    await state.update_data(trailer_target_movie_id=movie_id, is_spoiler=False)
+    
+    txt = (
+        f"📹 <b>ODDIY TREYLER YUBORISH REJIMI:</b>\n\n"
+        f"🎬 <b>Kino kodi:</b> <code>/{movie_id}</code>\n\n"
+        f"Iltimos, treyler video faylini yuboring!\n"
+        f"<i>Bot uni kinoga biriktiradi va darhol barcha kanallarga to'liq sarlavha va ma'lumotlar bilan chiqaradi. 🚀</i>\n\n"
+        f"Bekor qilish uchun: /cancel"
+    )
+    cancel_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Orqaga (Tanlovga qaytish)", callback_data=f'post_choice_back_{movie_id}')]
+    ])
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=cancel_kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('post_choice_trailer_spoiler_'))
+async def post_choice_trailer_spoiler_cb(callback: CallbackQuery, state: FSMContext):
+    movie_id = int(callback.data.split('_')[-1])
+    await state.set_state(AdminStates.waiting_for_trailer_attach_video)
+    await state.update_data(trailer_target_movie_id=movie_id, is_spoiler=True)
+    
+    txt = (
+        f"🔞 <b>XIRALASHTIRILGAN (SPOYLER) TREYLER REJIMI:</b>\n\n"
+        f"🎬 <b>Kino kodi:</b> <code>/{movie_id}</code>\n\n"
+        f"Iltimos, treyler video faylini yuboring!\n"
+        f"<i>Video Telegram 'Spoiler' (xiralashtirish) effekti bilan yopiladi va kanallarga jozibali ogohlantirish matni bilan post qilinadi! ⚠️</i>\n\n"
+        f"Bekor qilish uchun: /cancel"
+    )
+    cancel_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Orqaga (Tanlovga qaytish)", callback_data=f'post_choice_back_{movie_id}')]
+    ])
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=cancel_kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('post_choice_intrigue_text_'))
+async def post_choice_intrigue_text_cb(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split('_')
+    movie_id = int(parts[4])
+    idx = int(parts[5]) if len(parts) > 5 else 0
+    
+    selected_text = INTRIGUE_TEMPLATES[idx % len(INTRIGUE_TEMPLATES)]
+    next_idx = (idx + 1) % len(INTRIGUE_TEMPLATES)
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚀 Kanallarga Chiqarish", callback_data=f'publish_intrigue_text_{movie_id}_{idx}')],
+        [InlineKeyboardButton(text="🔄 Boshqa yozuv (Almashtirish)", callback_data=f'post_choice_intrigue_text_{movie_id}_{next_idx}')],
+        [InlineKeyboardButton(text="🔙 Orqaga (Tanlovga qaytish)", callback_data=f'post_choice_back_{movie_id}')]
+    ])
+    
+    txt = (
+        f"🎭 <b>TREYLERSIZ INTRIGALI POST (Oldindan ko'rish):</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{selected_text}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"💡 <i>Ushbu post kanallarga faqat matn va «🍿 Kinoni tomosha qilish va nomini bilish» tugmasi bilan chiqadi.\n"
+        f"Agar matn yoqmasa, «🔄 Boshqa yozuv» tugmasini bosing!</i>"
+    )
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('publish_intrigue_text_'))
+async def publish_intrigue_text_cb(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split('_')
+    movie_id = int(parts[3])
+    idx = int(parts[4]) if len(parts) > 4 else 0
+    selected_text = INTRIGUE_TEMPLATES[idx % len(INTRIGUE_TEMPLATES)]
+
+    await callback.message.edit_text("🚀 <b>Post kanallarga chiqarilmoqda, iltimos kuting...</b>", parse_mode='HTML')
+    await callback.answer("Yuborilmoqda... ⏳")
+
+    report = await send_intrigue_text_post_to_channels(callback.bot, movie_id, selected_text)
+    await state.clear()
+
+    report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}')]
+    ])
+    txt = (
+        f"🎭 <b>INTRIGALI POST MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
+        f"📌 <b>Kino kodi:</b> /{movie_id}\n\n"
+        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}\n\n"
+        f"✨ <i>Foydalanuvchilar qiziqib, nomini bilish uchun botga kirishadi!</i>"
+    )
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith('post_choice_skip_'))
 @router.callback_query(F.data.startswith('skip_trailer_'))
 async def skip_trailer_callback(callback: CallbackQuery, state: FSMContext):
     movie_id = int(callback.data.split('_')[-1])
@@ -4254,23 +4440,50 @@ async def skip_trailer_callback(callback: CallbackQuery, state: FSMContext):
     ])
     try:
         await callback.message.edit_text(
-            with_footer(f"✅ <b>/{movie_id} kodli kino saqlandi (Treylersiz).</b>\n\nJarayon muvaffaqiyatli yakunlandi! 🍿"),
+            with_footer(f"✅ <b>/{movie_id} kodli kino saqlandi (Kanalga post qilinmadi).</b>\n\nJarayon muvaffaqiyatli yakunlandi! 🍿"),
             parse_mode='HTML',
             reply_markup=kb
         )
     except Exception:
         await callback.message.answer(
-            with_footer(f"✅ <b>/{movie_id} kodli kino saqlandi (Treylersiz).</b>\n\nJarayon muvaffaqiyatli yakunlandi! 🍿"),
+            with_footer(f"✅ <b>/{movie_id} kodli kino saqlandi (Kanalga post qilinmadi).</b>\n\nJarayon muvaffaqiyatli yakunlandi! 🍿"),
             parse_mode='HTML',
             reply_markup=kb
         )
-    await callback.answer("Treyler o'tkazib yuborildi ✅")
+    await callback.answer("O'tkazib yuborildi ✅")
+
+
+@router.callback_query(F.data.startswith('post_choice_back_'))
+async def post_choice_back_cb(callback: CallbackQuery, state: FSMContext):
+    movie_id = int(callback.data.split('_')[-1])
+    movie = await db_req.get_movie(movie_id)
+    caption = movie[1] if movie else ''
+    cap_display = caption[:50] if caption else f"Kino #{movie_id}"
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📹 Treyler yuborish (Oddiy)", callback_data=f'post_choice_trailer_normal_{movie_id}')],
+        [InlineKeyboardButton(text="🔞 Xiralashtirib yuborish (Spoyler)", callback_data=f'post_choice_trailer_spoiler_{movie_id}')],
+        [InlineKeyboardButton(text="🎭 Treylersiz Intrigali post (1)", callback_data=f'post_choice_intrigue_text_{movie_id}_0')],
+        [InlineKeyboardButton(text="⏭ O'tkazib yuborish", callback_data=f'post_choice_skip_{movie_id}')],
+        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]
+    ])
+    
+    confirm_txt = (
+        f"🎬 <b>KANALGA POST VA TREYLER TANLOVI:</b>\n\n"
+        f"📌 <b>Kino:</b> <i>{cap_display}</i>\n"
+        f"🔢 <b>Kodi:</b> <code>/{movie_id}</code>\n\n"
+        f"<i>Quyidagi variantlardan birini tanlang:</i>"
+    )
+    await callback.message.edit_text(with_footer(confirm_txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer()
 
 
 @router.message(AdminStates.waiting_for_trailer_attach_video, F.video | F.animation)
 async def process_attached_trailer_video(message: Message, state: FSMContext):
     data = await state.get_data()
     movie_id = data.get('trailer_target_movie_id')
+    is_spoiler = data.get('is_spoiler', False)
+    
     if not movie_id:
         await state.clear()
         await message.answer(with_footer("⚠️ Kino kodi topilmadi. Jarayon bekor qilindi."))
@@ -4281,13 +4494,14 @@ async def process_attached_trailer_video(message: Message, state: FSMContext):
     # 1. Bazaga treylerni saqlash
     await db_req.set_movie_trailer(movie_id, trailer_file_id)
 
+    mode_label = "🔞 Spoyler effekti bilan" if is_spoiler else "📹 Oddiy rejimda"
     status_msg = await message.answer(
-        "⏳ <b>Treyler bazaga biriktirildi!</b>\nKanallar va guruhlarga avtomatik post yuborilmoqda, kuting...",
+        f"⏳ <b>Treyler bazaga biriktirildi!</b>\nKanallarga {mode_label} avtomatik post yuborilmoqda, kuting...",
         parse_mode='HTML'
     )
 
     # 2. Kanallarga avtomatik yuborish
-    report = await send_trailer_post_to_channels(message.bot, movie_id, trailer_file_id)
+    report = await send_trailer_post_to_channels(message.bot, movie_id, trailer_file_id, is_spoiler=is_spoiler)
     await state.clear()
 
     report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
@@ -4295,10 +4509,11 @@ async def process_attached_trailer_video(message: Message, state: FSMContext):
         [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]
     ])
     txt = (
-        f"🎬 <b>TREYLER BIRIKTIRILDI VA KANALLARGA POST QILINDI!</b> 🚀\n\n"
-        f"📌 <b>Kino kodi:</b> /{movie_id}\n\n"
+        f"🎬 <b>TREYLER MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
+        f"📌 <b>Kino kodi:</b> /{movie_id}\n"
+        f"✨ <b>Rejim:</b> {mode_label}\n\n"
         f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}\n\n"
-        f"✨ <i>Foydalanuvchilar endi botda ham «▶️ Treyler Ko'rish» tugmasini ko'rishadi!</i>"
+        f"🍿 <i>Foydalanuvchilar endi botda ham «▶️ Treyler Ko'rish» tugmasini ko'rishadi!</i>"
     )
     await status_msg.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
