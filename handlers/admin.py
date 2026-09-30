@@ -3977,9 +3977,9 @@ async def start_trailer_post_flow(message: Message, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_trailer_movie_id)
     txt = (
         "🎬 <b>KANAL VA GURUHLARGA POST CHIQARISH:</b>\n\n"
-        "Qaysi kino uchun post chiqarmoqchisiz?\n"
-        "Iltimos, <b>Kino kodini</b> yozib yuboring:\n"
-        "<i>(Masalan: <code>12</code> yoki <code>1</code>)</i>\n\n"
+        "📌 <b>Qaysi kino uchun post chiqarmoqchisiz?</b>\n"
+        "Iltimos, <b>Kino kodini</b> yuboring:\n"
+        "<i>Masalan: <code>12</code> yoki <code>/12</code></i>\n\n"
         "Bekor qilish uchun: /cancel"
     )
     await message.answer(with_footer(txt), parse_mode='HTML')
@@ -3998,78 +3998,61 @@ async def process_trailer_movie_id(message: Message, state: FSMContext):
         await message.answer(with_footer(f"❌ <b>/{movie_id}</b> kodli kino bazada topilmadi!\nIltimos, botda mavjud bo'lgan to'g'ri kino kodini kiriting."))
         return
 
+    await state.clear()
+
     file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
-    prem_badge = " [👑 VIP]" if is_prem_only else ""
-    access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+    aud_badge = "👑 <b>Faqat Premium (VIP)</b>" if is_prem_only else "🟢 <b>Barcha uchun bepul</b>"
     cap_display = caption[:50] if caption else f"Kino #{movie_id}"
+    saved_trailer = await db_req.get_movie_trailer(movie_id)
 
-    existing_trailer = await db_req.get_movie_trailer(movie_id)
-    
-    rows = []
-    if existing_trailer:
-        rows.append([InlineKeyboardButton(text="⚡️ Mavjud treylerni chiqarish (Oddiy)", callback_data=f'post_choice_saved_normal_{movie_id}')])
-        rows.append([InlineKeyboardButton(text="⚡️ Mavjud treylerni chiqarish (Spoyler)", callback_data=f'post_choice_saved_spoiler_{movie_id}')])
-    
-    rows.append([InlineKeyboardButton(text="📹 Yangi treyler yuborish (Oddiy)", callback_data=f'post_choice_trailer_normal_{movie_id}')])
-    rows.append([InlineKeyboardButton(text="🔞 Yangi treyler yuborish (Spoyler)", callback_data=f'post_choice_trailer_spoiler_{movie_id}')])
-    rows.append([InlineKeyboardButton(text="🎭 Treylersiz Intrigali post (1)", callback_data=f'post_choice_intrigue_text_{movie_id}_0')])
-    rows.append([InlineKeyboardButton(text="⏭ Bekor qilish", callback_data=f'post_choice_skip_{movie_id}')])
+    kb_rows = []
+    if saved_trailer:
+        kb_rows.append([InlineKeyboardButton(text="⚡️ Bazadagi treylerni kanalga chiqarish", callback_data=f'post_choice_use_saved_{movie_id}')])
+    kb_rows.append([InlineKeyboardButton(text="📹 Treyler yuborish (Oddiy)", callback_data=f'post_choice_trailer_normal_{movie_id}')])
+    kb_rows.append([InlineKeyboardButton(text="🔞 Xiralashtirib yuborish (Spoyler)", callback_data=f'post_choice_trailer_spoiler_{movie_id}')])
+    kb_rows.append([InlineKeyboardButton(text="🎭 Treylersiz Intrigali post (1)", callback_data=f'post_choice_intrigue_text_{movie_id}_0')])
+    kb_rows.append([InlineKeyboardButton(text="⏭ O'tkazib yuborish", callback_data=f'post_choice_skip_{movie_id}')])
+    kb_rows.append([InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}')])
 
-    kb = InlineKeyboardMarkup(inline_keyboard=rows)
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
 
     txt = (
-        f"🎬 <b>KINO TANLANDI:</b>\n\n"
-        f"📌 <b>Nomi:</b> <i>{cap_display}</i>\n"
-        f"🔢 <b>Kodi:</b> <code>/{movie_id}</code>\n"
-        f"🔒 <b>Turi:</b> {access_status}\n"
-        f"🎬 <b>Treyler holati:</b> {'✅ Bazada mavjud' if existing_trailer else '❌ Hali yuklanmagan'}\n\n"
+        f"🎬 <b>KANALGA POST VA TREYLER TANLOVI:</b>\n\n"
+        f"📌 <b>Kino:</b> <i>{cap_display}</i>\n"
+        f"🎬 <b>Kodi:</b> <code>/{movie_id}</code>\n"
+        f"🔒 <b>Turi:</b> {aud_badge}\n"
+        f"👁 <b>Ko'rishlar:</b> {views_count:,} marta\n"
+        f"📹 <b>Treyler holati:</b> {'✅ Bazada mavjud' if saved_trailer else '❌ Treyler yuklanmagan'}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 <b>KANALGA QANDAY POST CHIQARASIZ?</b> 🎬\n\n"
-        f"<i>Quyidagi variantlardan birini tanlang:</i>"
+        f"<i>Ushbu kino uchun kanallarga qanday post chiqarmoqchisiz? Quyidagi variantlardan birini tanlang:</i>"
     )
     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
 
-@router.callback_query(F.data.startswith('post_choice_saved_normal_'))
-async def post_choice_saved_normal_cb(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data.startswith('post_choice_use_saved_'))
+async def post_choice_use_saved_cb(callback: CallbackQuery, state: FSMContext):
     movie_id = int(callback.data.split('_')[-1])
     trailer_fid = await db_req.get_movie_trailer(movie_id)
     if not trailer_fid:
-        await callback.answer("⚠️ Treyler topilmadi. Yangi treyler yuboring.", show_alert=True)
+        await callback.answer("⚠️ Ushbu kino uchun bazada saqlangan treyler topilmadi!", show_alert=True)
         return
-    await callback.message.edit_text("🚀 <b>Mavjud treyler kanallarga yuborilmoqda, kuting...</b>", parse_mode='HTML')
+
+    await callback.message.edit_text("🚀 <b>Bazadagi treyler kanallarga chiqarilmoqda, kuting...</b>", parse_mode='HTML')
+    await callback.answer("Yuborilmoqda... ⏳")
+
     report = await send_trailer_post_to_channels(callback.bot, movie_id, trailer_fid, is_spoiler=False)
     await state.clear()
+
     report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}')]
+    ])
     txt = (
-        f"🎬 <b>TREYLER MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
-        f"📌 <b>Kino kodi:</b> /{movie_id}\n"
-        f"✨ <b>Rejim:</b> 📹 Oddiy rejimda\n\n"
+        f"🎬 <b>BAZADAGI TREYLER KANALLARGA POST QILINDI!</b> 🚀\n\n"
+        f"📌 <b>Kino kodi:</b> /{movie_id}\n\n"
         f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}"
     )
-    await callback.message.edit_text(with_footer(txt), parse_mode='HTML')
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith('post_choice_saved_spoiler_'))
-async def post_choice_saved_spoiler_cb(callback: CallbackQuery, state: FSMContext):
-    movie_id = int(callback.data.split('_')[-1])
-    trailer_fid = await db_req.get_movie_trailer(movie_id)
-    if not trailer_fid:
-        await callback.answer("⚠️ Treyler topilmadi. Yangi treyler yuboring.", show_alert=True)
-        return
-    await callback.message.edit_text("🚀 <b>Mavjud treyler spoyler bilan kanallarga yuborilmoqda, kuting...</b>", parse_mode='HTML')
-    report = await send_trailer_post_to_channels(callback.bot, movie_id, trailer_fid, is_spoiler=True)
-    await state.clear()
-    report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
-    txt = (
-        f"🎬 <b>TREYLER MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
-        f"📌 <b>Kino kodi:</b> /{movie_id}\n"
-        f"✨ <b>Rejim:</b> 🔞 Spoyler effekti bilan\n\n"
-        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}"
-    )
-    await callback.message.edit_text(with_footer(txt), parse_mode='HTML')
-    await callback.answer()
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
 
 
