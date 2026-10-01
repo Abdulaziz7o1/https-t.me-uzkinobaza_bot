@@ -4202,6 +4202,78 @@ async def delete_all_blocked_users() -> int:
     return len(blocked_ids)
 
 
+# ─── HOMIY KANALLARGA A'ZOLIK UCHUN 1 SOATLIK VIP BONUSI ────────────────────────
+async def has_user_received_sub_bonus(user_id: int) -> bool:
+    """Foydalanuvchi obuna bonusi (1 soatlik VIP) olgan-olmaganini tekshirish"""
+    async with get_db() as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_sub_bonus (
+                user_id INTEGER PRIMARY KEY,
+                granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        async with db.execute("SELECT user_id FROM user_sub_bonus WHERE user_id = ?", (user_id,)) as cur:
+            row = await cur.fetchone()
+            return row is not None
+
+async def mark_user_received_sub_bonus(user_id: int) -> bool:
+    """Foydalanuvchini 1 soatlik VIP bonusini olgan deb belgilash"""
+    async with get_db() as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_sub_bonus (
+                user_id INTEGER PRIMARY KEY,
+                granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.execute("INSERT OR IGNORE INTO user_sub_bonus (user_id) VALUES (?)", (user_id,))
+        await db.commit()
+        return True
+
+async def set_user_premium_hours(user_id: int, hours: int = 1, plan: str = "1 soatlik VIP (Sovg'a)") -> bool:
+    """Foydalanuvchiga soatbay Premium (VIP) maqomi berish"""
+    from datetime import timedelta
+    now = config.get_uzb_now()
+    until = now + timedelta(hours=hours)
+    until_str = until.strftime("%Y-%m-%d %H:%M:%S")
+    start_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE users SET is_premium = 1, premium_until = ? WHERE id = ?",
+            (until_str, user_id)
+        )
+        await db.execute(
+            """INSERT INTO premium_subscriptions (user_id, start_date, end_date, plan)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   start_date = excluded.start_date,
+                   end_date = excluded.end_date,
+                   plan = excluded.plan""",
+            (user_id, start_str, until_str, plan)
+        )
+        await db.commit()
+    from database.connection import cache
+    cache.delete(f"user_premium_{user_id}")
+    return True
+
+async def grant_welcome_sub_bonus(user_id: int) -> bool:
+    """
+    Foydalanuvchiga barcha homiy kanallarga a'zo bo'lgani uchun 1 marta 1 soatlik VIP berish.
+    Agar allaqachon pullik uzoq muddatli VIP bo'lsa, uning muddatini qisqartirmaydi.
+    """
+    already_received = await has_user_received_sub_bonus(user_id)
+    if already_received:
+        return False
+
+    is_prem = await is_user_premium(user_id)
+    await mark_user_received_sub_bonus(user_id)
+    if is_prem:
+        return False
+
+    await set_user_premium_hours(user_id, hours=1, plan="1 soatlik VIP (Sovg'a)")
+    return True
+
+
 # ─── FEATURE 1: Kinoga Treyler Biriktirish ───────────────────────────────────
 
 async def set_movie_trailer(movie_id: int, trailer_file_id: str) -> bool:

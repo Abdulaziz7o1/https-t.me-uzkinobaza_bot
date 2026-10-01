@@ -5028,6 +5028,7 @@ async def render_sub_users_page(target_msg_obj, bot, page: int = 1, is_edit: boo
             f"❌ <b>Barcha kanallarga to'liq a'zo bo'lgan foydalanuvchilar topilmadi.</b>\n"
         )
         extra_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎯 A'zo bo'lmaganlarga xabar yuborish 📢", callback_data="admin_prompt_broadcast_unsubbed")],
             [InlineKeyboardButton(text="🔄 Qayta tekshirish", callback_data="sub_users_refresh")],
             [InlineKeyboardButton(text="🔍 Foydalanuvchi Qidirish", callback_data="users_btn_search")]
         ])
@@ -5088,6 +5089,9 @@ async def render_sub_users_page(target_msg_obj, bot, page: int = 1, is_edit: boo
 
     extra_rows = [
         [
+            InlineKeyboardButton(text="🎯 A'zo bo'lmaganlarga xabar yuborish 📢", callback_data="admin_prompt_broadcast_unsubbed")
+        ],
+        [
             InlineKeyboardButton(text="🔄 Qayta tekshirish", callback_data="sub_users_refresh"),
             InlineKeyboardButton(text="🔍 Qidirish", callback_data="users_btn_search")
         ]
@@ -5139,6 +5143,112 @@ async def sub_users_refresh_callback(callback: CallbackQuery):
         return
     await callback.answer("⏳ Kanallar a'zoligi qayta tekshirilmoqda...", show_alert=False)
     await render_sub_users_page(callback.message, callback.bot, page=1, is_edit=True, force_refresh=True)
+
+
+async def get_unsubscribed_users(bot):
+    subscribed_users, total_users, channels = await get_all_channels_subscribed_users(bot, force_refresh=True)
+    if not channels:
+        return [], []
+    sub_ids = {u[0] for u in subscribed_users}
+    async with db_req.get_db() as db:
+        async with db.execute("SELECT id, username, full_name FROM users WHERE status != 'banned' AND is_blocked = 0") as cursor:
+            all_users = await cursor.fetchall()
+    unsub_users = [u for u in all_users if u[0] not in sub_ids]
+    return unsub_users, channels
+
+
+@router.callback_query(F.data == "admin_prompt_broadcast_unsubbed")
+async def admin_prompt_broadcast_unsubbed(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'send_broadcast')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+
+    unsub_users, channels = await get_unsubscribed_users(callback.bot)
+    if not unsub_users:
+        await callback.answer("ℹ️ Barcha foydalanuvchilar kanallarga to'liq a'zo bo'lgan!", show_alert=True)
+        return
+
+    txt = (
+        "🎯 <b>TO'LIQ OBUNA BO'LMAGANLARGA MAXSUS TAKLIF YUBORISH</b>\n\n"
+        f"👥 <b>Qamrov:</b> <code>{len(unsub_users):,} ta</code> hali a'zo bo'lmagan foydalanuvchi\n"
+        f"🎁 <b>Mavzu:</b> 1 soatlik bepul VIP Premium sovg'asi + Homiy kanallar ro'yxati\n\n"
+        "<i>Foydalanuvchilarga professional tarzda 1 soatlik VIP sovg'asi haqidagi xabar va kanallarga a'zo bo'lish tugmalari yuboriladi. Bu ularning kanallarga obuna bo'lish ehtimolini keskin oshiradi.</i>\n\n"
+        "<b>Xabar hozir yuborilsinmi?</b>"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🚀 Ha, barchasiga yuborish!", callback_data="admin_do_broadcast_unsubbed")
+        ],
+        [
+            InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="sub_users_page_1")
+        ]
+    ])
+    await callback.answer()
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await callback.message.answer(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+
+
+@router.callback_query(F.data == "admin_do_broadcast_unsubbed")
+async def admin_do_broadcast_unsubbed(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'send_broadcast')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+
+    await callback.answer("⏳ Xabarlar yuborilmoqda...", show_alert=False)
+    progress_msg = await callback.message.edit_text(
+        with_footer("🔄 <b>To'liq obuna bo'lmaganlarga maxsus sovg'a xabari yuborilmoqda...</b>\n\n<i>Biroz kuting...</i>"),
+        parse_mode="HTML"
+    )
+
+    unsub_users, channels = await get_unsubscribed_users(callback.bot)
+    if not unsub_users:
+        await progress_msg.edit_text(with_footer("ℹ️ Hali a'zo bo'lmagan foydalanuvchilar topilmadi."), parse_mode="HTML")
+        return
+
+    from keyboards.inline import get_subscription_keyboard
+    promo_text = (
+        "🔥 <b>SIZGA MAXSUS SOVG'A TAYYORLADIK! 🎁</b>\n\n"
+        "Hurmatli kinosevar, siz botimizdagi rasmiy homiy kanallarimizga hali to'liq a'zo bo'lmabsiz.\n\n"
+        "⚡️ <b>Faqat bugun siz uchun eksklyuziv imkoniyat:</b>\n"
+        "Quyidagi rasmiy kanallarimizga a'zo bo'ling va bir zumda <b>💎 1 SOATLIK BEPUL VIP PREMIUM</b> (reklamasiz va limitsiz tomosha) sovg'asini qo'lga kiriting!\n\n"
+        "🍿 <b>VIP Premium imkoniyatlari:</b>\n"
+        "• Barcha eng so'nggi premyeralarni limitsiz yuklab olish\n"
+        "• 1080p Full HD sifat va tezyurar serverlar\n"
+        "• Hech qanday majburiy kutishlarsiz erkin tomosha!\n\n"
+        "<i>👇 Kanallarga obuna bo'lib, pastdagi «A'zo bo'ldim va 1 soatlik VIP olish 🎁» tugmasini bosing:</i>"
+    )
+    sub_kb = get_subscription_keyboard(channels)
+
+    success_count = 0
+    fail_count = 0
+
+    for u in unsub_users:
+        u_id = u[0]
+        try:
+            await callback.bot.send_message(
+                chat_id=u_id,
+                text=with_footer(promo_text),
+                parse_mode="HTML",
+                reply_markup=sub_kb
+            )
+            success_count += 1
+        except Exception:
+            fail_count += 1
+        await asyncio.sleep(0.04)
+
+    done_text = (
+        "✅ <b>XABARLAR MUVAFFAQIYATLI YUBORILDI! 🎯</b>\n\n"
+        f"📊 <b>Jami rejalashtirilgan:</b> <code>{len(unsub_users):,} ta</code>\n"
+        f"🟢 <b>Yetkazildi:</b> <code>{success_count:,} ta</code>\n"
+        f"🔴 <b>Yetkazilmadi (bloklagan):</b> <code>{fail_count:,} ta</code>\n\n"
+        "🚀 <i>Foydalanuvchilar taklifni ko'rib a'zo bo'lishi bilan ularga 1 soatlik VIP avtomatik beriladi.</i>"
+    )
+    back_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 Obunachilar ro'yxatini ko'rish", callback_data="sub_users_page_1")]
+    ])
+    await progress_msg.edit_text(with_footer(done_text), parse_mode="HTML", reply_markup=back_kb)
 
 
 @router.callback_query(F.data.startswith('admin_manage_user_'))

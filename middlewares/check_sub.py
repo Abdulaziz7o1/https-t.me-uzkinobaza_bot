@@ -136,9 +136,13 @@ class CheckSubMiddleware(BaseMiddleware):
 
         if not_subscribed_channels:
             if is_msg:
+                sub_promo_txt = (
+                    "📢 <b>Kinolarni yuklab olish va botdan to'liq foydalanish uchun homiy kanallarimizga a'zo bo'ling:</b>\n\n"
+                    "🎁 <b>MAXSUS SOVG'A:</b> Barcha kanallarga a'zo bo'ling va bir zumda <b>💎 1 SOATLIK BEPUL VIP PREMIUM</b> (reklamasiz va limitsiz tomosha)ga ega bo'ling! 🚀"
+                )
                 try:
                     await event.answer(
-                        "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
+                        sub_promo_txt,
                         parse_mode="HTML",
                         reply_markup=get_subscription_keyboard(not_subscribed_channels)
                     )
@@ -149,8 +153,12 @@ class CheckSubMiddleware(BaseMiddleware):
                 try:
                     await event.answer("⚠️ Botdan foydalanish uchun homiy kanallarga a'zo bo'ling!", show_alert=True)
                     if event.message:
+                        sub_promo_txt = (
+                            "📢 <b>Kinolarni yuklab olish va botdan to'liq foydalanish uchun homiy kanallarimizga a'zo bo'ling:</b>\n\n"
+                            "🎁 <b>MAXSUS SOVG'A:</b> Barcha kanallarga a'zo bo'ling va bir zumda <b>💎 1 SOATLIK BEPUL VIP PREMIUM</b> (reklamasiz va limitsiz tomosha)ga ega bo'ling! 🚀"
+                        )
                         await event.message.answer(
-                            "📢 <b>Botdan foydalanish va kinolarni tomosha qilish uchun quyidagi homiy kanallarimizga a'zo bo'ling:</b>",
+                            sub_promo_txt,
                             parse_mode="HTML",
                             reply_markup=get_subscription_keyboard(not_subscribed_channels)
                         )

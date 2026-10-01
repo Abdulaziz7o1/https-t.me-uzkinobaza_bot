@@ -253,8 +253,13 @@ async def btn_start(message: Message, state: FSMContext):
                 channel_buttons.append([InlineKeyboardButton(text=chat.title, url=f'https://t.me/{channel}')])
             except Exception:
                 channel_buttons.append([InlineKeyboardButton(text=channel, url=f'https://t.me/{channel}')])
-        channel_buttons.append([InlineKeyboardButton(text='✅ Obunani tekshirish', callback_data='check_sub')])
-        await message.answer(with_footer(f"👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:"), parse_mode='HTML', reply_markup=InlineKeyboardMarkup(inline_keyboard=channel_buttons))
+        channel_buttons.append([InlineKeyboardButton(text="A'zo bo'ldim va 1 soatlik VIP olish 🎁", callback_data='check_sub')])
+        start_sub_txt = (
+            f"👋 Assalomu alaykum, {name_to_show}!\n\n"
+            f"🎬 <b>Botdan to'liq foydalanish va kinolarni ko'rish uchun homiy kanallarimizga a'zo bo'ling:</b>\n\n"
+            f"🎁 <b>MAXSUS SOVG'A:</b> Barcha kanallarga a'zo bo'ling va bir zumda <b>💎 1 SOATLIK BEPUL VIP PREMIUM</b> (reklamasiz va limitsiz tomosha)ga ega bo'ling! 🚀"
+        )
+        await message.answer(with_footer(start_sub_txt), parse_mode='HTML', reply_markup=InlineKeyboardMarkup(inline_keyboard=channel_buttons))
     else:
         await message.answer(with_footer(f'👋 Assalomu alaykum, {name_to_show}!\n\n🎬 Bot orqali eng sara kinolarni tomosha qilishingiz mumkin.\n⚡ Quyidagi menyudan foydalaning:'), parse_mode='HTML', reply_markup=get_user_menu())
 
@@ -291,8 +296,22 @@ async def check_subscription_callback(callback: CallbackQuery):
     if not_subscribed:
         await callback.answer("❌ Hali barcha homiy kanallarga a'zo bo'lmadingiz! Iltimos, a'zo bo'lib qayta bosing.", show_alert=True)
         return
-    await callback.message.edit_text(with_footer("✅ <b>Rahmat! Barcha homiy kanallarga muvaffaqiyatli a'zo bo'ldingiz.</b>\n\nEndi kino nomini yoki kodini yuborishingiz mumkin! 🍿"), parse_mode='HTML')
-    await callback.answer("A'zolik tasdiqlandi! ✅", show_alert=True)
+    
+    bonus_granted = await db_req.grant_welcome_sub_bonus(user_id)
+    if bonus_granted:
+        success_txt = (
+            "🎉 <b>TABRIKLAYMIZ! SIZGA SOVG'A BERILDI!</b> 🎁\n\n"
+            "Barcha homiy kanallarimizga a'zo bo'lganingiz uchun sizga <b>💎 1 SOATLIK BEPUL VIP PREMIUM</b> faollashtirildi!\n\n"
+            "🍿 <b>Endi 1 soat davomida:</b>\n"
+            "• Istalgan kinoni limitsiz tomosha qilishingiz\n"
+            "• Reklamasiz va kutishlarsiz tezkor yuklab olishingiz mumkin! 🚀\n\n"
+            "🎬 <i>Kino kodini yoki nomini yuborishingiz mumkin:</i>"
+        )
+        await callback.message.edit_text(with_footer(success_txt), parse_mode='HTML')
+        await callback.answer("🎉 1 soatlik VIP sovg'angiz faollashtirildi! 💎", show_alert=True)
+    else:
+        await callback.message.edit_text(with_footer("✅ <b>Rahmat! Barcha homiy kanallarga muvaffaqiyatli a'zo bo'ldingiz.</b>\n\nEndi kino nomini yoki kodini yuborishingiz mumkin! 🍿"), parse_mode='HTML')
+        await callback.answer("A'zolik tasdiqlandi! ✅", show_alert=True)
 
 @router.message(StateFilter(None), F.text.regexp('^/?\\d+$'))
 async def search_movie_by_code(message: Message):
