@@ -83,6 +83,7 @@ def get_admin_menu():
                 KeyboardButton(text="🚫 Botni Bloklaganlar")
             ],
             [
+                KeyboardButton(text="✅ Barcha Kanallarga Obuna Bo'lganlar"),
                 KeyboardButton(text="🔍 Foydalanuvchi Qidirish")
             ],
             [

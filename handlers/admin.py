@@ -416,7 +416,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar', '📁 Kolleksiyalar', 'Kolleksiyalar', '📊 Dashboard', 'Dashboard']
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar', '📁 Kolleksiyalar', 'Kolleksiyalar', '📊 Dashboard', 'Dashboard', "✅ Barcha Kanallarga Obuna Bo'lganlar", "Barcha Kanallarga Obuna Bo'lganlar", "✅ Barcha Kanallarga A'zolar", "Barcha Kanallarga A'zolar"]
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -4824,6 +4824,213 @@ async def admin_scan_blocked_users_callback(callback: CallbackQuery):
         await render_blocked_users_page(callback.message, page=1, is_edit=True)
     except Exception as e:
         await status_msg.edit_text(with_footer(f"❌ Skanerlashda xatolik yuz berdi: {e}"), parse_mode="HTML")
+
+
+_sub_users_cache = {
+    "timestamp": 0,
+    "total_users": 0,
+    "subscribed_users": [],
+    "channels": []
+}
+
+async def get_all_channels_subscribed_users(bot, force_refresh: bool = False):
+    import time
+    global _sub_users_cache
+    now = time.time()
+    if not force_refresh and _sub_users_cache["timestamp"] > 0 and (now - _sub_users_cache["timestamp"] < 120):
+        return _sub_users_cache["subscribed_users"], _sub_users_cache["total_users"], _sub_users_cache["channels"]
+
+    db_channels = await db_req.get_sponsor_channels()
+    formatted_channels = []
+    for ch in config.CHANNELS:
+        formatted_channels.append((ch, ch))
+    for db_ch in db_channels:
+        formatted_channels.append((db_ch[1], db_ch[2] or db_ch[1]))
+
+    if not formatted_channels:
+        return [], 0, []
+
+    async with db_req.get_db() as db:
+        async with db.execute("SELECT id, username, full_name, created_at FROM users WHERE status != 'banned' ORDER BY id DESC") as cursor:
+            all_users = await cursor.fetchall()
+
+    total_users = len(all_users)
+    subscribed_users = []
+
+    for u in all_users:
+        u_id = u[0]
+        is_all = True
+        for ch_tuple in formatted_channels:
+            ch_id = ch_tuple[0]
+            target_id = db_req.normalize_channel_identifier(ch_id)
+            if isinstance(target_id, str) and target_id.startswith("-") and target_id.lstrip("-").isdigit():
+                target_id = int(target_id)
+            try:
+                member = await bot.get_chat_member(chat_id=target_id, user_id=u_id)
+                if member.status not in ["creator", "administrator", "member"]:
+                    is_all = False
+                    break
+            except Exception as e:
+                err_str = str(e).lower()
+                if "chat not found" in err_str or "bot is not a member" in err_str:
+                    pass
+                else:
+                    is_all = False
+                    break
+        if is_all:
+            subscribed_users.append(u)
+        await asyncio.sleep(0.02)
+
+    _sub_users_cache["timestamp"] = now
+    _sub_users_cache["total_users"] = total_users
+    _sub_users_cache["subscribed_users"] = subscribed_users
+    _sub_users_cache["channels"] = formatted_channels
+
+    return subscribed_users, total_users, formatted_channels
+
+
+async def render_sub_users_page(target_msg_obj, bot, page: int = 1, is_edit: bool = False, force_refresh: bool = False):
+    import math
+    subscribed_users, total_users, channels = await get_all_channels_subscribed_users(bot, force_refresh=force_refresh)
+
+    if not channels:
+        txt = (
+            "📢 <b>BARCHA KANALLARGA OBUNA BO'LGANLAR:</b>\n\n"
+            "⚠️ <b>Hozircha hech qanday homiy kanal sozlanmagan!</b>\n\n"
+            "<i>Iltimos, avval admin menyusidagi «Homiy Kanallar 📢» bo'limi orqali kanallarni qo'shing.</i>"
+        )
+        extra_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📢 Homiy Kanallar", callback_data="admin_manage_sponsors")]
+        ])
+        if is_edit:
+            try:
+                await target_msg_obj.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+            except Exception:
+                await target_msg_obj.answer(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+        else:
+            await target_msg_obj.answer(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+        return
+
+    if not subscribed_users:
+        ch_list_str = "\n".join([f"• <b>{c[1]}</b>" for c in channels])
+        txt = (
+            f"📢 <b>BARCHA KANALLARGA OBUNA BO'LGANLAR:</b>\n\n"
+            f"📌 <b>Homiy kanallar ({len(channels)} ta):</b>\n{ch_list_str}\n\n"
+            f"📊 <b>Jami tekshirilgan a'zolar:</b> <code>{total_users:,} ta</code>\n"
+            f"❌ <b>Barcha kanallarga to'liq a'zo bo'lgan foydalanuvchilar topilmadi.</b>\n"
+        )
+        extra_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Qayta tekshirish", callback_data="sub_users_refresh")],
+            [InlineKeyboardButton(text="🔍 Foydalanuvchi Qidirish", callback_data="users_btn_search")]
+        ])
+        if is_edit:
+            try:
+                await target_msg_obj.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+            except Exception:
+                await target_msg_obj.answer(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+        else:
+            await target_msg_obj.answer(with_footer(txt), parse_mode='HTML', reply_markup=extra_kb)
+        return
+
+    per_page = 10
+    total_count = len(subscribed_users)
+    total_pages = max(1, math.ceil(total_count / per_page))
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * per_page
+    page_items = subscribed_users[offset : offset + per_page]
+
+    pct = round((total_count / max(1, total_users)) * 100, 1)
+    not_sub_count = max(0, total_users - total_count)
+    ch_names = ", ".join([str(c[1]) for c in channels[:3]])
+    if len(channels) > 3:
+        ch_names += f" + {len(channels) - 3} ta"
+
+    lines = [
+        "📢 <b>BARCHA KANALLARGA OBUNA BO'LGANLAR:</b>\n",
+        f"📌 <b>Kanallar ({len(channels)} ta):</b> {ch_names}",
+        f"👥 <b>Jami foydalanuvchilar:</b> <code>{total_users:,} ta</code>",
+        f"✅ <b>To'liq obuna bo'lganlar:</b> <code>{total_count:,} ta</code> (<b>{pct}%</b>)",
+        f"❌ <b>To'liq obuna bo'lmaganlar:</b> <code>{not_sub_count:,} ta</code>",
+        f"📄 <b>Sahifa:</b> <code>{page}/{total_pages}</code>\n",
+        "────────────────────────"
+    ]
+
+    for idx, u in enumerate(page_items, start=offset + 1):
+        u_id = u[0]
+        username = u[1] if len(u) > 1 else None
+        full_name = u[2] if len(u) > 2 else None
+        c_at = u[3] if len(u) > 3 else ""
+
+        uname_str = f"@{username}" if username else "—"
+        name_str = (full_name[:20] if full_name else "Nomsiz").replace("<", "&lt;").replace(">", "&gt;")
+        date_str = str(c_at)[:10] if c_at else ""
+        lines.append(
+            f"{idx}. 👤 <b>{name_str}</b>\n"
+            f"   🆔 <code>{u_id}</code> | 🔗 {uname_str}\n"
+            f"   📅 {date_str} | ✅ <i>A'zo</i>\n"
+        )
+
+    full_text = "\n".join(lines)
+
+    kb_row = []
+    if page > 1:
+        kb_row.append(InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"sub_users_page_{page - 1}"))
+    if page < total_pages:
+        kb_row.append(InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"sub_users_page_{page + 1}"))
+
+    extra_rows = [
+        [
+            InlineKeyboardButton(text="🔄 Qayta tekshirish", callback_data="sub_users_refresh"),
+            InlineKeyboardButton(text="🔍 Qidirish", callback_data="users_btn_search")
+        ]
+    ]
+
+    all_rows = ([kb_row] if kb_row else []) + extra_rows
+    kb = InlineKeyboardMarkup(inline_keyboard=all_rows)
+
+    if is_edit:
+        try:
+            await target_msg_obj.edit_text(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+        except Exception:
+            await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+    else:
+        await target_msg_obj.answer(with_footer(full_text), parse_mode='HTML', reply_markup=kb)
+
+
+@router.message(F.text.regexp(r'(?i).*(barcha kanallarga obuna|barcha kanallarga a\'zolar).*'), StateFilter('*'))
+@router.message(F.text == "✅ Barcha Kanallarga Obuna Bo'lganlar", StateFilter('*'))
+@router.message(F.text == "Barcha kanallarga obuna bo'lgan foydalanuvchilar", StateFilter('*'))
+@router.message(F.text == "✅ Barcha Kanallarga A'zolar", StateFilter('*'))
+async def show_all_sub_users_handler(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
+        await message.answer(with_footer("❌ Bu amal faqat administratorlar uchun ruxsat etilgan!"))
+        return
+
+    loading_msg = await message.answer(
+        with_footer("🔄 <b>Barcha foydalanuvchilarning homiy kanallarga a'zoligi tekshirilmoqda...</b>\n\n<i>Biroz kuting...</i>"),
+        parse_mode='HTML'
+    )
+    await render_sub_users_page(loading_msg, message.bot, page=1, is_edit=True, force_refresh=False)
+
+
+@router.callback_query(F.data.startswith('sub_users_page_'))
+async def sub_users_page_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'view_stats')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    page = int(callback.data.split('_')[-1])
+    await callback.answer()
+    await render_sub_users_page(callback.message, callback.bot, page=page, is_edit=True, force_refresh=False)
+
+
+@router.callback_query(F.data == 'sub_users_refresh')
+async def sub_users_refresh_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'view_stats')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await callback.answer("⏳ Kanallar a'zoligi qayta tekshirilmoqda...", show_alert=False)
+    await render_sub_users_page(callback.message, callback.bot, page=1, is_edit=True, force_refresh=True)
 
 
 @router.callback_query(F.data.startswith('admin_manage_user_'))
