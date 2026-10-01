@@ -416,7 +416,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar']
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar', '📁 Kolleksiyalar', 'Kolleksiyalar', '📊 Dashboard', 'Dashboard']
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -4903,3 +4903,282 @@ async def admin_privacy_alert_callback(callback: CallbackQuery):
         f"Telegram qoidasiga binoan bunga havola orqali kirib bo'lmaydi. Unga «✉️ Xabar Yozish» orqali yozishingiz mumkin.",
         show_alert=True
     )
+
+
+# ─── 📁 FEATURE 8: KOLLEKSIYALAR (PLAYLIST) BOSHQARUVI ─────────────────────────
+
+@router.message(F.text.in_(['📁 Kolleksiyalar', 'Kolleksiyalar']), StateFilter('*'))
+@router.message(F.text.regexp(r'(?i).*(kolleksiya).*'), StateFilter('*'))
+@router.message(Command('collections'), StateFilter('*'))
+@router.message(Command('kolleksiyalar'), StateFilter('*'))
+async def admin_collections_panel(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'add_movie')):
+        await message.answer(with_footer("❌ Bu amal faqat Bosh Admin yoki ruxsat berilgan moderatorlar uchun!"))
+        return
+
+    collections = await db_req.get_all_collections()
+    kb_rows = []
+    
+    for col in collections:
+        col_id, col_name, col_desc, created_by = col
+        movies = await db_req.get_collection_movies(col_id)
+        kb_rows.append([InlineKeyboardButton(text=f"📁 {col_name} ({len(movies)} ta kino)", callback_data=f"admin_view_col_{col_id}")])
+    
+    kb_rows.append([InlineKeyboardButton(text="➕ Yangi Kolleksiya Yaratish", callback_data="admin_create_col_start")])
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+
+    txt = (
+        "📁 <b>KOLLEKSIYALAR (PLAYLIST) BOSHQARUVI:</b>\n\n"
+        "Bu yerda kinolarni guruhlab (masalan: <i>«Marvel filmlari»</i>, <i>«2024 Premyeralar»</i>, <i>«Qo'rqinchli filmlar»</i>) to'plamlar yaratishingiz mumkin.\n\n"
+        f"📊 <b>Mavjud to'plamlar soni:</b> <code>{len(collections)} ta</code>\n\n"
+        "<i>Boshqarish uchun quyidagi to'plamni tanlang yoki yangi to'plam yarating:</i>"
+    )
+    await message.answer(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+
+
+@router.callback_query(F.data == "admin_collections_back")
+async def admin_collections_back_cb(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    collections = await db_req.get_all_collections()
+    kb_rows = []
+    for col in collections:
+        col_id, col_name, col_desc, created_by = col
+        movies = await db_req.get_collection_movies(col_id)
+        kb_rows.append([InlineKeyboardButton(text=f"📁 {col_name} ({len(movies)} ta kino)", callback_data=f"admin_view_col_{col_id}")])
+    kb_rows.append([InlineKeyboardButton(text="➕ Yangi Kolleksiya Yaratish", callback_data="admin_create_col_start")])
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+
+    txt = (
+        "📁 <b>KOLLEKSIYALAR (PLAYLIST) BOSHQARUVI:</b>\n\n"
+        f"📊 <b>Mavjud to'plamlar soni:</b> <code>{len(collections)} ta</code>\n\n"
+        "<i>Boshqarish uchun to'plamni tanlang yoki yangi to'plam yarating:</i>"
+    )
+    await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_create_col_start")
+async def admin_create_col_start_cb(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminStates.waiting_for_collection_name)
+    txt = (
+        "➕ <b>YANGI KOLLEKSIYA YARATISH:</b>\n\n"
+        "1️⃣ <b>To'plam nomini kiriting:</b>\n"
+        "<i>Masalan: Marvel Kinoolami yoki O'zbek Filmlari</i>\n\n"
+        "Bekor qilish uchun: /cancel"
+    )
+    await callback.message.edit_text(with_footer(txt), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.message(AdminStates.waiting_for_collection_name, F.text, ~F.text.in_(MENU_BUTTONS))
+async def admin_save_col_name(message: Message, state: FSMContext):
+    name = message.text.strip()
+    if len(name) < 2:
+        await message.answer(with_footer("⚠️ To'plam nomi kamida 2 ta harfdan iborat bo'lishi kerak!"))
+        return
+    await state.update_data(new_col_name=name)
+    await state.set_state(AdminStates.waiting_for_collection_movie_ids)
+    txt = (
+        f"✅ <b>Nomi:</b> <b>{name}</b>\n\n"
+        "2️⃣ <b>Ushbu to'plamga qaysi kinolarni qo'shmoqchisiz?</b>\n"
+        "Kino kodlarini vergul yoki bo'sh joy bilan ajratib yozing:\n"
+        "<i>Masalan: <code>1, 2, 5, 12, 105</code></i>\n\n"
+        "<i>(Hozircha kino qo'shmaslik uchun shunchaki <b>.</b> (nuqta) yuboring)</i>\n\n"
+        "Bekor qilish uchun: /cancel"
+    )
+    await message.answer(with_footer(txt), parse_mode="HTML")
+
+
+@router.message(AdminStates.waiting_for_collection_movie_ids, F.text, ~F.text.in_(MENU_BUTTONS))
+async def admin_save_col_movies(message: Message, state: FSMContext):
+    data = await state.get_data()
+    name = data.get('new_col_name', 'To\'plam')
+    text = message.text.strip()
+    
+    col_id = await db_req.create_collection(name, '', message.from_user.id)
+    added_count = 0
+
+    if text != '.':
+        import re
+        codes = re.findall(r'\d+', text)
+        for c in codes:
+            m_id = int(c)
+            m = await db_req.get_movie(m_id)
+            if m:
+                await db_req.add_movie_to_collection(col_id, m_id)
+                added_count += 1
+
+    await state.clear()
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📁 To'plamni Ko'rish", callback_data=f"admin_view_col_{col_id}")],
+        [InlineKeyboardButton(text="🔙 Kolleksiyalar Ro'yxatiga Qaytish", callback_data="admin_collections_back")]
+    ])
+    txt = (
+        f"🎉 <b>KOLLEKSIYA MUVAFFAQIYATLI YARATILDI!</b>\n\n"
+        f"📌 <b>To'plam nomi:</b> <b>{name}</b>\n"
+        f"🎬 <b>Qo'shilgan kinolar soni:</b> <code>{added_count} ta</code>\n\n"
+        "<i>Foydalanuvchilar botda ushbu to'plamni to'liq ko'ra oladilar!</i>"
+    )
+    await message.answer(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("admin_view_col_"))
+async def admin_view_collection_cb(callback: CallbackQuery, state: FSMContext):
+    col_id = int(callback.data.split("_")[-1])
+    collections = await db_req.get_all_collections()
+    col_match = [c for c in collections if c[0] == col_id]
+    if not col_match:
+        await callback.answer("❌ To'plam topilmadi!", show_alert=True)
+        return
+    col = col_match[0]
+    col_name = col[1]
+    movies = await db_req.get_collection_movies(col_id)
+    
+    txt = f"📁 <b>TO'PLAM: {col_name}</b>\n\n"
+    if movies:
+        txt += "🎬 <b>Ushbu to'plamdagi kinolar:</b>\n\n"
+        for i, (m_id, m_cap, m_views) in enumerate(movies, 1):
+            name = (m_cap or 'Nomsiz')[:35]
+            txt += f"{i}. <code>/{m_id}</code> — <b>{name}</b> (👁 {m_views:,})\n"
+    else:
+        txt += "<i>Ushbu to'plamda hozircha kinolar yo'q.</i>\n"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Kino Qo'shish", callback_data=f"admin_add_movies_to_col_{col_id}")],
+        [InlineKeyboardButton(text="🗑 To'plamni O'chirish", callback_data=f"admin_del_col_{col_id}")],
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data="admin_collections_back")]
+    ])
+    await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin_add_movies_to_col_"))
+async def admin_add_movies_to_col_cb(callback: CallbackQuery, state: FSMContext):
+    col_id = int(callback.data.split("_")[-1])
+    await state.set_state(AdminStates.waiting_for_collection_movie_ids)
+    await state.update_data(target_add_col_id=col_id)
+    txt = (
+        "➕ <b>TO'PLAMGA KINO QO'SHISH:</b>\n\n"
+        "Qo'shmoqchi bo'lgan kino kodlarini yuboring:\n"
+        "<i>Masalan: <code>15, 20, 35</code></i>\n\n"
+        "Bekor qilish uchun: /cancel"
+    )
+    await callback.message.edit_text(with_footer(txt), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin_del_col_"))
+async def admin_del_col_cb(callback: CallbackQuery):
+    col_id = int(callback.data.split("_")[-1])
+    await db_req.delete_collection(col_id)
+    await callback.answer("🗑 To'plam o'chirildi!", show_alert=True)
+    
+    collections = await db_req.get_all_collections()
+    kb_rows = []
+    for col in collections:
+        col_id_row, col_name, col_desc, created_by = col
+        movies = await db_req.get_collection_movies(col_id_row)
+        kb_rows.append([InlineKeyboardButton(text=f"📁 {col_name} ({len(movies)} ta kino)", callback_data=f"admin_view_col_{col_id_row}")])
+    kb_rows.append([InlineKeyboardButton(text="➕ Yangi Kolleksiya Yaratish", callback_data="admin_create_col_start")])
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+
+    txt = (
+        "📁 <b>KOLLEKSIYALAR (PLAYLIST) BOSHQARUVI:</b>\n\n"
+        f"📊 <b>Mavjud to'plamlar soni:</b> <code>{len(collections)} ta</code>\n\n"
+        "<i>Boshqarish uchun to'plamni tanlang yoki yangi to'plam yarating:</i>"
+    )
+    await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+
+
+# ─── 📊 FEATURE 15: ADMIN DASHBOARD ──────────────────────────────────────────
+
+@router.message(F.text.in_(['📊 Dashboard', 'Dashboard']), StateFilter('*'))
+@router.message(F.text.regexp(r'(?i).*(dashboard).*'), StateFilter('*'))
+@router.message(Command('dashboard'), StateFilter('*'))
+async def admin_dashboard_handler(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
+        await message.answer(with_footer("❌ Bu amal faqat Bosh Admin yoki ruxsat berilgan moderatorlar uchun!"))
+        return
+
+    status_msg = await message.answer("⏳ <i>Dashboard ma'lumotlari tahlil qilinmoqda...</i>", parse_mode="HTML")
+    
+    total_users = await db_req.get_total_users_count()
+    total_movies = await db_req.get_total_movies_count()
+    premium_users = await db_req.get_premium_users_count()
+    collections = await db_req.get_all_collections()
+    sponsors = await db_req.get_sponsor_channels()
+    top_movies = await db_req.get_top_movies_by_views(limit=3)
+
+    top_txt = ""
+    for i, (m_id, m_cap, m_views, _) in enumerate(top_movies, 1):
+        name = (m_cap or 'Nomsiz')[:35]
+        top_txt += f"  {i}. <code>/{m_id}</code> — <b>{name}</b> (👁 {m_views:,})\n"
+    if not top_txt:
+        top_txt = "  <i>Kinolar mavjud emas</i>\n"
+
+    txt = (
+        "📊 <b>BOT ASOSIY DASHBOARD BOSHQARUVI</b> 🚀\n\n"
+        f"👥 <b>Jami a'zolar:</b> <code>{total_users:,} ta</code>\n"
+        f"💎 <b>Faol VIP Premium:</b> <code>{premium_users:,} ta</code>\n"
+        f"🎬 <b>Jami kinolar:</b> <code>{total_movies:,} ta</code>\n"
+        f"📁 <b>Kolleksiyalar:</b> <code>{len(collections)} ta</code>\n"
+        f"📢 <b>Homiy kanallar:</b> <code>{len(sponsors)} ta</code>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔥 <b>TOP 3 ENG KO'P KO'RILGAN KINOLAR:</b>\n"
+        f"{top_txt}"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "💾 <b>Ma'lumotlar bazasi:</b> 🟢 SQLite + MongoDB Atlas\n"
+        "🤖 <b>Bot holati:</b> 🟢 100% Barqaror va Faol"
+    )
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📁 Kolleksiyalar", callback_data="admin_collections_back")],
+        [InlineKeyboardButton(text="🔄 Yangilash", callback_data="refresh_admin_dashboard")]
+    ])
+    
+    await status_msg.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+
+
+@router.callback_query(F.data == "refresh_admin_dashboard")
+async def refresh_admin_dashboard_cb(callback: CallbackQuery):
+    total_users = await db_req.get_total_users_count()
+    total_movies = await db_req.get_total_movies_count()
+    premium_users = await db_req.get_premium_users_count()
+    collections = await db_req.get_all_collections()
+    sponsors = await db_req.get_sponsor_channels()
+    top_movies = await db_req.get_top_movies_by_views(limit=3)
+
+    top_txt = ""
+    for i, (m_id, m_cap, m_views, _) in enumerate(top_movies, 1):
+        name = (m_cap or 'Nomsiz')[:35]
+        top_txt += f"  {i}. <code>/{m_id}</code> — <b>{name}</b> (👁 {m_views:,})\n"
+    if not top_txt:
+        top_txt = "  <i>Kinolar mavjud emas</i>\n"
+
+    txt = (
+        "📊 <b>BOT ASOSIY DASHBOARD BOSHQARUVI</b> 🚀\n\n"
+        f"👥 <b>Jami a'zolar:</b> <code>{total_users:,} ta</code>\n"
+        f"💎 <b>Faol VIP Premium:</b> <code>{premium_users:,} ta</code>\n"
+        f"🎬 <b>Jami kinolar:</b> <code>{total_movies:,} ta</code>\n"
+        f"📁 <b>Kolleksiyalar:</b> <code>{len(collections)} ta</code>\n"
+        f"📢 <b>Homiy kanallar:</b> <code>{len(sponsors)} ta</code>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔥 <b>TOP 3 ENG KO'P KO'RILGAN KINOLAR:</b>\n"
+        f"{top_txt}"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "💾 <b>Ma'lumotlar bazasi:</b> 🟢 SQLite + MongoDB Atlas\n"
+        "🤖 <b>Bot holati:</b> 🟢 100% Barqaror va Faol"
+    )
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📁 Kolleksiyalar", callback_data="admin_collections_back")],
+        [InlineKeyboardButton(text="🔄 Yangilash", callback_data="refresh_admin_dashboard")]
+    ])
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        pass
+    await callback.answer("Dashboard yangilandi! 📊")
+

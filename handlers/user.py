@@ -1761,6 +1761,11 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
         return
     if query in USER_MENU_BUTTONS:
         return
+
+    from handlers.admin import MENU_BUTTONS as ADMIN_MENU_BUTTONS
+    if query in ADMIN_MENU_BUTTONS:
+        return
+
     text_clean = query.lower().replace('️', '').strip()
     menu_keywords = [
         'qidirish', 'saqlanganlar', 'tanlanganlar', 'tasodifiy', "so'rash",
@@ -1769,7 +1774,10 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
         "kino qo'shish", "kino o'chirish", 'kino tahrirlash', 'statistika',
         'reklama', 'kassa', 'audit', 'tahlili', 'bot rejimi', 'nofaollarga',
         'promo', 'zaxira', 'moderatorlar', 'trendlari', 'shubhali', 'keshni',
-        'ommaviy', 'sizga mos', 'mos kinolar', 'tarixim', "to'lovlarim", 'tolovlarim'
+        'ommaviy', 'sizga mos', 'mos kinolar', 'tarixim', "to'lovlarim", 'tolovlarim',
+        'kolleksiya', 'kolleksiyalar', 'dashboard', 'savat', 'treyler', 'bloklanganlar',
+        'foydalanuvchi', 'foydalanuvchilar', 'boshqarish', 'eslatma', 'bosh menyu',
+        'admin', 'moderator'
     ]
     if any((kw in text_clean for kw in menu_keywords)):
         return
