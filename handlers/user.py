@@ -1777,7 +1777,7 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
         'ommaviy', 'sizga mos', 'mos kinolar', 'tarixim', "to'lovlarim", 'tolovlarim',
         'kolleksiya', 'kolleksiyalar', 'dashboard', 'savat', 'treyler', 'bloklanganlar',
         'foydalanuvchi', 'foydalanuvchilar', 'boshqarish', 'eslatma', 'bosh menyu',
-        'admin', 'moderator', 'obuna', 'kanallarga'
+        'admin', 'moderator', 'obuna', 'kanallarga', 'bloklagan', 'bloklaganlar', 'olib tashlash'
     ]
     if any((kw in text_clean for kw in menu_keywords)):
         return

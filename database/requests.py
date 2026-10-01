@@ -4167,6 +4167,41 @@ async def scan_all_users_for_blocks(bot) -> tuple[int, int, int]:
     return total, blocked_count, active_count
 
 
+async def delete_all_blocked_users() -> int:
+    """Botni bloklagan barcha foydalanuvchilarni bazadan butunlay tozalash/o'chirish"""
+    async with get_db() as db:
+        async with db.execute("SELECT id FROM users WHERE is_blocked = 1") as c:
+            rows = await c.fetchall()
+            blocked_ids = [r[0] for r in rows]
+        
+        if not blocked_ids:
+            return 0
+            
+        await db.execute("DELETE FROM users WHERE is_blocked = 1")
+        await db.commit()
+    
+    try:
+        mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URL") or DEFAULT_MONGO_URI
+        if mongo_uri:
+            async def _del_mongo():
+                try:
+                    from motor.motor_asyncio import AsyncIOMotorClient
+                    client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=3000, tls=True, tlsAllowInvalidCertificates=True)
+                    await client["kino_bot_database"]["users"].delete_many({"_id": {"$in": [int(uid) for uid in blocked_ids]}})
+                except Exception:
+                    pass
+            asyncio.create_task(_del_mongo())
+    except Exception:
+        pass
+
+    try:
+        await export_master_backup_json()
+    except Exception:
+        pass
+        
+    return len(blocked_ids)
+
+
 # ─── FEATURE 1: Kinoga Treyler Biriktirish ───────────────────────────────────
 
 async def set_movie_trailer(movie_id: int, trailer_file_id: str) -> bool:

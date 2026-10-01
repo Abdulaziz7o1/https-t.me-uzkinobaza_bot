@@ -416,7 +416,7 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar', '📁 Kolleksiyalar', 'Kolleksiyalar', '📊 Dashboard', 'Dashboard', "✅ Barcha Kanallarga Obuna Bo'lganlar", "Barcha Kanallarga Obuna Bo'lganlar", "✅ Barcha Kanallarga A'zolar", "Barcha Kanallarga A'zolar"]
+MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar', '📁 Kolleksiyalar', 'Kolleksiyalar', '📊 Dashboard', 'Dashboard', "✅ Barcha Kanallarga Obuna Bo'lganlar", "Barcha Kanallarga Obuna Bo'lganlar", "✅ Barcha Kanallarga A'zolar", "Barcha Kanallarga A'zolar", "🗑 Bloklaganlarni to'liq olib tashlash", "Bloklaganlarni to'liq olib tashlash", "Bloklaganlarni olib tashlash"]
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -4752,6 +4752,9 @@ async def render_blocked_users_page(target_msg_obj, page: int = 1, is_edit: bool
         InlineKeyboardButton(text="⚡ Bazani Skanerlash", callback_data="admin_scan_blocked_users"),
         InlineKeyboardButton(text="🔄 Yangilash", callback_data=f"blocked_users_page_{page}")
     ])
+    inline_keyboard.append([
+        InlineKeyboardButton(text="🗑 Bloklaganlarni to'liq olib tashlash", callback_data="admin_confirm_delete_blocked")
+    ])
     inline_keyboard.append([InlineKeyboardButton(text="🔍 Qidirish (ID/@username)", callback_data="users_btn_search")])
 
     kb = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
@@ -4812,18 +4815,123 @@ async def admin_scan_blocked_users_callback(callback: CallbackQuery):
     )
     try:
         total, blocked, active = await db_req.scan_all_users_for_blocks(callback.bot)
-        await status_msg.edit_text(
-            with_footer(
-                f"✅ <b>Skanerlash muvaffaqiyatli yakunlandi!</b>\n\n"
-                f"👥 <b>Jami tekshirildi:</b> <code>{total:,} ta</code>\n"
-                f"🟢 <b>Faol (aloqada):</b> <code>{active:,} ta</code>\n"
-                f"🚫 <b>Botni bloklaganlar:</b> <code>{blocked:,} ta</code>"
-            ),
-            parse_mode="HTML"
-        )
+        if blocked > 0:
+            scan_done_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🗑 Bloklaganlarni to'liq olib tashlash", callback_data="admin_confirm_delete_blocked")]
+            ])
+            await status_msg.edit_text(
+                with_footer(
+                    f"✅ <b>Skanerlash muvaffaqiyatli yakunlandi!</b>\n\n"
+                    f"👥 <b>Jami tekshirildi:</b> <code>{total:,} ta</code>\n"
+                    f"🟢 <b>Faol (aloqada):</b> <code>{active:,} ta</code>\n"
+                    f"🚫 <b>Botni bloklaganlar:</b> <code>{blocked:,} ta</code>\n\n"
+                    f"<i>💡 Ushbu bloklaganlarni bazadan tozalash uchun quyidagi tugmani bosing:</i>"
+                ),
+                parse_mode="HTML",
+                reply_markup=scan_done_kb
+            )
+        else:
+            await status_msg.edit_text(
+                with_footer(
+                    f"✅ <b>Skanerlash muvaffaqiyatli yakunlandi!</b>\n\n"
+                    f"👥 <b>Jami tekshirildi:</b> <code>{total:,} ta</code>\n"
+                    f"🟢 <b>Faol (aloqada):</b> <code>{active:,} ta</code>\n"
+                    f"🚫 <b>Botni bloklaganlar:</b> <code>{blocked:,} ta</code>"
+                ),
+                parse_mode="HTML"
+            )
         await render_blocked_users_page(callback.message, page=1, is_edit=True)
     except Exception as e:
         await status_msg.edit_text(with_footer(f"❌ Skanerlashda xatolik yuz berdi: {e}"), parse_mode="HTML")
+
+
+@router.callback_query(F.data == "admin_confirm_delete_blocked")
+async def admin_confirm_delete_blocked_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'add_movie')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    
+    _, total_blocked = await db_req.get_blocked_users_list(limit=1, offset=0)
+    if total_blocked == 0:
+        await callback.answer("ℹ️ Bazada botni bloklagan foydalanuvchilar yo'q!", show_alert=True)
+        return
+    
+    confirm_text = (
+        "⚠️ <b>DIQQAT! ROSTAN HAM BOTNI BLOKLAGAN FOYDALANUVCHILARNI BAZADAN O'CHIRMOQCHIMISIZ?</b>\n\n"
+        f"📊 <b>Aniqlangan bloklaganlar:</b> <code>{total_blocked:,} ta</code>\n\n"
+        "<i>❗️ Ushbu foydalanuvchilar bazadan (va bulutli MongoDB zaxirasidan) butunlay olib tashlanadi.\n"
+        "Baza tozalanishi botning tez va samarali ishlashini ta'minlaydi.</i>\n\n"
+        "<b>Rostan ham barchasini to'liq olib tashlaysizmi?</b>"
+    )
+    confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🗑 Ha, to'liq olib tashlash!", callback_data="admin_execute_delete_blocked")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Bekor qilish", callback_data="blocked_users_page_1")
+        ]
+    ])
+    await callback.answer()
+    try:
+        await callback.message.edit_text(with_footer(confirm_text), parse_mode="HTML", reply_markup=confirm_kb)
+    except Exception:
+        await callback.message.answer(with_footer(confirm_text), parse_mode="HTML", reply_markup=confirm_kb)
+
+
+@router.callback_query(F.data == "admin_execute_delete_blocked")
+async def admin_execute_delete_blocked_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS and (not await db_req.has_permission(callback.from_user.id, 'add_movie')):
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    
+    await callback.answer("⏳ Bloklagan foydalanuvchilar o'chirilmoqda...", show_alert=False)
+    
+    deleted_count = await db_req.delete_all_blocked_users()
+    
+    result_text = (
+        f"✅ <b>Muvaffaqiyatli yakunlandi!</b>\n\n"
+        f"🗑 <b>Bazadan to'liq olib tashlandi:</b> <code>{deleted_count:,} ta</code> bloklagan foydalanuvchi.\n\n"
+        f"🚀 <i>Baza tozalandi va optimallashtirildi.</i>"
+    )
+    
+    done_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="⚡ Bazani Qayta Skanerlash", callback_data="admin_scan_blocked_users"),
+            InlineKeyboardButton(text="🔙 Ro'yxatga qaytish", callback_data="blocked_users_page_1")
+        ]
+    ])
+    
+    try:
+        await callback.message.edit_text(with_footer(result_text), parse_mode="HTML", reply_markup=done_kb)
+    except Exception:
+        await callback.message.answer(with_footer(result_text), parse_mode="HTML", reply_markup=done_kb)
+
+
+@router.message(F.text.regexp(r'(?i).*(bloklaganlarni (to\'liq )?olib tashlash|bloklaganlarni o\'chirish).*'), StateFilter('*'))
+async def message_delete_blocked_users_handler(message: Message, state: FSMContext):
+    await state.clear()
+    if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'add_movie')):
+        await message.answer(with_footer("❌ Bu amal faqat administratorlar uchun ruxsat etilgan!"))
+        return
+    _, total_blocked = await db_req.get_blocked_users_list(limit=1, offset=0)
+    if total_blocked == 0:
+        await message.answer(with_footer("ℹ️ <b>Bazada botni bloklagan foydalanuvchilar yo'q!</b>\n\n<i>Barcha a'zolar faol yoki baza allaqachon tozalangan.</i>"), parse_mode="HTML")
+        return
+    confirm_text = (
+        "⚠️ <b>DIQQAT! ROSTAN HAM BOTNI BLOKLAGAN FOYDALANUVCHILARNI BAZADAN O'CHIRMOQCHIMISIZ?</b>\n\n"
+        f"📊 <b>Aniqlangan bloklaganlar:</b> <code>{total_blocked:,} ta</code>\n\n"
+        "<i>❗️ Ushbu foydalanuvchilar bazadan (va bulutli zaxiradan) butunlay olib tashlanadi.</i>\n\n"
+        "<b>Rostan ham barchasini to'liq olib tashlaysizmi?</b>"
+    )
+    confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🗑 Ha, to'liq olib tashlash!", callback_data="admin_execute_delete_blocked")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Bekor qilish", callback_data="blocked_users_page_1")
+        ]
+    ])
+    await message.answer(with_footer(confirm_text), parse_mode="HTML", reply_markup=confirm_kb)
 
 
 _sub_users_cache = {
