@@ -471,8 +471,8 @@ async def set_movie_audience_callback(callback: CallbackQuery, state: FSMContext
         f"📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n"
         f"💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 <b>KANALGA POST VA TREYLER TANLOVI:</b> 🎬\n\n"
-        f"<i>Ushbu kino uchun kanallarga qanday post chiqarmoqchisiz? Quyidagi variantlardan birini tanlang:</i>"
+        f"📢 <b>POST VA TREYLER TANLOVI:</b> 🎬\n\n"
+        f"<i>Ushbu kino uchun qanday post chiqarmoqchisiz? Quyidagi variantlardan birini tanlang:</i>"
     )
     
     try:
@@ -4007,7 +4007,7 @@ async def process_trailer_movie_id(message: Message, state: FSMContext):
 
     kb_rows = []
     if saved_trailer:
-        kb_rows.append([InlineKeyboardButton(text="⚡️ Bazadagi treylerni kanalga chiqarish", callback_data=f'post_choice_use_saved_{movie_id}')])
+        kb_rows.append([InlineKeyboardButton(text="⚡️ Bazadagi treylerni chiqarish", callback_data=f'post_choice_use_saved_{movie_id}')])
     kb_rows.append([InlineKeyboardButton(text="📹 Treyler yuborish (Oddiy)", callback_data=f'post_choice_trailer_normal_{movie_id}')])
     kb_rows.append([InlineKeyboardButton(text="🔞 Xiralashtirib yuborish (Spoyler)", callback_data=f'post_choice_trailer_spoiler_{movie_id}')])
     kb_rows.append([InlineKeyboardButton(text="🎭 Treylersiz Intrigali post (1)", callback_data=f'post_choice_intrigue_text_{movie_id}_0')])
@@ -4017,14 +4017,14 @@ async def process_trailer_movie_id(message: Message, state: FSMContext):
     kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
 
     txt = (
-        f"🎬 <b>KANALGA POST VA TREYLER TANLOVI:</b>\n\n"
+        f"🎬 <b>POST VA TREYLER TANLOVI:</b>\n\n"
         f"📌 <b>Kino:</b> <i>{cap_display}</i>\n"
         f"🎬 <b>Kodi:</b> <code>/{movie_id}</code>\n"
         f"🔒 <b>Turi:</b> {aud_badge}\n"
         f"👁 <b>Ko'rishlar:</b> {views_count:,} marta\n"
         f"📹 <b>Treyler holati:</b> {'✅ Bazada mavjud' if saved_trailer else '❌ Treyler yuklanmagan'}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"<i>Ushbu kino uchun kanallarga qanday post chiqarmoqchisiz? Quyidagi variantlardan birini tanlang:</i>"
+        f"<i>Ushbu kino uchun qanday post chiqarmoqchisiz? Quyidagi variantlardan birini tanlang:</i>"
     )
     await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
@@ -4037,22 +4037,22 @@ async def post_choice_use_saved_cb(callback: CallbackQuery, state: FSMContext):
         await callback.answer("⚠️ Ushbu kino uchun bazada saqlangan treyler topilmadi!", show_alert=True)
         return
 
-    await callback.message.edit_text("🚀 <b>Bazadagi treyler kanallarga chiqarilmoqda, kuting...</b>", parse_mode='HTML')
-    await callback.answer("Yuborilmoqda... ⏳")
-
-    report = await send_trailer_post_to_channels(callback.bot, movie_id, trailer_fid, is_spoiler=False)
-    await state.clear()
-
-    report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}')]
+        [InlineKeyboardButton(text="🚀 Kanallar + Barcha foydalanuvchilar 🔥", callback_data=f"exec_tr_post_all_{movie_id}_0")],
+        [InlineKeyboardButton(text="📢 Faqat kanallarga", callback_data=f"exec_tr_post_channels_{movie_id}_0")],
+        [InlineKeyboardButton(text="👥 Faqat barcha foydalanuvchilarga", callback_data=f"exec_tr_post_users_{movie_id}_0")],
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data=f"post_choice_back_{movie_id}")]
     ])
+
     txt = (
-        f"🎬 <b>BAZADAGI TREYLER KANALLARGA POST QILINDI!</b> 🚀\n\n"
-        f"📌 <b>Kino kodi:</b> /{movie_id}\n\n"
-        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}"
+        f"🎬 <b>BAZADAGI TREYLER AUDITORIYASINI TANLANG:</b>\n\n"
+        f"📌 <b>Kino kodi:</b> /{movie_id}\n"
+        f"📹 <b>Treyler:</b> ✅ Bazada mavjud\n\n"
+        f"🎯 <b>Ushbu treyler posti qayerga yuborilsin?</b>\n"
+        f"<i>Quyidagi auditoriyalardan birini tanlang:</i>"
     )
     await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer()
 
 
 
@@ -4072,11 +4072,11 @@ INTRIGUE_TEMPLATES = [
 ]
 
 
-async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str, is_spoiler: bool = False) -> list[str]:
-    """Kinoning treylerini barcha homiy va ulangan kanallarga post qilib yuborish (oddiy yoki spoyler)"""
+async def send_trailer_post_to_destinations(bot, movie_id: int, trailer_file_id: str, is_spoiler: bool = False, target: str = "all") -> dict:
+    """Kinoning treylerini barcha homiy kanallarga va/yoki barcha bot foydalanuvchilariga post qilib yuborish"""
     movie = await db_req.get_movie(movie_id)
     if not movie:
-        return ["❌ Kino ma'lumotlari topilmadi"]
+        return {"channel_report": ["❌ Kino ma'lumotlari topilmadi"], "users_sent": 0, "users_failed": 0, "users_total": 0}
 
     file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
     prem_badge = " [👑 VIP]" if is_prem_only else ""
@@ -4121,56 +4121,97 @@ async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str
     ])
 
     channel_report = []
-    try:
-        db_channels = await db_req.get_sponsor_channels()
-        all_ch = list(config.CHANNELS)
-        for _, ch_id, ch_name in db_channels:
-            if ch_id not in all_ch:
-                all_ch.append(ch_id)
+    # 1. Kanallarga yuborish
+    if target in ["channels", "all"]:
+        try:
+            db_channels = await db_req.get_sponsor_channels()
+            all_ch = list(config.CHANNELS)
+            for _, ch_id, ch_name in db_channels:
+                if ch_id not in all_ch:
+                    all_ch.append(ch_id)
 
-        backup_ch = await db_req.get_backup_channel_id()
-        if backup_ch and backup_ch not in all_ch:
-            all_ch.append(backup_ch)
+            backup_ch = await db_req.get_backup_channel_id()
+            if backup_ch and backup_ch not in all_ch:
+                all_ch.append(backup_ch)
 
-        for ch in all_ch:
-            target_chat = db_req.normalize_channel_identifier(ch)
-            ch_display = str(target_chat)
-            try:
-                chat_info = await bot.get_chat(target_chat)
-                ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(target_chat))
-            except Exception:
+            for ch in all_ch:
+                target_chat = db_req.normalize_channel_identifier(ch)
                 ch_display = str(target_chat)
+                try:
+                    chat_info = await bot.get_chat(target_chat)
+                    ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(target_chat))
+                except Exception:
+                    ch_display = str(target_chat)
 
+                try:
+                    await bot.send_video(
+                        chat_id=target_chat,
+                        video=trailer_file_id,
+                        caption=post_caption,
+                        has_spoiler=is_spoiler,
+                        reply_markup=post_btn_kb,
+                        parse_mode='HTML'
+                    )
+                    channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli yuborildi 🚀")
+                    await asyncio.sleep(0.2)
+                except Exception as err:
+                    err_text = str(err)
+                    if "chat not found" in err_text.lower():
+                        tip = "Bot ushbu kanalda admin emas"
+                    elif "not enough rights" in err_text.lower() or "administrator rights" in err_text.lower():
+                        tip = "Botga post yozish ruxsati berilmagan"
+                    elif "bot is not a member" in err_text.lower():
+                        tip = "Bot kanalga a'zo qilinmagan"
+                    else:
+                        tip = err_text[:40]
+                    channel_report.append(f"❌ <b>{ch_display}</b> ({tip})")
+        except Exception as e:
+            channel_report.append(f"⚠️ Xatolik: {e}")
+
+    # 2. Barcha foydalanuvchilarga yuborish
+    users_sent = 0
+    users_failed = 0
+    total_users_count = 0
+    if target in ["users", "all"]:
+        async with db_req.get_db() as db:
+            async with db.execute("SELECT id FROM users WHERE status != 'banned' AND is_blocked = 0") as cursor:
+                rows = await cursor.fetchall()
+                active_uids = [r[0] for r in rows]
+        total_users_count = len(active_uids)
+
+        for uid in active_uids:
             try:
                 await bot.send_video(
-                    chat_id=target_chat,
+                    chat_id=uid,
                     video=trailer_file_id,
-                    caption=post_caption,
+                    caption=with_footer(post_caption),
                     has_spoiler=is_spoiler,
                     reply_markup=post_btn_kb,
                     parse_mode='HTML'
                 )
-                channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli yuborildi 🚀")
-                await asyncio.sleep(0.2)
-            except Exception as err:
-                err_text = str(err)
-                if "chat not found" in err_text.lower():
-                    tip = "Bot ushbu kanalda admin emas"
-                elif "not enough rights" in err_text.lower() or "administrator rights" in err_text.lower():
-                    tip = "Botga post yozish ruxsati berilmagan"
-                elif "bot is not a member" in err_text.lower():
-                    tip = "Bot kanalga a'zo qilinmagan"
-                else:
-                    tip = err_text[:40]
-                channel_report.append(f"❌ <b>{ch_display}</b> ({tip})")
-    except Exception as e:
-        channel_report.append(f"⚠️ Xatolik: {e}")
+                users_sent += 1
+            except Exception as e:
+                users_failed += 1
+                err_str = str(e).lower()
+                if any(kw in err_str for kw in ['forbidden', 'blocked', 'deactivated', 'chat not found']):
+                    await db_req.set_user_bot_blocked(uid, 1)
+            await asyncio.sleep(0.04)
 
-    return channel_report
+    return {
+        "channel_report": channel_report,
+        "users_sent": users_sent,
+        "users_failed": users_failed,
+        "users_total": total_users_count
+    }
 
 
-async def send_intrigue_text_post_to_channels(bot, movie_id: int, text_content: str) -> list[str]:
-    """Treylersiz intrigali matnli postni kanallarga chiqarish"""
+async def send_trailer_post_to_channels(bot, movie_id: int, trailer_file_id: str, is_spoiler: bool = False) -> list[str]:
+    res = await send_trailer_post_to_destinations(bot, movie_id, trailer_file_id, is_spoiler=is_spoiler, target="channels")
+    return res.get("channel_report", [])
+
+
+async def send_intrigue_text_post_to_destinations(bot, movie_id: int, text_content: str, target: str = "all") -> dict:
+    """Treylersiz intrigali matnli postni kanallarga va/yoki barcha bot foydalanuvchilariga chiqarish"""
     bot_username = config.BOT_USERNAME.lstrip('@')
     watch_url = f"https://t.me/{bot_username}?start=kino_{movie_id}"
 
@@ -4185,48 +4226,160 @@ async def send_intrigue_text_post_to_channels(bot, movie_id: int, text_content: 
     ])
 
     channel_report = []
-    try:
-        db_channels = await db_req.get_sponsor_channels()
-        all_ch = list(config.CHANNELS)
-        for _, ch_id, ch_name in db_channels:
-            if ch_id not in all_ch:
-                all_ch.append(ch_id)
+    # 1. Kanallarga yuborish
+    if target in ["channels", "all"]:
+        try:
+            db_channels = await db_req.get_sponsor_channels()
+            all_ch = list(config.CHANNELS)
+            for _, ch_id, ch_name in db_channels:
+                if ch_id not in all_ch:
+                    all_ch.append(ch_id)
 
-        backup_ch = await db_req.get_backup_channel_id()
-        if backup_ch and backup_ch not in all_ch:
-            all_ch.append(backup_ch)
+            backup_ch = await db_req.get_backup_channel_id()
+            if backup_ch and backup_ch not in all_ch:
+                all_ch.append(backup_ch)
 
-        for ch in all_ch:
-            target_chat = db_req.normalize_channel_identifier(ch)
-            ch_display = str(target_chat)
-            try:
-                chat_info = await bot.get_chat(target_chat)
-                ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(target_chat))
-            except Exception:
+            for ch in all_ch:
+                target_chat = db_req.normalize_channel_identifier(ch)
                 ch_display = str(target_chat)
+                try:
+                    chat_info = await bot.get_chat(target_chat)
+                    ch_display = f"@{chat_info.username}" if chat_info.username else (chat_info.title or str(target_chat))
+                except Exception:
+                    ch_display = str(target_chat)
 
+                try:
+                    await bot.send_message(
+                        chat_id=target_chat,
+                        text=post_caption,
+                        reply_markup=post_btn_kb,
+                        parse_mode='HTML'
+                    )
+                    channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli yuborildi 🚀")
+                    await asyncio.sleep(0.2)
+                except Exception as err:
+                    err_text = str(err)
+                    if "chat not found" in err_text.lower():
+                        tip = "Bot ushbu kanalda admin emas"
+                    elif "not enough rights" in err_text.lower() or "administrator rights" in err_text.lower():
+                        tip = "Botga post yozish ruxsati berilmagan"
+                    else:
+                        tip = err_text[:40]
+                    channel_report.append(f"❌ <b>{ch_display}</b> ({tip})")
+        except Exception as e:
+            channel_report.append(f"⚠️ Xatolik: {e}")
+
+    # 2. Foydalanuvchilarga yuborish
+    users_sent = 0
+    users_failed = 0
+    total_users_count = 0
+    if target in ["users", "all"]:
+        async with db_req.get_db() as db:
+            async with db.execute("SELECT id FROM users WHERE status != 'banned' AND is_blocked = 0") as cursor:
+                rows = await cursor.fetchall()
+                active_uids = [r[0] for r in rows]
+        total_users_count = len(active_uids)
+
+        for uid in active_uids:
             try:
                 await bot.send_message(
-                    chat_id=target_chat,
-                    text=post_caption,
+                    chat_id=uid,
+                    text=with_footer(post_caption),
                     reply_markup=post_btn_kb,
                     parse_mode='HTML'
                 )
-                channel_report.append(f"✅ <b>{ch_display}</b> — Muvaffaqiyatli yuborildi 🚀")
-                await asyncio.sleep(0.2)
-            except Exception as err:
-                err_text = str(err)
-                if "chat not found" in err_text.lower():
-                    tip = "Bot ushbu kanalda admin emas"
-                elif "not enough rights" in err_text.lower() or "administrator rights" in err_text.lower():
-                    tip = "Botga post yozish ruxsati berilmagan"
-                else:
-                    tip = err_text[:40]
-                channel_report.append(f"❌ <b>{ch_display}</b> ({tip})")
-    except Exception as e:
-        channel_report.append(f"⚠️ Xatolik: {e}")
+                users_sent += 1
+            except Exception as e:
+                users_failed += 1
+                err_str = str(e).lower()
+                if any(kw in err_str for kw in ['forbidden', 'blocked', 'deactivated', 'chat not found']):
+                    await db_req.set_user_bot_blocked(uid, 1)
+            await asyncio.sleep(0.04)
 
-    return channel_report
+    return {
+        "channel_report": channel_report,
+        "users_sent": users_sent,
+        "users_failed": users_failed,
+        "users_total": total_users_count
+    }
+
+
+async def send_intrigue_text_post_to_channels(bot, movie_id: int, text_content: str) -> list[str]:
+    res = await send_intrigue_text_post_to_destinations(bot, movie_id, text_content, target="channels")
+    return res.get("channel_report", [])
+
+
+def format_post_report(report_dict: dict, movie_id: int, mode_label: str, target_label: str) -> str:
+    lines = [
+        "🎬 <b>TREYLER / POST MUVAFFAQIYATLI YUBORILDI!</b> 🚀\n",
+        f"📌 <b>Kino kodi:</b> /{movie_id}",
+        f"✨ <b>Rejim:</b> {mode_label}",
+        f"🎯 <b>Auditoriya:</b> {target_label}\n"
+    ]
+    ch_report = report_dict.get("channel_report", [])
+    if ch_report:
+        lines.append("📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>")
+        lines.extend(ch_report)
+        lines.append("")
+    if report_dict.get("users_total", 0) > 0:
+        lines.append("👥 <b>Bot foydalanuvchilariga yuborilish natijasi:</b>")
+        lines.append(f"🟢 <b>Muvaffaqiyatli yetkazildi:</b> <code>{report_dict['users_sent']:,} ta</code>")
+        if report_dict['users_failed'] > 0:
+            lines.append(f"🔴 <b>Yetkazilmadi (bloklagan):</b> <code>{report_dict['users_failed']:,} ta</code>")
+        lines.append("")
+    lines.append("🍿 <i>Foydalanuvchilar endi botda ham «▶️ Treyler Ko'rish» tugmasini ko'rishadi!</i>")
+    return "\n".join(lines)
+
+
+@router.callback_query(F.data.startswith('exec_tr_post_'))
+async def exec_tr_post_cb(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split('_')
+    target = parts[3]
+    movie_id = int(parts[4])
+    is_spoiler = bool(int(parts[5]))
+
+    trailer_fid = await db_req.get_movie_trailer(movie_id)
+    if not trailer_fid:
+        await callback.answer("⚠️ Ushbu kino uchun bazada saqlangan treyler topilmadi!", show_alert=True)
+        return
+
+    mode_label = "🔞 Spoyler effekti bilan" if is_spoiler else "📹 Oddiy rejimda"
+    target_label = "🚀 Kanallar + Barcha foydalanuvchilar" if target == "all" else ("📢 Faqat kanallar" if target == "channels" else "👥 Faqat barcha foydalanuvchilar")
+
+    await callback.message.edit_text(f"⏳ <b>Treyler {target_label}ga yuborilmoqda, kuting...</b>", parse_mode='HTML')
+    await callback.answer("Yuborilmoqda... ⏳")
+
+    res = await send_trailer_post_to_destinations(callback.bot, movie_id, trailer_fid, is_spoiler=is_spoiler, target=target)
+    await state.clear()
+
+    txt = format_post_report(res, movie_id, mode_label, target_label)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]
+    ])
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith('exec_intrig_post_'))
+async def exec_intrig_post_cb(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split('_')
+    target = parts[3]
+    movie_id = int(parts[4])
+    idx = int(parts[5]) if len(parts) > 5 else 0
+
+    selected_text = INTRIGUE_TEMPLATES[idx % len(INTRIGUE_TEMPLATES)]
+    target_label = "🚀 Kanallar + Barcha foydalanuvchilar" if target == "all" else ("📢 Faqat kanallar" if target == "channels" else "👥 Faqat barcha foydalanuvchilar")
+
+    await callback.message.edit_text(f"⏳ <b>Intrigali post {target_label}ga yuborilmoqda, kuting...</b>", parse_mode='HTML')
+    await callback.answer("Yuborilmoqda... ⏳")
+
+    res = await send_intrigue_text_post_to_destinations(callback.bot, movie_id, selected_text, target=target)
+    await state.clear()
+
+    txt = format_post_report(res, movie_id, "🎭 Treylersiz Intrigali post", target_label)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]
+    ])
+    await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
 
 # ─── 4 TA TANLOVNING CALLBACK HANDLERLARI ───
@@ -4303,25 +4456,23 @@ async def publish_intrigue_text_cb(callback: CallbackQuery, state: FSMContext):
     parts = callback.data.split('_')
     movie_id = int(parts[3])
     idx = int(parts[4]) if len(parts) > 4 else 0
-    selected_text = INTRIGUE_TEMPLATES[idx % len(INTRIGUE_TEMPLATES)]
 
-    await callback.message.edit_text("🚀 <b>Post kanallarga chiqarilmoqda, iltimos kuting...</b>", parse_mode='HTML')
-    await callback.answer("Yuborilmoqda... ⏳")
-
-    report = await send_intrigue_text_post_to_channels(callback.bot, movie_id, selected_text)
-    await state.clear()
-
-    report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}')]
+        [InlineKeyboardButton(text="🚀 Kanallar + Barcha foydalanuvchilar 🔥", callback_data=f"exec_intrig_post_all_{movie_id}_{idx}")],
+        [InlineKeyboardButton(text="📢 Faqat kanallarga", callback_data=f"exec_intrig_post_channels_{movie_id}_{idx}")],
+        [InlineKeyboardButton(text="👥 Faqat barcha foydalanuvchilarga", callback_data=f"exec_intrig_post_users_{movie_id}_{idx}")],
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data=f"post_choice_intrigue_text_{movie_id}_{idx}")]
     ])
+
     txt = (
-        f"🎭 <b>INTRIGALI POST MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
-        f"📌 <b>Kino kodi:</b> /{movie_id}\n\n"
-        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}\n\n"
-        f"✨ <i>Foydalanuvchilar qiziqib, nomini bilish uchun botga kirishadi!</i>"
+        f"🎭 <b>INTRIGALI POST AUDITORIYASINI TANLANG:</b>\n\n"
+        f"📌 <b>Kino kodi:</b> /{movie_id}\n"
+        f"📝 <b>Turi:</b> Treylersiz intrigali matn\n\n"
+        f"🎯 <b>Ushbu post qayerga chiqarilsin?</b>\n"
+        f"<i>Quyidagi auditoriyalardan birini tanlang:</i>"
     )
     await callback.message.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith('post_choice_skip_'))
@@ -4363,7 +4514,7 @@ async def post_choice_back_cb(callback: CallbackQuery, state: FSMContext):
     ])
     
     confirm_txt = (
-        f"🎬 <b>KANALGA POST VA TREYLER TANLOVI:</b>\n\n"
+        f"🎬 <b>POST VA TREYLER TANLOVI:</b>\n\n"
         f"📌 <b>Kino:</b> <i>{cap_display}</i>\n"
         f"🔢 <b>Kodi:</b> <code>/{movie_id}</code>\n\n"
         f"<i>Quyidagi variantlardan birini tanlang:</i>"
@@ -4387,29 +4538,26 @@ async def process_attached_trailer_video(message: Message, state: FSMContext):
 
     # 1. Bazaga treylerni saqlash
     await db_req.set_movie_trailer(movie_id, trailer_file_id)
-
-    mode_label = "🔞 Spoyler effekti bilan" if is_spoiler else "📹 Oddiy rejimda"
-    status_msg = await message.answer(
-        f"⏳ <b>Treyler bazaga biriktirildi!</b>\nKanallarga {mode_label} avtomatik post yuborilmoqda, kuting...",
-        parse_mode='HTML'
-    )
-
-    # 2. Kanallarga avtomatik yuborish
-    report = await send_trailer_post_to_channels(message.bot, movie_id, trailer_file_id, is_spoiler=is_spoiler)
     await state.clear()
 
-    report_str = "\n".join(report) if report else "<i>Ulangan kanallar topilmadi.</i>"
+    mode_label = "🔞 Spoyler effekti bilan" if is_spoiler else "📹 Oddiy rejimda"
+    spoiler_flag = 1 if is_spoiler else 0
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]
+        [InlineKeyboardButton(text="🚀 Kanallar + Barcha foydalanuvchilar 🔥", callback_data=f"exec_tr_post_all_{movie_id}_{spoiler_flag}")],
+        [InlineKeyboardButton(text="📢 Faqat kanallarga", callback_data=f"exec_tr_post_channels_{movie_id}_{spoiler_flag}")],
+        [InlineKeyboardButton(text="👥 Faqat barcha foydalanuvchilarga", callback_data=f"exec_tr_post_users_{movie_id}_{spoiler_flag}")],
+        [InlineKeyboardButton(text="⏭ O'tkazib yuborish (Faqat bazada saqlash)", callback_data=f"post_choice_skip_{movie_id}")]
     ])
+
     txt = (
-        f"🎬 <b>TREYLER MUVAFFAQIYATLI CHIQARILDI!</b> 🚀\n\n"
+        f"✅ <b>Treyler qabul qilindi va kinoga biriktirildi!</b> 🎬\n\n"
         f"📌 <b>Kino kodi:</b> /{movie_id}\n"
         f"✨ <b>Rejim:</b> {mode_label}\n\n"
-        f"📢 <b>Kanal va Guruhlarga yuborilish natijasi:</b>\n{report_str}\n\n"
-        f"🍿 <i>Foydalanuvchilar endi botda ham «▶️ Treyler Ko'rish» tugmasini ko'rishadi!</i>"
+        f"🎯 <b>Ushbu treyler posti qayerga yuborilsin?</b>\n"
+        f"<i>Quyidagi auditoriyalardan birini tanlang:</i>"
     )
-    await status_msg.edit_text(with_footer(txt), parse_mode='HTML', reply_markup=kb)
+    await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
 
 
 @router.message(AdminStates.waiting_for_trailer_attach_video, F.text)
