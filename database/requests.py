@@ -1451,12 +1451,12 @@ async def set_setting(key: str, value: str):
     except Exception:
         pass
 
-async def get_setting(key: str) -> str:
+async def get_setting(key: str, default: str = None) -> str:
     """Bot sozlamasini olish"""
     async with get_db() as db:
         async with db.execute("SELECT value FROM bot_settings WHERE key = ?", (key,)) as cursor:
             row = await cursor.fetchone()
-            return row[0] if row else None
+            return row[0] if (row and row[0] is not None) else default
 
 async def get_config_int(key: str, default: int) -> int:
     """Int turidagi bot sozlamasini olish"""
