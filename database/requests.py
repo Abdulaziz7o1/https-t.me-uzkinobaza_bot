@@ -3908,49 +3908,126 @@ async def reset_user_birthday_lock(user_id: int) -> bool:
 
 
 # ─── ⏳ 15 MINUTLIK BEPUL VIP TRIAL (MAX 20 TA KINO) ──────────────────────────
-async def has_claimed_vip_trial(user_id: int) -> bool:
-    """Foydalanuvchi 15 minutlik bepul VIP sinovini ishlatganmi?"""
+_TRIAL_LOCK = asyncio.Lock()
+_PENDING_MOVIES_CACHE = {}
+
+async def set_user_pending_movie(user_id: int, movie_id: int):
+    """Foydalanuvchi obuna bo'lishi yoki VIP olishi kutilayotgan kinoni eslab qolish"""
+    _PENDING_MOVIES_CACHE[user_id] = movie_id
     async with get_db() as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_pending_movie (
+                user_id INTEGER PRIMARY KEY,
+                movie_id INTEGER,
+                created_at TEXT
+            )
+        """)
+        now_str = config.get_uzb_now().strftime("%Y-%m-%d %H:%M:%S")
+        await db.execute("""
+            INSERT INTO user_pending_movie (user_id, movie_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET movie_id = ?, created_at = ?
+        """, (user_id, movie_id, now_str, movie_id, now_str))
+        await db.commit()
+
+
+async def get_and_clear_pending_movie(user_id: int):
+    """Foydalanuvchi qidirgan kutilayotgan kinoni olish va tozalash"""
+    cached = _PENDING_MOVIES_CACHE.pop(user_id, None)
+    db_movie_id = None
+    try:
+        async with get_db() as db:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS user_pending_movie (
+                    user_id INTEGER PRIMARY KEY,
+                    movie_id INTEGER,
+                    created_at TEXT
+                )
+            """)
+            async with db.execute("SELECT movie_id FROM user_pending_movie WHERE user_id = ?", (user_id,)) as c:
+                row = await c.fetchone()
+                if row and row[0]:
+                    db_movie_id = int(row[0])
+            await db.execute("DELETE FROM user_pending_movie WHERE user_id = ?", (user_id,))
+            await db.commit()
+    except Exception:
+        pass
+    return db_movie_id or cached
+
+
+async def has_claimed_vip_trial(user_id: int) -> bool:
+    """Foydalanuvchi 15 minutlik bepul VIP sinovini ishlatganmi? (Qat'iy tekshiruv)"""
+    async with get_db() as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS vip_trial_claims (
+                user_id INTEGER PRIMARY KEY,
+                claimed_at TEXT
+            )
+        """)
+        # 1. vip_trial_claims jadvalidan tekshirish
+        async with db.execute("SELECT 1 FROM vip_trial_claims WHERE user_id = ?", (user_id,)) as c:
+            if await c.fetchone():
+                return True
+        # 2. users jadvalidan tekshirish
         try:
             async with db.execute("SELECT vip_trial_claimed FROM users WHERE id = ?", (user_id,)) as c:
                 r = await c.fetchone()
-                return bool(r and r[0] and r[0] != 0)
+                if r and r[0] and r[0] != 0:
+                    return True
         except Exception:
-            return False
+            pass
+    return False
 
 
 async def claim_vip_trial(user_id: int) -> tuple[bool, str]:
-    """15 minutlik bepul VIP sinov rejimini berish (1 marta, max 20 ta kino)"""
+    """15 minutlik bepul VIP sinov rejimini berish (qat'iy 1 marta, max 20 ta kino)"""
     from datetime import datetime, timedelta
-    if await has_claimed_vip_trial(user_id):
-        return False, "⚠️ <b>Siz allaqachon 15 minutlik bepul VIP sinov imkoniyatidan foydalangansiz!</b>\n\nVIP imtiyozlarini davom ettirish uchun /premium orqali obuna xarid qilishingiz mumkin."
+    
+    async with _TRIAL_LOCK:
+        if await has_claimed_vip_trial(user_id):
+            return False, "⚠️ <b>Siz allaqachon 15 minutlik bepul VIP sinov imkoniyatidan foydalangansiz!</b>\n\nVIP imtiyozlarini davom ettirish uchun /premium orqali obuna xarid qilishingiz mumkin."
 
-    now = config.get_uzb_now()
-    end_time = now + timedelta(minutes=15)
-    end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
-    start_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        now = config.get_uzb_now()
+        end_time = now + timedelta(minutes=15)
+        end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+        start_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    async with get_db() as db:
-        await db.execute(
-            """INSERT INTO users (id, is_premium, premium_until, vip_trial_claimed, vip_trial_movies_count)
-               VALUES (?, 1, ?, 1, 0)
-               ON CONFLICT(id) DO UPDATE SET
-                   is_premium = 1,
-                   premium_until = ?,
-                   vip_trial_claimed = 1,
-                   vip_trial_movies_count = 0""",
-            (user_id, end_str, end_str)
-        )
-        await db.execute(
-            """INSERT INTO premium_subscriptions (user_id, start_date, end_date, plan)
-               VALUES (?, ?, ?, '15 minutlik VIP Sinov')
-               ON CONFLICT(user_id) DO UPDATE SET
-                   start_date = excluded.start_date,
-                   end_date = excluded.end_date,
-                   plan = excluded.plan""",
-            (user_id, start_str, end_str)
-        )
-        await db.commit()
+        async with get_db() as db:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS vip_trial_claims (
+                    user_id INTEGER PRIMARY KEY,
+                    claimed_at TEXT
+                )
+            """)
+            try:
+                await db.execute(
+                    "INSERT INTO vip_trial_claims (user_id, claimed_at) VALUES (?, ?)",
+                    (user_id, start_str)
+                )
+            except Exception:
+                # Parallel so'rov yoki allaqachon olingan
+                return False, "⚠️ <b>Siz allaqachon 15 minutlik bepul VIP sinov imkoniyatidan foydalangansiz!</b>"
+
+            await db.execute(
+                """INSERT INTO users (id, is_premium, premium_until, vip_trial_claimed, vip_trial_movies_count)
+                   VALUES (?, 1, ?, 1, 0)
+                   ON CONFLICT(id) DO UPDATE SET
+                       is_premium = 1,
+                       premium_until = ?,
+                       vip_trial_claimed = 1,
+                       vip_trial_movies_count = 0""",
+                (user_id, end_str, end_str)
+            )
+            await db.execute(
+                """INSERT INTO premium_subscriptions (user_id, start_date, end_date, plan)
+                   VALUES (?, ?, ?, '15 minutlik VIP Sinov')
+                   ON CONFLICT(user_id) DO UPDATE SET
+                       start_date = excluded.start_date,
+                       end_date = excluded.end_date,
+                       plan = excluded.plan""",
+                (user_id, start_str, end_str)
+            )
+            await db.commit()
 
     return True, (
         f"🎉 <b>TABRIKLAYMIZ! 15 MINUTLIK BEPUL VIP SINOV YOQILDI!</b> 👑\n\n"

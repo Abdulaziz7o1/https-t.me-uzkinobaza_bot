@@ -2124,6 +2124,19 @@ async def admin_approve_prem_callback(callback: CallbackQuery):
             f"<i>Endi botimizdan kunlik cheklovlarsiz va barcha imtiyozlar bilan foydalanishingiz mumkin! Maroqli hordiq chiqaring!</i> 🍿"
         )
         await callback.bot.send_message(u_id, with_footer(user_msg), parse_mode='HTML')
+        
+        pending_mid = await db_req.get_and_clear_pending_movie(u_id)
+        if pending_mid:
+            try:
+                from handlers.user import send_movie_by_id_direct
+                await callback.bot.send_message(
+                    u_id,
+                    f"🎬 <b>Siz qidirgan /{pending_mid} kodli kino tayyorlandi, yuklanmoqda...</b> 🍿",
+                    parse_mode='HTML'
+                )
+                await send_movie_by_id_direct(callback.bot, u_id, pending_mid)
+            except Exception as pe:
+                logging.error(f"Error auto-delivering pending movie to {u_id}: {pe}")
     except Exception:
         pass
     await callback.answer(f'✅ {period_text} Premium faollashtirildi (+{cashback_pts} ball keshbek)!', show_alert=True)

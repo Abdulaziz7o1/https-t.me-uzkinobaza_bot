@@ -135,6 +135,19 @@ class CheckSubMiddleware(BaseMiddleware):
                     not_subscribed_channels.append(ch_tuple)
 
         if not_subscribed_channels:
+            if is_msg and event.text:
+                txt = event.text.strip()
+                import re
+                m = re.match(r'^/start\s+(?:movie_|kino_|film_|m_|k_)?(\d+)$', txt, re.IGNORECASE)
+                if m:
+                    target_m_id = int(m.group(1))
+                    from database.requests import set_user_pending_movie
+                    await set_user_pending_movie(user_id, target_m_id)
+                elif re.match(r'^/?\d+$', txt):
+                    target_m_id = int(txt.lstrip('/'))
+                    from database.requests import set_user_pending_movie
+                    await set_user_pending_movie(user_id, target_m_id)
+
             if is_msg:
                 sub_promo_txt = (
                     "📢 <b>Kinolarni yuklab olish va botdan to'liq foydalanish uchun homiy kanallarimizga a'zo bo'ling:</b>\n\n"

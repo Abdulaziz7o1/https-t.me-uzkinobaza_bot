@@ -196,6 +196,7 @@ async def cmd_start(message: Message, state: FSMContext):
             _db_admins = await db_req.get_all_admins()
             _is_admin = user_id in config.ADMINS or user_id in [int(a) for a in _db_admins]
             if is_prem_only and not _is_admin and not (await db_req.is_premium_user(user_id)):
+                await db_req.set_user_pending_movie(user_id, movie_id)
                 trial_claimed = await db_req.has_claimed_vip_trial(user_id)
                 kb_rows = [[InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]]
                 if not trial_claimed:
@@ -313,6 +314,62 @@ async def check_subscription_callback(callback: CallbackQuery):
         await callback.message.edit_text(with_footer("✅ <b>Rahmat! Barcha homiy kanallarga muvaffaqiyatli a'zo bo'ldingiz.</b>\n\nEndi kino nomini yoki kodini yuborishingiz mumkin! 🍿"), parse_mode='HTML')
         await callback.answer("A'zolik tasdiqlandi! ✅", show_alert=True)
 
+    # Obuna bo'lishdan oldin qidirilgan kino bo'lsa, esdan chiqarmasdan avtomatik yetkazib berish!
+    pending_mid = await db_req.get_and_clear_pending_movie(user_id)
+    if pending_mid:
+        await callback.message.answer(
+            f"🎬 <b>Siz qidirgan /{pending_mid} kodli kino tayyorlandi, yuklanmoqda...</b> 🍿",
+            parse_mode='HTML'
+        )
+        await send_movie_by_id_direct(callback.bot, user_id, pending_mid)
+
+async def send_movie_by_id_direct(bot, chat_id: int, movie_id: int) -> bool:
+    """Kinoni to'g'ridan-to'g'ri foydalanuvchiga yuborish (avtomatik yetkazib berish)"""
+    movie = await db_req.get_movie(movie_id, user_id=chat_id)
+    if not movie:
+        return False
+    file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
+    
+    await db_req.add_to_watch_history(chat_id, movie_id)
+    avg_rating, votes = await db_req.get_movie_rating(movie_id)
+    is_fav = await db_req.is_favorite(chat_id, movie_id)
+    likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
+    rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
+    prem_badge = " [👑 VIP]" if is_prem_only else ""
+    access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+    cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
+    if avg_rating > 0:
+        cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
+    cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
+
+    trailer_file_id = await db_req.get_movie_trailer(movie_id)
+    has_trailer = bool(trailer_file_id)
+
+    try:
+        await bot.send_video(
+            chat_id=chat_id,
+            video=file_id,
+            caption=with_footer(cap),
+            parse_mode='HTML',
+            protect_content=True,
+            reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
+        )
+    except Exception:
+        try:
+            await bot.send_video(
+                chat_id=chat_id,
+                video=file_id,
+                caption=with_footer(cap),
+                parse_mode='HTML',
+                reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
+            )
+        except Exception as e:
+            logging.error(f"Direct movie delivery error for {movie_id}: {e}")
+            return False
+
+    await _movie_watched_extra(chat_id, caption)
+    return True
+
 @router.message(F.text.regexp('^/?\\d+$'))
 async def search_movie_by_code(message: Message, state: FSMContext = None):
     user_id = message.from_user.id
@@ -346,6 +403,7 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
             is_prem_only = 0  # Bugun bepul!
 
         if is_prem_only and not _is_admin2 and not (await db_req.is_premium_user(user_id)):
+            await db_req.set_user_pending_movie(user_id, movie_id)
             trial_claimed = await db_req.has_claimed_vip_trial(user_id)
             kb_rows = [[InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]]
             if not trial_claimed:
@@ -932,6 +990,17 @@ async def stars_successful_payment_handler(message: Message):
         parse_mode='HTML'
     )
 
+    pending_mid = await db_req.get_and_clear_pending_movie(user_id)
+    if pending_mid:
+        try:
+            await message.answer(
+                f"🎬 <b>Siz qidirgan /{pending_mid} kodli kino tayyorlandi, yuklanmoqda...</b> 🍿",
+                parse_mode='HTML'
+            )
+            await send_movie_by_id_direct(message.bot, user_id, pending_mid)
+        except Exception as e:
+            logger.error(f"Error auto-delivering pending movie after stars payment: {e}")
+
     admin_alert = (
         f"⭐️ <b>YANGI TELEGRAM STARS TO'LOVI!</b>\n\n"
         f"👤 <b>Foydalanuvchi:</b> {uname} (ID: <code>{user_id}</code>)\n"
@@ -949,6 +1018,11 @@ async def stars_successful_payment_handler(message: Message):
 @router.callback_query(F.data == 'claim_vip_trial_cb')
 async def claim_vip_trial_cb(callback: CallbackQuery):
     user_id = callback.from_user.id
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
     success, msg = await db_req.claim_vip_trial(user_id)
     if success:
         await callback.message.edit_text(with_footer(msg), parse_mode='HTML')
@@ -962,6 +1036,17 @@ async def claim_vip_trial_cb(callback: CallbackQuery):
                 )
             except Exception:
                 pass
+
+        pending_mid = await db_req.get_and_clear_pending_movie(user_id)
+        if pending_mid:
+            try:
+                await callback.message.answer(
+                    f"🎬 <b>Siz qidirgan /{pending_mid} kodli kino tayyorlandi, yuklanmoqda...</b> 🍿",
+                    parse_mode='HTML'
+                )
+                await send_movie_by_id_direct(callback.bot, user_id, pending_mid)
+            except Exception as e:
+                logger.error(f"Error auto-delivering pending movie after trial VIP: {e}")
     else:
         await callback.answer(msg, show_alert=True)
     await callback.answer()
