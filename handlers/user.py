@@ -313,9 +313,15 @@ async def check_subscription_callback(callback: CallbackQuery):
         await callback.message.edit_text(with_footer("✅ <b>Rahmat! Barcha homiy kanallarga muvaffaqiyatli a'zo bo'ldingiz.</b>\n\nEndi kino nomini yoki kodini yuborishingiz mumkin! 🍿"), parse_mode='HTML')
         await callback.answer("A'zolik tasdiqlandi! ✅", show_alert=True)
 
-@router.message(StateFilter(None), F.text.regexp('^/?\\d+$'))
-async def search_movie_by_code(message: Message):
+@router.message(F.text.regexp('^/?\\d+$'))
+async def search_movie_by_code(message: Message, state: FSMContext = None):
     user_id = message.from_user.id
+    
+    if state:
+        curr_state = await state.get_state()
+        if curr_state and "AdminStates" in str(curr_state):
+            return
+        await state.clear()
     
     # Texnik ishlar rejimi
     if user_id not in config.ADMINS and (await db_req.is_maintenance_mode()):
@@ -384,7 +390,25 @@ async def search_movie_by_code(message: Message):
         trailer_file_id = await db_req.get_movie_trailer(movie_id)
         has_trailer = bool(trailer_file_id)
 
-        await message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer))
+        try:
+            await message.answer_video(
+                video=file_id,
+                caption=with_footer(cap),
+                parse_mode='HTML',
+                protect_content=True,
+                reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
+            )
+        except Exception as send_err:
+            try:
+                await message.answer_video(
+                    video=file_id,
+                    caption=with_footer(cap),
+                    parse_mode='HTML',
+                    reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
+                )
+            except Exception:
+                await message.answer(with_footer(f"⚠️ <b>/{movie_id} kodli kino faylini yuborishda xatolik yuz berdi.</b>\n\nIltimos, adminga murojaat qiling."), parse_mode='HTML')
+
         await _movie_watched_extra(user_id, caption)
 
         # Feature 6: O'xshash kinolar tavsiyasi
