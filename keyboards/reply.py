@@ -89,6 +89,9 @@ def get_admin_menu():
             [
                 KeyboardButton(text="📁 Kolleksiyalar"),
                 KeyboardButton(text="📊 Dashboard")
+            ],
+            [
+                KeyboardButton(text="✨ Premium Emojilar")
             ]
         ],
         resize_keyboard=True

@@ -16,6 +16,15 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 logger = logging.getLogger(__name__)
 router = Router()
 
+from utils.custom_emoji import (
+    apply_custom_emojis,
+    is_custom_emojis_enabled,
+    set_custom_emojis_enabled,
+    save_custom_emoji,
+    get_all_custom_emojis,
+    init_custom_emojis
+)
+
 CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
 
 def with_footer(text):
@@ -24,8 +33,10 @@ def with_footer(text):
     if not isinstance(text, str):
         return text
     if "8245305906" in text or "Murojaat uchun" in text:
-        return text
-    return f"{text}{CONTACT_FOOTER}"
+        full_text = text
+    else:
+        full_text = f"{text}{CONTACT_FOOTER}"
+    return apply_custom_emojis(full_text)
 
 
 class IsAdminOrMod(Filter):
@@ -5767,4 +5778,178 @@ async def refresh_admin_dashboard_cb(callback: CallbackQuery):
     except Exception:
         pass
     await callback.answer("Dashboard yangilandi! 📊")
+
+
+# --- PREMIUM CUSTOM EMOJILAR BOSHQARUVI ---
+
+def get_custom_emojis_control_kb():
+    enabled = is_custom_emojis_enabled()
+    status_btn = "🔴 O'chirish" if enabled else "🟢 Yoqish"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"⚡ Holat: {status_btn}", callback_data="toggle_custom_emojis_cb")],
+        [
+            InlineKeyboardButton(text="📋 Barcha emojilar", callback_data="list_custom_emojis_cb"),
+            InlineKeyboardButton(text="🔄 Qayta yuklash", callback_data="reload_custom_emojis_cb")
+        ]
+    ])
+
+@router.message(F.text == "✨ Premium Emojilar")
+@router.message(Command("emojis"))
+@router.message(Command("custom_emojis"))
+async def admin_custom_emojis_menu(message: Message):
+    if message.from_user.id not in config.ADMINS:
+        return
+    enabled = is_custom_emojis_enabled()
+    status_icon = "🟢 Yoqilgan" if enabled else "🔴 O'chirilgan"
+    all_emojis = get_all_custom_emojis()
+    
+    txt = (
+        "✨ <b>TELEGRAM PREMIUM CUSTOM EMOJILAR TIZIMI</b>\n\n"
+        f"⚡ <b>Tizim holati:</b> {status_icon}\n"
+        f"🎨 <b>Faol animatsiyali emojilar:</b> <code>{len(all_emojis)} ta</code>\n\n"
+        "💡 <i>Ushbu tizim orqali bot yuboradigan barcha xabarlar, kinolar, xabarnomalar va tugmalar "
+        "avtomatik ravishda chiroyli harakatlanuvchi Telegram Premium emojilari bilan bezatiladi!</i>\n\n"
+        "📌 <b>Yangi emoji qo'shish:</b>\n"
+        "Siz shunchaki o'zingiz xohlagan har qanday Telegram Premium emojini shu chatga botga yuboring — "
+        "bot uni avtomatik aniqlab bazaga kiritishni taklif qiladi!"
+    )
+    await message.answer(with_footer(txt), parse_mode="HTML", reply_markup=get_custom_emojis_control_kb())
+
+@router.callback_query(F.data == "toggle_custom_emojis_cb")
+async def toggle_custom_emojis_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    new_state = not is_custom_emojis_enabled()
+    await set_custom_emojis_enabled(new_state)
+    status_icon = "🟢 Yoqilgan" if new_state else "🔴 O'chirilgan"
+    all_emojis = get_all_custom_emojis()
+    txt = (
+        "✨ <b>TELEGRAM PREMIUM CUSTOM EMOJILAR TIZIMI</b>\n\n"
+        f"⚡ <b>Tizim holati:</b> {status_icon}\n"
+        f"🎨 <b>Faol animatsiyali emojilar:</b> <code>{len(all_emojis)} ta</code>\n\n"
+        "💡 <i>Ushbu tizim orqali bot yuboradigan barcha xabarlar, kinolar, xabarnomalar va tugmalar "
+        "avtomatik ravishda chiroyli harakatlanuvchi Telegram Premium emojilari bilan bezatiladi!</i>\n\n"
+        "📌 <b>Yangi emoji qo'shish:</b>\n"
+        "Siz shunchaki o'zingiz xohlagan har qanday Telegram Premium emojini shu chatga botga yuboring — "
+        "bot uni avtomatik aniqlab bazaga kiritishni taklif qiladi!"
+    )
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=get_custom_emojis_control_kb())
+    except Exception:
+        pass
+    msg = "✅ Premium emojilar yoqildi!" if new_state else "🔴 Premium emojilar o'chirildi!"
+    await callback.answer(msg, show_alert=True)
+
+@router.callback_query(F.data == "reload_custom_emojis_cb")
+async def reload_custom_emojis_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    await init_custom_emojis()
+    all_emojis = get_all_custom_emojis()
+    await callback.answer(f"✅ Barcha emojilar qayta yuklandi: {len(all_emojis)} ta!", show_alert=True)
+
+@router.callback_query(F.data == "list_custom_emojis_cb")
+async def list_custom_emojis_callback(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    all_emojis = get_all_custom_emojis()
+    seen_ids = set()
+    sample_tags = []
+    lines = []
+    for ch, cid in all_emojis.items():
+        if cid not in seen_ids:
+            seen_ids.add(cid)
+            sample_tags.append(f'<tg-emoji emoji-id="{cid}">{ch}</tg-emoji>')
+            if len(lines) < 25:
+                lines.append(f"• <tg-emoji emoji-id=\"{cid}\">{ch}</tg-emoji> <code>{ch}</code> — ID: <code>{cid}</code>")
+    
+    txt = (
+        f"📋 <b>BOTDAGI BARCHA PREMIUM EMOJILAR ({len(seen_ids)} ta tur):</b>\n\n"
+        + " ".join(sample_tags[:30]) + "\n\n"
+        + "\n".join(lines[:20])
+    )
+    back_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ Ortga", callback_data="back_to_custom_emojis_menu")]
+    ])
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=back_kb)
+    except Exception:
+        pass
+    await callback.answer()
+
+@router.callback_query(F.data == "back_to_custom_emojis_menu")
+async def back_to_custom_emojis_menu_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        return
+    enabled = is_custom_emojis_enabled()
+    status_icon = "🟢 Yoqilgan" if enabled else "🔴 O'chirilgan"
+    all_emojis = get_all_custom_emojis()
+    txt = (
+        "✨ <b>TELEGRAM PREMIUM CUSTOM EMOJILAR TIZIMI</b>\n\n"
+        f"⚡ <b>Tizim holati:</b> {status_icon}\n"
+        f"🎨 <b>Faol animatsiyali emojilar:</b> <code>{len(all_emojis)} ta</code>\n\n"
+        "💡 <i>Ushbu tizim orqali bot yuboradigan barcha xabarlar, kinolar, xabarnomalar va tugmalar "
+        "avtomatik ravishda chiroyli harakatlanuvchi Telegram Premium emojilari bilan bezatiladi!</i>\n\n"
+        "📌 <b>Yangi emoji qo'shish:</b>\n"
+        "Siz shunchaki o'zingiz xohlagan har qanday Telegram Premium emojini shu chatga botga yuboring — "
+        "bot uni avtomatik aniqlab bazaga kiritishni taklif qiladi!"
+    )
+    try:
+        await callback.message.edit_text(with_footer(txt), parse_mode="HTML", reply_markup=get_custom_emojis_control_kb())
+    except Exception:
+        pass
+    await callback.answer()
+
+_PENDING_EMOJI_SAVES = {}
+
+@router.message(F.from_user.id.in_(config.ADMINS), F.entities)
+async def admin_custom_emoji_detector(message: Message):
+    if not message.text or message.text.startswith('/'):
+        return
+    detected = []
+    if message.entities:
+        for ent in message.entities:
+            if ent.type == "custom_emoji" and ent.custom_emoji_id:
+                ch = message.text[ent.offset:ent.offset + ent.length]
+                detected.append((ch, ent.custom_emoji_id))
+    
+    if not detected:
+        return
+
+    rows = []
+    for ch, cid in detected:
+        key = f"save_cem_{cid[:10]}"
+        _PENDING_EMOJI_SAVES[key] = (ch, cid)
+        rows.append([InlineKeyboardButton(text=f"💾 {ch} (ID: {cid}) ni saqlash", callback_data=key)])
+
+    txt = (
+        f"✨ <b>Xabaringizda {len(detected)} ta Telegram Premium Emoji aniqlandi!</b>\n\n"
+        "Quyidagi tugmani bosish orqali ushbu emojini botning avtomatik premium almashtirgichiga qo'shishingiz mumkin:"
+    )
+    await message.reply(with_footer(txt), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+@router.callback_query(F.data.startswith("save_cem_"))
+async def save_detected_custom_emoji_cb(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMINS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+    key = callback.data
+    data = _PENDING_EMOJI_SAVES.get(key)
+    if not data:
+        await callback.answer("❌ Bu emoji allaqachon saqlangan yoki muddati o'tgan!", show_alert=True)
+        return
+    ch, cid = data
+    success = await save_custom_emoji(ch, cid)
+    if success:
+        await callback.message.edit_text(
+            with_footer(f"✅ <b>Muvaffaqiyatli saqlandi!</b>\n\nEmoji: <tg-emoji emoji-id=\"{cid}\">{ch}</tg-emoji>\nID: <code>{cid}</code>\n\nEndi bot barcha <code>{ch}</code> emojilarini ushbu premium animatsiya bilan chiqaradi!"),
+            parse_mode="HTML"
+        )
+        await callback.answer("✅ Saqlandi!", show_alert=True)
+    else:
+        await callback.answer("❌ Saqlashda xatolik yuz berdi!", show_alert=True)
+
 

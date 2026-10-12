@@ -7,6 +7,8 @@ from database import requests as db_req
 import config
 router = Router()
 
+from utils.custom_emoji import apply_custom_emojis
+
 CONTACT_FOOTER = f'\n\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
 
 def with_footer(text):
@@ -15,8 +17,10 @@ def with_footer(text):
     if not isinstance(text, str):
         return text
     if "Abdulaziz7o1" in text or "Murojaat uchun" in text:
-        return text
-    return f"{text}{CONTACT_FOOTER}"
+        full_text = text
+    else:
+        full_text = f"{text}{CONTACT_FOOTER}"
+    return apply_custom_emojis(full_text)
 
 
 class PaymentStates(StatesGroup):

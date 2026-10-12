@@ -429,6 +429,11 @@ async def on_startup(bot: Bot):
     logging.info("Bot ishga tushmoqda...")
     # Baza jadvallarini tekshirish/yaratish
     await init_db()
+    try:
+        from utils.custom_emoji import init_custom_emojis
+        await init_custom_emojis()
+    except Exception as e:
+        logging.warning(f"Custom emojilarni ishga tushirishda xato: {e}")
     import database.requests as db_req
     await db_req.ensure_movie_requests_table()
     
