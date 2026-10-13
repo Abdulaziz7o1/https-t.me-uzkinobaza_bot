@@ -151,9 +151,9 @@ async def execute_start_logic(message: Message, state: FSMContext):
     await db_req.add_user(user_id, user.username or '', user.full_name)
     db_admins = await db_req.get_all_admins()
     if user_id in config.ADMINS:
-        await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Bosh Admin {name_to_show}!</b>\n\n🛠 <b>Bot boshqaruv paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:'), parse_mode='HTML', reply_markup=get_admin_menu())
+        await message.answer(with_footer(f'👑 <b>Assalomu alaykum, Bosh Admin {name_to_show}!</b>\n\n🚀 <b>Bot boshqaruv paneliga xush kelibsiz.</b>\n⚡ Quyidagi menyudan foydalanib botni boshqarishingiz mumkin:'), parse_mode='HTML', reply_markup=get_admin_menu())
     elif user_id in db_admins:
-        await message.answer(with_footer(f'👋 <b>Assalomu alaykum, Moderator {name_to_show}!</b>\n\n🛠 <b>Moderator paneliga xush kelibsiz.</b>\nQuyidagi menyudan foydalanib botni boshqarishingiz mumkin:'), parse_mode='HTML', reply_markup=get_moderator_menu())
+        await message.answer(with_footer(f'👑 <b>Assalomu alaykum, Moderator {name_to_show}!</b>\n\n🚀 <b>Moderator paneliga xush kelibsiz.</b>\n⚡ Quyidagi menyudan foydalanib botni boshqarishingiz mumkin:'), parse_mode='HTML', reply_markup=get_moderator_menu())
     else:
         # Texnik ishlar rejimi tekshiruvi (Admin 4)
         if await db_req.is_maintenance_mode():
@@ -2017,10 +2017,10 @@ async def cb_home_menu(callback: CallbackQuery):
     name = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
     db_admins = await db_req.get_all_admins()
     if uid in config.ADMINS:
-        txt = f'👋 <b>Assalomu alaykum, Bosh Admin {name}!</b>\n\n🛠 Boshqaruv paneli'
+        txt = f'👑 <b>Assalomu alaykum, Bosh Admin {name}!</b>\n\n🚀 Boshqaruv paneli'
         kb = get_admin_menu()
     elif uid in db_admins:
-        txt = f'👋 <b>Assalomu alaykum, Moderator {name}!</b>\n\n🛠 Moderator paneli'
+        txt = f'👑 <b>Assalomu alaykum, Moderator {name}!</b>\n\n🚀 Moderator paneli'
         kb = get_moderator_menu()
     else:
         txt = f'👋 <b>Assalomu alaykum, {name}!</b>\n\n🍿 Kino botiga xush kelibsiz!'

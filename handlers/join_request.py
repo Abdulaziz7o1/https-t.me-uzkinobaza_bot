@@ -20,11 +20,16 @@ async def auto_approve_join_request(update: ChatJoinRequest):
     
     # 3. Foydalanuvchiga shaxsiy xabar yuborishga urinish
     try:
+        from utils.custom_emoji import apply_custom_emojis
+        msg_text = (
+            f"👋 <b>Assalomu alaykum, {user.first_name}!</b>\n\n"
+            f"✅ <b>{update.chat.title}</b> kanaliga qo'shilish so'rovingiz muvaffaqiyatli tasdiqlandi.\n\n"
+            f"🍿 Menga shunchaki kino kodini yuborib tomosha qilishingiz mumkin!"
+        )
         await update.bot.send_message(
             chat_id=user.id,
-            text=f"👋 <b>Assalomu alaykum, {user.first_name}!</b>\n\n"
-                 f"✅ <b>{update.chat.title}</b> kanaliga qo'shilish so'rovingiz muvaffaqiyatli tasdiqlandi.\n\n"
-                 f"🍿 Menga shunchaki kino kodini yuborib tomosha qilishingiz mumkin!"
+            text=apply_custom_emojis(msg_text),
+            parse_mode="HTML"
         )
     except Exception:
         # Agar foydalanuvchi botga avval start bosmagan bo'lsa xato beradi, uni e'tiborsiz qoldiramiz

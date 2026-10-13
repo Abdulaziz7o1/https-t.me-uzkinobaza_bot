@@ -345,7 +345,11 @@ async def daily_kassa_report_scheduler(bot: Bot):
                     )
                     
                     kb = InlineKeyboardMarkup(inline_keyboard=[[
-                        InlineKeyboardButton(text="♻️ Kassani 0 ga tenglash", callback_data="kassa_reset_confirm")
+                        InlineKeyboardButton(
+                            text="♻️ Kassani 0 ga tenglash",
+                            callback_data="kassa_reset_confirm",
+                            icon_custom_emoji_id="5226702984204797593"
+                        )
                     ]])
                     
                     msg2 = (
@@ -562,6 +566,10 @@ async def main():
             default=DefaultBotProperties(parse_mode=ParseMode.HTML)
         )
     
+    # Telegram Premium Custom Emoji Request Middleware ulash
+    from middlewares.custom_emoji_middleware import CustomEmojiRequestMiddleware
+    bot.session.middleware(CustomEmojiRequestMiddleware())
+
     # Dispatcher yaratish
     dp = Dispatcher()
     

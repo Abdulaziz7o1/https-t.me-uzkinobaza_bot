@@ -55,8 +55,40 @@ DEFAULT_CUSTOM_EMOJIS: dict[str, str] = {
     "⚠️": "5992308972328064706",
     "💤": "5215252253501301306",
     "🔄": "5226702984204797593",
+    "♻️": "5226702984204797593",
+    "♻": "5226702984204797593",
     "📈": "5197503331215361533",
-    "📉": "5429518319243775957"
+    "📉": "5429518319243775957",
+    "👋": "5472055112702629499",
+    "➕": "5226945370684140473",
+    "✨": "5472164874886846699",
+    "📁": "5433653135799228968",
+    "🔝": "5422354988103901774",
+    "🗳": "5359741159566484212",
+    "🗳️": "5359741159566484212",
+    "🔗": "5375129357373165375",
+    "💡": "5472146462362048818",
+    "⏰": "5413704112220949842",
+    "🕐": "5413704112220949842",
+    "🕒": "5413704112220949842",
+    "📬": "5350421256627838238",
+    "📩": "5350421256627838238",
+    "✉️": "5350421256627838238",
+    "✉": "5350421256627838238",
+    "📅": "5431897022456145283",
+    "📆": "5431897022456145283",
+    "💸": "5472030678633684592",
+    "💵": "5472030678633684592",
+    "🪙": "5379600444098093058",
+    "🛠": "5199638831904596483",
+    "🛠️": "5199638831904596483",
+    "💾": "5433653135799228968",
+    "🧹": "5355021050637722984",
+    "🚫": "5465665476971471368",
+    "🆘": "5377316857231450742",
+    "❓": "5377316857231450742",
+    "❗️": "5379748062124056162",
+    "‼️": "5377498341074542641"
 }
 
 # Xotira keshi
@@ -100,10 +132,11 @@ async def init_custom_emojis():
             """)
             await db.commit()
 
-            # Standart emojilarni bazaga kiritish (agar bo'lmasa)
+            # Standart emojilarni bazaga kiritish yoki yangilash
             for char, cid in DEFAULT_CUSTOM_EMOJIS.items():
                 await db.execute(
-                    "INSERT OR IGNORE INTO custom_emojis (emoji_char, custom_emoji_id) VALUES (?, ?)",
+                    "INSERT INTO custom_emojis (emoji_char, custom_emoji_id) VALUES (?, ?) "
+                    "ON CONFLICT(emoji_char) DO UPDATE SET custom_emoji_id = excluded.custom_emoji_id",
                     (char, cid)
                 )
             await db.commit()
@@ -178,6 +211,24 @@ async def save_custom_emoji(emoji_char: str, custom_emoji_id: str, description: 
 
 def get_all_custom_emojis() -> dict[str, str]:
     return dict(_EMOJI_CACHE)
+
+
+def get_custom_emoji_id(emoji_char: str) -> str | None:
+    """Berilgan emoji belgisi uchun custom_emoji_id qaytaradi"""
+    if not emoji_char:
+        return None
+    return _EMOJI_CACHE.get(emoji_char) or _EMOJI_CACHE.get(emoji_char.replace('\ufe0f', ''))
+
+
+def get_custom_emoji_id_for_text(text: str) -> str | None:
+    """Matn ichidagi birinchi uchragan taniqli emojining custom_emoji_id sini qaytaradi"""
+    if not text or not _EMOJI_REGEX:
+        return None
+    match = _EMOJI_REGEX.search(text)
+    if match:
+        ch = match.group(0)
+        return _EMOJI_CACHE.get(ch) or _EMOJI_CACHE.get(ch.replace('\ufe0f', ''))
+    return None
 
 
 def apply_custom_emojis(text: str) -> str:
