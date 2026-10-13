@@ -235,8 +235,7 @@ async def admin_restore_json_backup(message: Message):
         await message.answer(with_footer(f'❌ Zaxirani tiklashda xato yuz berdi: {e}'))
 
 @router.message(Command('backup'))
-@router.message(F.text == '💾 Baza zaxirasi')
-@router.message(F.text == 'Zaxira (Backup) 💾')
+@router.message(F.text.in_(['Zaxira (Backup) 💾', 'Zaxira (Backup)', '💾 Baza zaxirasi', 'Baza zaxirasi']))
 async def send_movies_backup_to_admin(message: Message):
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'backup_db')):
         return
@@ -248,7 +247,7 @@ async def send_movies_backup_to_admin(message: Message):
     caption_txt = f"💾 <b>BOTNING FULL MASTER ZAXIRA FAYLI (Backup).</b>\n\nUshbu `.json` faylda barcha kinolar, homiy kanallar, ballar, kassa, promo kodlar va sozlamalar 100% jamlangan!\n\n📌 <b>Tiklash usuli:</b> Render restart bo'lganda bot avtomatik tiklaydi yoki ushbu faylni botga shunchaki yuborsangiz 100% qayta tiklaydi!"
     await message.answer_document(document=file, caption=caption_txt, parse_mode='HTML')
 
-@router.message(F.text == 'Statistika 📊')
+@router.message(F.text.in_(['Statistika 📊', 'Statistika']))
 async def get_bot_statistics(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'view_stats'):
@@ -427,7 +426,53 @@ async def save_direct_auto_callback(callback: CallbackQuery, state: FSMContext):
         import logging
         logging.error(f'save_direct_auto_callback error: {err}')
         await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring.", show_alert=True)
-MENU_BUTTONS = ["Kino qo'shish ➕", "Kino o'chirish ❌", 'Statistika 📊', 'Reklama yuborish 📢', 'Homiy Kanallar 📢', 'Moderatorlar 👥', 'Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️', 'Kino Trendlari 📈', 'Zaxira (Backup) 💾', 'Kino tahrirlash ✏️', 'Kino faylini yangilash 🔄', "Kino so'rovlari 📥", 'Rejalashtirilgan reklama 📅', 'Shubhali harakatlar 🚨', 'Keshni tozalash 🧹', '➕ Mannual Premium Qo\'shish', 'Treyler Post Yuborish 🎬', '🗑 Savat (3 kunlik)', '👥 Barcha Foydalanuvchilar', '🔍 Foydalanuvchi Qidirish', '🚫 Botni Bloklaganlar', '📁 Kolleksiyalar', 'Kolleksiyalar', '📊 Dashboard', 'Dashboard', "✅ Barcha Kanallarga Obuna Bo'lganlar", "Barcha Kanallarga Obuna Bo'lganlar", "✅ Barcha Kanallarga A'zolar", "Barcha Kanallarga A'zolar", "🗑 Bloklaganlarni to'liq olib tashlash", "Bloklaganlarni to'liq olib tashlash", "Bloklaganlarni olib tashlash"]
+MENU_BUTTONS = [
+    "Kino qo'shish ➕", "Kino qo'shish",
+    "Kino o'chirish ❌", "Kino o'chirish",
+    'Statistika 📊', 'Statistika',
+    'Reklama yuborish 📢', 'Reklama yuborish',
+    'Homiy Kanallar 📢', 'Homiy Kanallar',
+    'Moderatorlar 👥', 'Moderatorlar',
+    'Boshqarish ⚙️', 'Boshqarish',
+    'Moderatorlarni boshqarish ⚙️', 'Moderatorlarni boshqarish',
+    'Kino Trendlari 📈', 'Kino Trendlari',
+    'Zaxira (Backup) 💾', 'Zaxira (Backup)',
+    'Kino tahrirlash ✏️', 'Kino tahrirlash',
+    'Kino faylini yangilash 🔄', 'Kino faylini yangilash',
+    "Kino so'rovlari 📥", "Kino so'rovlari",
+    'Rejalashtirilgan reklama 📅', 'Rejalashtirilgan reklama',
+    'Shubhali harakatlar 🚨', 'Shubhali harakatlar',
+    'Keshni tozalash 🧹', 'Keshni tozalash',
+    'Ballar 💎', 'Ballar',
+    'Sozlamalar ⚙️', 'Sozlamalar',
+    'Izohlar moderatsiyasi 💬', 'Izohlar moderatsiyasi',
+    '🚫 Bloklanganlar', 'Bloklanganlar',
+    '💎 Premium Obunachilar', 'Premium Obunachilar',
+    'Card 💳', 'Card',
+    'Limit ⏳', 'Limit',
+    'Kassa 💰', 'Kassa',
+    'Promo Kodlar 🎁', 'Promo Kodlar',
+    'Audit Log 🛡️', 'Audit Log',
+    'Faollik Tahlili 📊', 'Faollik Tahlili',
+    'Yuborilgan reklamalar 📢', 'Yuborilgan reklamalar',
+    'Bot Rejimi 🛠️', 'Bot Rejimi',
+    'Nofaollarga Eslatma 💤', 'Nofaollarga Eslatma',
+    'Premium Sozlamalar 👑', 'Premium Sozlamalar',
+    'Aktivlik Grafigi', '📊 Aktivlik Grafigi',
+    'Eng past baholi kinolar (75+ 👎)', 'Eng past baholi kinolar (75+)', 'Eng past baholi kinolar',
+    "➕ Mannual Premium Qo'shish", "Mannual Premium Qo'shish",
+    'Treyler Post Yuborish 🎬', 'Treyler Post Yuborish',
+    '🗑 Savat (3 kunlik)', 'Savat (3 kunlik)',
+    '👥 Barcha Foydalanuvchilar', 'Barcha Foydalanuvchilar',
+    '🔍 Foydalanuvchi Qidirish', 'Foydalanuvchi Qidirish',
+    '🚫 Botni Bloklaganlar', 'Botni Bloklaganlar',
+    '📁 Kolleksiyalar', 'Kolleksiyalar',
+    '📊 Dashboard', 'Dashboard',
+    "✅ Barcha Kanallarga Obuna Bo'lganlar", "Barcha Kanallarga Obuna Bo'lganlar",
+    "✅ Barcha Kanallarga A'zolar", "Barcha Kanallarga A'zolar",
+    "🗑 Bloklaganlarni to'liq olib tashlash", "Bloklaganlarni to'liq olib tashlash", "Bloklaganlarni olib tashlash",
+    "✨ Premium Emojilar", "Premium Emojilar"
+]
 
 @router.message(AdminStates.waiting_for_movie_video, F.text)
 async def add_movie_video_invalid(message: Message, state: FSMContext):
@@ -598,7 +643,7 @@ async def show_trending_movies(message: Message, state: FSMContext):
         text += f'{idx}. 🎬 /{movie_id} — {name} (👁 <b>{views} marta</b>)\n'
     await message.answer(with_footer(text), parse_mode='HTML')
 
-@router.message(F.text == 'Homiy Kanallar 📢')
+@router.message(F.text.in_(['Homiy Kanallar 📢', 'Homiy Kanallar']))
 async def sponsor_channels_list(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'manage_sponsors'):
@@ -661,7 +706,7 @@ async def delete_channel(callback: CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=get_sponsor_channels_keyboard(channels))
     await callback.answer("Hamkor kanal o'chirildi! ❌")
 
-@router.message(F.text.in_(['Moderatorlar 🛠', 'Moderatorlar 👥', 'Moderatorlarni boshqarish 🛠']))
+@router.message(F.text.in_(['Moderatorlar 🛠', 'Moderatorlar 👥', 'Moderatorlar', 'Moderatorlarni boshqarish 🛠']))
 async def moderators_list(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -670,7 +715,7 @@ async def moderators_list(message: Message, state: FSMContext):
     mods = await db_req.get_moderators()
     await message.answer(with_footer("🛠 <b>Moderatorlar boshqaruvi:</b>\n\nModerator qo'shish uchun quyidagi tugmani bosing."), reply_markup=get_moderators_keyboard(mods), parse_mode='HTML')
 
-@router.message(F.text.in_(['Boshqarish ⚙️', 'Moderatorlarni boshqarish ⚙️']))
+@router.message(F.text.in_(['Boshqarish ⚙️', 'Boshqarish', 'Moderatorlarni boshqarish ⚙️', 'Moderatorlarni boshqarish']))
 async def admin_boshqarish(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -798,7 +843,7 @@ async def unban_user_cmd(message: Message):
     else:
         await message.answer(with_footer('❌ Bunday foydalanuvchi bazada topilmadi.'))
 
-@router.message(F.text == 'Zaxira (Backup) 💾')
+@router.message(F.text.in_(['Zaxira (Backup) 💾', 'Zaxira (Backup)']))
 async def backup_database(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'backup_db'):
@@ -824,7 +869,7 @@ async def backup_database(message: Message, state: FSMContext):
     else:
         await message.answer(with_footer('Baza fayli topilmadi.'))
 
-@router.message(F.text == 'Reklama yuborish 📢')
+@router.message(F.text.in_(['Reklama yuborish 📢', 'Reklama yuborish']))
 async def broadcast_wizard_start(message: Message, state: FSMContext):
     if not await db_req.has_permission(message.from_user.id, 'send_broadcast'):
         return
@@ -1169,7 +1214,7 @@ async def bc_send_confirm_callback(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(with_footer(summary_text), parse_mode='HTML')
     await callback.answer()
 
-@router.message(F.text == "Kino so'rovlari 📥")
+@router.message(F.text.in_(["Kino so'rovlari 📥", "Kino so'rovlari"]))
 async def show_movie_requests(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'view_stats'):
@@ -1198,7 +1243,7 @@ async def resolve_movie_request(callback: CallbackQuery):
     else:
         await callback.answer('Xatolik yuz berdi!', show_alert=True)
 
-@router.message(F.text == 'Kino tahrirlash ✏️')
+@router.message(F.text.in_(['Kino tahrirlash ✏️', 'Kino tahrirlash']))
 async def edit_movie_start(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'add_movie'):
@@ -1266,7 +1311,7 @@ async def replace_movie_video(message: Message, state: FSMContext):
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Kinoni Ko'rish", callback_data=f'get_movie_{movie_id}'), InlineKeyboardButton(text='✏️ Tahrirlash', callback_data=f'edit_movie_start_{movie_id}')]])
     await message.answer(with_footer(f'✅ <b>KINO FAYLI MUVAFFAQIYATLI ALMASHTIRILDI!</b>\n\n🎬 <b>Kino kodi:</b> <code>{movie_id}</code>\n🔄 <i>Yangi video fayl SQLite va MongoDB Atlas Cloud bulutingizga saqlandi!</i>'), parse_mode='HTML', reply_markup=kb)
 
-@router.message(F.text == 'Rejalashtirilgan reklama 📅')
+@router.message(F.text.in_(['Rejalashtirilgan reklama 📅', 'Rejalashtirilgan reklama']))
 async def scheduled_broadcast_start(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'send_broadcast'):
@@ -1274,7 +1319,7 @@ async def scheduled_broadcast_start(message: Message, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_scheduled_broadcast_msg)
     await message.answer(with_footer("📅 <b>Rejalashtirilgan reklama xabarini yozing:</b>\nXabar rasm, video, matn yoki boshqa har qanday formatda bo'lishi mumkin.\n<i>Bekor qilish uchun /cancel yozing.</i>"))
 
-@router.message(F.text == 'Shubhali harakatlar 🚨')
+@router.message(F.text.in_(['Shubhali harakatlar 🚨', 'Shubhali harakatlar']))
 async def show_abuse_logs(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -1324,7 +1369,7 @@ async def warn_user_callback(callback: CallbackQuery):
         await callback.message.edit_text(with_footer(f'{callback.message.text}\n\n⚠️ <b>Ogohlantirildi ({warn_cnt}/3) {status_note}</b>'), parse_mode='HTML')
         await callback.answer(f'Foydalanuvchiga ogohlantirish berildi ({warn_cnt}/3)! {status_note}', show_alert=True)
 
-@router.message(F.text == 'Keshni tozalash 🧹')
+@router.message(F.text.in_(['Keshni tozalash 🧹', 'Keshni tozalash']))
 async def clear_all_caches_cmd(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -1499,7 +1544,7 @@ async def back_to_leaderboard(callback: CallbackQuery):
         await callback.message.answer(with_footer("📊 <b>Leaderboard - Reytinglar</b>\n\nQuyidagi bo'limlardan birini tanlang:"), parse_mode='HTML', reply_markup=keyboard)
     await callback.answer()
 
-@router.message(F.text == 'Ballar 💎')
+@router.message(F.text.in_(['Ballar 💎', 'Ballar']))
 async def admin_ballar(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -1517,7 +1562,7 @@ async def admin_ballar(message: Message, state: FSMContext):
         text += f'{icon} {name} — <code>{pts}</code> 💎\n'
     await message.answer(with_footer(text), parse_mode='HTML', reply_markup=get_admin_gift_keyboard())
 
-@router.message(F.text == 'Sozlamalar ⚙️')
+@router.message(F.text.in_(['Sozlamalar ⚙️', 'Sozlamalar']))
 async def show_admin_config_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -1656,7 +1701,7 @@ async def config_edit_save(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(with_footer(f'✅ <b>{label} muvaffaqiyatli saqlandi: {val}</b>'), parse_mode='HTML')
 
-@router.message(F.text == 'Izohlar moderatsiyasi 💬')
+@router.message(F.text.in_(['Izohlar moderatsiyasi 💬', 'Izohlar moderatsiyasi']))
 async def show_moderation_panel(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'add_movie'):
@@ -1753,7 +1798,7 @@ async def bulk_upload_process(message: Message, state: FSMContext):
     cap_display = movie_caption[:50] if movie_caption else '(Nomsiz video fayl)'
     await message.answer(with_footer(f"✅ <b>KINO OMMAVIY MUVAFFAQIYATLI YUKLANDI!</b>\n\n📌 <b>Nomi / Tavsifi:</b> <i>{cap_display}</i>\n🎬 <b>Biriktirilgan Kod:</b> <code>{movie_id}</code>\n📊 <b>Bazadagi jami kinolar:</b> <code>{total_movies} ta</code>\n💡 <b>Navbatdagi bo'sh kod:</b> <code>{next_free}</code>\n\n<i>Kino avtomatik SQLite hamda MongoDB Atlas Cloud bazangizga saqlandi! Yana yuborishingiz mumkin.</i>"), parse_mode='HTML', reply_markup=kb)
 
-@router.message(F.text == '🚫 Bloklanganlar')
+@router.message(F.text.in_(['🚫 Bloklanganlar', 'Bloklanganlar']))
 async def show_banned_users_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -2368,7 +2413,7 @@ async def confirm_clean_inactives_callback(callback: CallbackQuery, state: FSMCo
         await callback.message.edit_text(with_footer("O'chirish uchun foydalanuvchilar topilmadi."))
     await callback.answer()
 
-@router.message(F.text == 'Card 💳')
+@router.message(F.text.in_(['Card 💳', 'Card']))
 async def show_admin_card_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -2424,7 +2469,7 @@ async def delete_admin_card_callback(callback: CallbackQuery, state: FSMContext)
     await callback.message.edit_text(with_footer("❌ <b>Karta raqami o'chirildi!</b>\n\nYangi karta raqamini qo'shishingiz mumkin."), parse_mode='HTML', reply_markup=kb)
     await callback.answer("Karta raqami o'chirildi ❌")
 
-@router.message(F.text == 'Limit ⏳')
+@router.message(F.text.in_(['Limit ⏳', 'Limit']))
 async def show_bonus_limit_panel(message: Message, state: FSMContext):
     await state.clear()
     db_admins = await db_req.get_all_admins()
@@ -2478,7 +2523,7 @@ async def process_bonus_limit_value(message: Message, state: FSMContext):
             pass
     await message.answer(with_footer(f'✅ <b>BONUS KINO LIMITI MUVAFFAQIYATLI BERILDI!</b>\n\n🎯 <b>Auditoriya:</b> {target_label}\n🎁 <b>Bonus miqdori:</b> +{bonus_amount} ta kino\n👥 <b>Bonus berilganlar:</b> {saved_cnt} ta\n📩 <b>Bildirishnoma yetkazildi:</b> {sent_cnt} ta\n\n<i>Ushbu bonus faqat bugungi kun uchun amal qiladi, ertaga avtomatik ravishda 0 ga tushib standart limit tiklanadi.</i>'), parse_mode='HTML')
 
-@router.message(F.text == 'Kassa 💰')
+@router.message(F.text.in_(['Kassa 💰', 'Kassa']))
 async def show_kassa_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
@@ -2708,7 +2753,7 @@ async def kassa_clear_history_exec_cb(callback: CallbackQuery):
     await callback.message.edit_text(with_footer('✅ <b>To\'lovlar tarixi (foydalanuvchilar nomlari ro\'yxati) muvaffaqiyatli tozalandi!</b>'), parse_mode='HTML')
     await callback.answer('Nomlar tarixi tozalandi 🧹')
 
-@router.message(F.text == 'Promo Kodlar 🎁')
+@router.message(F.text.in_(['Promo Kodlar 🎁', 'Promo Kodlar']))
 async def show_promo_codes_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -2938,7 +2983,7 @@ async def process_promo_uses_text(message: Message, state: FSMContext):
         await message.answer(with_footer("❌ Xatolik yuz berdi. Ushbu kod allaqachon mavjud bo'lishi mumkin."))
 
 
-@router.message(F.text == 'Audit Log 🛡️')
+@router.message(F.text.in_(['Audit Log 🛡️', 'Audit Log']))
 async def show_audit_logs_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -2954,7 +2999,7 @@ async def show_audit_logs_panel(message: Message, state: FSMContext):
         txt += "<i>Hali jurnalda yozuvlar yo'q.</i>"
     await message.answer(with_footer(txt), parse_mode='HTML')
 
-@router.message(F.text == 'Faollik Tahlili 📊')
+@router.message(F.text.in_(['Faollik Tahlili 📊', 'Faollik Tahlili']))
 async def show_activity_stats_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
@@ -3033,7 +3078,7 @@ async def cmd_test_sub(message: Message):
         
     await message.answer(with_footer("\n".join(lines)), parse_mode="HTML")
 
-@router.message(F.text == 'Yuborilgan reklamalar 📢')
+@router.message(F.text.in_(['Yuborilgan reklamalar 📢', 'Yuborilgan reklamalar']))
 async def show_broadcasts_history_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'send_broadcast')):
@@ -3061,7 +3106,7 @@ async def delete_broadcast_batch_cb(callback: CallbackQuery):
     success, failed = await db_req.delete_broadcast_batch(callback.bot, b_id)
     await callback.message.edit_text(with_footer(f"✅ <b>REKLAMA OMMAVIY O'CHIRILDI!</b>\n\n🗑️ <b>O'chirildi:</b> {success} ta chatdan\n❌ <b>O'chirilmadi:</b> {failed} ta chatdan"), parse_mode='HTML')
 
-@router.message(F.text == 'Bot Rejimi 🛠️')
+@router.message(F.text.in_(['Bot Rejimi 🛠️', 'Bot Rejimi']))
 async def show_maintenance_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS:
@@ -3092,7 +3137,7 @@ async def toggle_maint_off_cb(callback: CallbackQuery):
     await callback.answer('✅ Bot oddiy rejimga qaytarildi!', show_alert=True)
     await callback.message.edit_text(with_footer("✅ <b>Bot oddiy ishchi rejimga qaytarildi. Barcha foydalanuvchilar botdan to'liq foydalanishi mumkin!</b>"), parse_mode='HTML')
 
-@router.message(F.text == 'Nofaollarga Eslatma 💤')
+@router.message(F.text.in_(['Nofaollarga Eslatma 💤', 'Nofaollarga Eslatma']))
 async def show_inactive_reminder_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'send_broadcast')):
@@ -3332,7 +3377,7 @@ async def mod_perms_list_back_cb(callback: CallbackQuery):
     await callback.answer()
     await callback.message.delete()
 
-@router.message(F.text == '➕ Mannual Premium Qo\'shish')
+@router.message(F.text.in_(['➕ Mannual Premium Qo\'shish', 'Mannual Premium Qo\'shish', 'Manual Premium Qo\'shish']))
 async def manual_premium_start(message: Message, state: FSMContext):
     """Mannual Premium qo'shish bosganda ketma-ket so'raladigan bosqichlarni ishga tushirish"""
     await state.clear()
@@ -3556,7 +3601,7 @@ async def _finalize_manual_premium(event_obj, state: FSMContext, premium_type: s
         await event_obj.answer(with_footer(result_text), parse_mode='HTML')
 
 
-@router.message(F.text == 'Premium Sozlamalar 👑')
+@router.message(F.text.in_(['Premium Sozlamalar 👑', 'Premium Sozlamalar']))
 async def show_premium_settings_panel(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
@@ -3760,7 +3805,7 @@ async def process_backup_channel_input(message: Message, state: FSMContext):
 # ═══════════════════════════════════════════════════════════════════════════════
 #  📊 A7: FAOLLIK GRAFIGI (7 KUN / 30 KUN) HESOBOTLARI
 # ═══════════════════════════════════════════════════════════════════════════════
-@router.message(F.text.in_(['Faollik Tahlili 📊', '📊 Aktivlik Grafigi']))
+@router.message(F.text.in_(['Faollik Tahlili 📊', 'Faollik Tahlili', '📊 Aktivlik Grafigi', 'Aktivlik Grafigi']))
 async def admin_activity_report_menu(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'view_stats'):
@@ -3866,7 +3911,7 @@ async def cb_reset_all_points_exec(callback: CallbackQuery):
 # ═══════════════════════════════════════════════════════════════════════════════
 #  👎 A5: ENG PAST BAHOLI KINOLAR (75+ DISLIKE)
 # ═══════════════════════════════════════════════════════════════════════════════
-@router.message(F.text.in_(['Izohlar moderatsiyasi 💬', '📉 Eng past baholi kinolar (75+ 👎)']))
+@router.message(F.text.in_(['Izohlar moderatsiyasi 💬', 'Izohlar moderatsiyasi', '📉 Eng past baholi kinolar (75+ 👎)', 'Eng past baholi kinolar (75+ 👎)', 'Eng past baholi kinolar (75+)', 'Eng past baholi kinolar']))
 async def admin_disliked_menu(message: Message, state: FSMContext):
     await state.clear()
     if not await db_req.has_permission(message.from_user.id, 'delete_movie') and message.from_user.id not in config.ADMINS:
@@ -3992,7 +4037,7 @@ async def admin_flash_sale_broadcast_cb(callback: CallbackQuery):
     )
 
 
-@router.message(F.text == 'Treyler Post Yuborish 🎬')
+@router.message(F.text.in_(['Treyler Post Yuborish 🎬', 'Treyler Post Yuborish']))
 async def start_trailer_post_flow(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'send_broadcast')):
@@ -4635,7 +4680,7 @@ async def set_trailer_cmd(message: Message, state: FSMContext):
 
 
 
-@router.message(F.text == '🗑 Savat (3 kunlik)')
+@router.message(F.text.in_(['🗑 Savat (3 kunlik)', 'Savat (3 kunlik)']))
 async def show_trash_panel(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'delete_movie')):
@@ -4716,7 +4761,7 @@ async def perm_delete_from_trash_cb(callback: CallbackQuery):
 
 
 @router.message(F.text.regexp(r'(?i).*(foydalanuvchi qidirish).*'), StateFilter('*'))
-@router.message(F.text == '🔍 Foydalanuvchi Qidirish', StateFilter('*'))
+@router.message(F.text.in_(['🔍 Foydalanuvchi Qidirish', 'Foydalanuvchi Qidirish']), StateFilter('*'))
 async def trigger_user_search_button(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'add_movie')):
@@ -4733,7 +4778,7 @@ async def trigger_user_search_button(message: Message, state: FSMContext):
 
 
 @router.message(F.text.regexp(r'(?i).*(barcha foydalanuvchilar).*'), StateFilter('*'))
-@router.message(F.text == '👥 Barcha Foydalanuvchilar', StateFilter('*'))
+@router.message(F.text.in_(['👥 Barcha Foydalanuvchilar', 'Barcha Foydalanuvchilar']), StateFilter('*'))
 async def show_all_users_list_handler(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
@@ -4836,7 +4881,7 @@ async def cb_admin_menu(callback: CallbackQuery):
 
 @router.message(F.text.regexp(r'(?i).*(botni bloklaganlar|bloklaganlar).*'), StateFilter('*'))
 @router.message(F.text.contains('Botni Bloklaganlar'), StateFilter('*'))
-@router.message(F.text == '🚫 Botni Bloklaganlar', StateFilter('*'))
+@router.message(F.text.in_(['🚫 Botni Bloklaganlar', 'Botni Bloklaganlar']), StateFilter('*'))
 async def show_blocked_users_list_handler(message: Message, state: FSMContext):
     await state.clear()
     if message.from_user.id not in config.ADMINS and (not await db_req.has_permission(message.from_user.id, 'view_stats')):
@@ -5282,7 +5327,7 @@ async def render_sub_users_page(target_msg_obj, bot, page: int = 1, is_edit: boo
 
 
 @router.message(F.text.regexp(r'(?i).*(barcha kanallarga obuna|barcha kanallarga a\'zolar).*'), StateFilter('*'))
-@router.message(F.text == "✅ Barcha Kanallarga Obuna Bo'lganlar", StateFilter('*'))
+@router.message(F.text.in_(["✅ Barcha Kanallarga Obuna Bo'lganlar", "Barcha Kanallarga Obuna Bo'lganlar", "✅ Barcha Kanallarga A'zolar", "Barcha Kanallarga A'zolar"]), StateFilter('*'))
 @router.message(F.text == "Barcha kanallarga obuna bo'lgan foydalanuvchilar", StateFilter('*'))
 @router.message(F.text == "✅ Barcha Kanallarga A'zolar", StateFilter('*'))
 async def show_all_sub_users_handler(message: Message, state: FSMContext):
@@ -5793,7 +5838,7 @@ def get_custom_emojis_control_kb():
         ]
     ])
 
-@router.message(F.text == "✨ Premium Emojilar")
+@router.message(F.text.in_(["✨ Premium Emojilar", "Premium Emojilar"]))
 @router.message(Command("emojis"))
 @router.message(Command("custom_emojis"))
 async def admin_custom_emojis_menu(message: Message):

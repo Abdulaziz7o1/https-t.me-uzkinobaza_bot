@@ -1088,7 +1088,7 @@ async def user_payment_receipt_handler(message: Message, state: FSMContext):
         except Exception:
             pass
 
-@router.message(F.text == 'Tanlanganlar ⭐️')
+@router.message(F.text.in_(['Tanlanganlar ⭐️', 'Tanlanganlar', '⭐️ Saqlanganlar', 'Saqlanganlar']))
 async def show_favorites(message: Message, state: FSMContext):
     await state.clear()
     favorites = await db_req.get_favorites(message.from_user.id)
@@ -1490,7 +1490,7 @@ async def inline_query_handler(inline_query: InlineQuery):
         inline_results.append(InlineQueryResultCachedVideo(id=str(movie_id), video_file_id=file_id, title=f'Kino kodi: {movie_id}', description=f"{(caption[:100] if caption else 'Tavsifsiz')}{rating_text}", caption=shared_caption, parse_mode='HTML'))
     await inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
-@router.message(F.text == '🎁 Kunlik Bonus')
+@router.message(F.text.in_(['🎁 Kunlik Bonus', 'Kunlik Bonus']))
 async def user_daily_bonus(message: Message, state: FSMContext):
     await state.clear()
     success, msg, pts = await db_req.claim_daily_bonus(message.from_user.id)
