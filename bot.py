@@ -590,9 +590,9 @@ async def main():
     dp.include_router(user.router)
     dp.include_router(payment.router)
     
-    # Delete webhook and start polling cleanly
+    # Delete webhook and start polling cleanly (do not drop pending messages)
     try:
-        await bot.delete_webhook(drop_pending_updates=True)
+        await bot.delete_webhook(drop_pending_updates=False)
     except Exception:
         pass
 
