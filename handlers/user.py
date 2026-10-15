@@ -374,14 +374,27 @@ async def send_movie_by_id_direct(bot, chat_id: int, movie_id: int) -> bool:
     await _movie_watched_extra(chat_id, caption)
     return True
 
-@router.message(F.text.regexp('^/?\\d+$'))
+@router.message(F.text.regexp(r'(?i)^\s*/?\s*(?:kino\s*|#\s*)?(\d+)(?:\s*(?:-|–)?\s*(?:kino|film|qism))?\s*$'))
 async def search_movie_by_code(message: Message, state: FSMContext = None):
     user_id = message.from_user.id
     
     if state:
         curr_state = await state.get_state()
         if curr_state and "AdminStates" in str(curr_state):
-            return
+            # Faqat admin aynan son kiritishi shart bo'lgan formadagina ushlab qolamiz
+            admin_id_states = [
+                "waiting_for_movie_id",
+                "waiting_for_movie_id_for_video",
+                "waiting_for_movie_delete",
+                "waiting_for_movie_edit_id",
+                "waiting_for_movie_replace_id",
+                "waiting_for_trailer_movie_id",
+                "waiting_for_mod_id",
+                "waiting_for_channel_id",
+                "waiting_for_user_search"
+            ]
+            if any(s in str(curr_state) for s in admin_id_states):
+                return
         await state.clear()
     
     # Texnik ishlar rejimi
@@ -394,19 +407,38 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
         await message.answer(with_footer("⚠️ <b>Iltimos, biroz sekinroq so'rov yuboring! (Anti-Spam himoyasi)</b>"), parse_mode='HTML')
         return
 
-    movie_id = int(message.text.lstrip('/'))
-    movie = await db_req.get_movie(movie_id, user_id=user_id)
-    if movie:
-        file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
-        _db_admins2 = await db_req.get_all_admins()
-        _is_admin2 = user_id in config.ADMINS or user_id in [int(a) for a in _db_admins2]
+    # Kodni aniqlash
+    raw_text = message.text.strip()
+    match = re.search(r'\d+', raw_text)
+    if not match:
+        return
+    movie_id = int(match.group(0))
 
-        # Feature 9: Kunlik bepul kino tekshiruvi
+    # 1. Kinoni tezkor keshdan yoki bazadan olish
+    movie = await db_req.get_movie(movie_id, user_id=user_id)
+    if not movie:
+        await message.answer(with_footer(f"❌ <b>Kino topilmadi!</b>\n\nKino kodi <code>{movie_id}</code> bo'yicha kino mavjud emas.\nIltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning."), parse_mode='HTML')
+        return
+
+    file_id, caption, views_count, is_prem_only = (movie[0], movie[1], movie[2] if len(movie) > 2 else 0, movie[3] if len(movie) > 3 else 0)
+
+    # 2. Parallel asinxron yuklashlar (Tezlikni 3-5 barobar oshirish uchun)
+    rating_task = asyncio.create_task(db_req.get_movie_rating(movie_id))
+    fav_task = asyncio.create_task(db_req.is_favorite(user_id, movie_id))
+    reactions_task = asyncio.create_task(db_req.get_movie_reactions(movie_id))
+    trailer_task = asyncio.create_task(db_req.get_movie_trailer(movie_id))
+
+    _is_admin2 = user_id in config.ADMINS
+    if not _is_admin2:
+        db_admins = await db_req.get_all_admins()
+        _is_admin2 = user_id in [int(a) for a in db_admins]
+
+    # Feature 9: Kunlik bepul kino tekshiruvi
+    if is_prem_only and not _is_admin2:
         daily_free = await db_req.get_setting('daily_free_movie', '0')
         if daily_free and daily_free.isdigit() and int(daily_free) == movie_id:
-            is_prem_only = 0  # Bugun bepul!
-
-        if is_prem_only and not _is_admin2 and not (await db_req.is_premium_user(user_id)):
+            is_prem_only = 0
+        elif not (await db_req.is_premium_user(user_id)):
             await db_req.set_user_pending_movie(user_id, movie_id)
             trial_claimed = await db_req.has_claimed_vip_trial(user_id)
             kb_rows = [[InlineKeyboardButton(text="💎 Premium Obuna Sotib Olish", callback_data="sub_buy_premium")]]
@@ -422,7 +454,8 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
             await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
             return
 
-        # VIP Trial limit tekshiruvi (15 minutlik rejimda 20 ta kino)
+    # VIP Trial limit tekshiruvi
+    if not _is_admin2:
         can_watch, remaining_trial = await db_req.check_and_increment_trial_movie_count(user_id)
         if not can_watch:
             kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -436,48 +469,47 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
             await message.answer(with_footer(txt), parse_mode='HTML', reply_markup=kb)
             return
 
-        await db_req.add_to_watch_history(user_id, movie_id)
-        avg_rating, votes = await db_req.get_movie_rating(movie_id)
-        is_fav = await db_req.is_favorite(message.from_user.id, movie_id)
-        likes, dislikes, fires = await db_req.get_movie_reactions(movie_id)
-        rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
-        prem_badge = " [👑 VIP]" if is_prem_only else ""
-        access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
-        cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
-        if avg_rating > 0:
-            cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
-        cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
+    # Orqa fonda bajariladigan amallarni (tarix, statistika) kutmasdan ishga tushirish
+    asyncio.create_task(db_req.add_to_watch_history(user_id, movie_id))
+    asyncio.create_task(_movie_watched_extra(user_id, caption))
+    asyncio.create_task(suggest_similar_movies(message, movie_id, caption or ""))
 
-        # Feature 2: Treyler tekshiruvi
-        trailer_file_id = await db_req.get_movie_trailer(movie_id)
-        has_trailer = bool(trailer_file_id)
+    # Parallel ma'lumotlarni qabul qilish
+    (avg_rating, votes), is_fav, (likes, dislikes, fires), trailer_file_id = await asyncio.gather(
+        rating_task, fav_task, reactions_task, trailer_task
+    )
+    has_trailer = bool(trailer_file_id)
 
+    rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
+    prem_badge = " [👑 VIP]" if is_prem_only else ""
+    access_status = "👑 <b>Kino turi:</b> Faqat VIP Premium a'zolar uchun" if is_prem_only else "🟢 <b>Kino turi:</b> Hamma uchun bepul"
+    cap = f"{caption or ''}\n\n🎬 <b>Kino kodi:</b> /{movie_id}{prem_badge}\n{access_status}\n🖥 <b>Sifati:</b> 1080p Full HD 🍿\n📥 <b>Yuklashlar:</b> {views_count:,} marta"
+    if avg_rating > 0:
+        cap += f'\n⭐ <b>Reyting:</b> {avg_rating:.1f}/5 ({votes} ta ovoz) {rating_stars}'
+    cap += f'\n\n🤖 {config.BOT_USERNAME}\n📩 <b>Murojaat uchun:</b> <a href="{config.ADMIN_CONTACT_URL}">@Abdulaziz7o1</a>'
+
+    action_kb = get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
+
+    # Kinoni eng tezkor yuborish
+    try:
+        await message.answer_video(
+            video=file_id,
+            caption=with_footer(cap),
+            parse_mode='HTML',
+            protect_content=True,
+            reply_markup=action_kb
+        )
+    except Exception:
         try:
             await message.answer_video(
                 video=file_id,
                 caption=with_footer(cap),
                 parse_mode='HTML',
-                protect_content=True,
-                reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
+                reply_markup=action_kb
             )
-        except Exception as send_err:
-            try:
-                await message.answer_video(
-                    video=file_id,
-                    caption=with_footer(cap),
-                    parse_mode='HTML',
-                    reply_markup=get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
-                )
-            except Exception:
-                await message.answer(with_footer(f"⚠️ <b>/{movie_id} kodli kino faylini yuborishda xatolik yuz berdi.</b>\n\nIltimos, adminga murojaat qiling."), parse_mode='HTML')
-
-        await _movie_watched_extra(user_id, caption)
-
-        # Feature 6: O'xshash kinolar tavsiyasi
-        asyncio.create_task(suggest_similar_movies(message, movie_id, caption or ""))
-    else:
-        await message.answer(with_footer(f"❌ <b>Kino topilmadi!</b>\n\nKino kodi <code>{movie_id}</code> bo'yicha kino mavjud emas.\nIltimos, to'g'ri kino kodini kiriting yoki kino qidirishdan foydalaning."), parse_mode='HTML')
-        return
+        except Exception as e:
+            logging.error(f"Movie delivery error for {movie_id}: {e}")
+            await message.answer(with_footer(f"⚠️ <b>/{movie_id} kodli kino faylini yuborishda xatolik yuz berdi.</b>\n\nIltimos, adminga murojaat qiling."), parse_mode='HTML')
 
 @router.callback_query(F.data.startswith('react_'))
 async def movie_reaction_cb(callback: CallbackQuery):
@@ -1886,8 +1918,10 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
         if current_state is not None:
             return
     query = message.text.strip()
-    if query.isdigit() or query.lstrip('/').isdigit() or query.startswith(('http://', 'https://', 't.me/')) or ('://' in query):
+    if query.startswith(('http://', 'https://', 't.me/')) or ('://' in query):
         return
+    if re.search(r'^/?\d+$', query):
+        return await search_movie_by_code(message, state)
     if not query or len(query) < 2:
         await message.answer(with_footer('🔍 Kamida 2 ta belgi kiriting.'))
         return

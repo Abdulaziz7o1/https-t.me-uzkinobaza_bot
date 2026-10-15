@@ -5,6 +5,9 @@ import config
 from keyboards.inline import get_subscription_keyboard
 from database.requests import add_user, is_banned, get_sponsor_channels, normalize_channel_identifier
 
+# Foydalanuvchi obunasini 60 soniya xotirada saqlash keshi (Tezkorlik uchun)
+_USER_SUB_CACHE: dict[tuple, float] = {}
+
 class CheckSubMiddleware(BaseMiddleware):
     async def __call__(
         self,
@@ -114,25 +117,39 @@ class CheckSubMiddleware(BaseMiddleware):
 
         bot = data["bot"]
         not_subscribed_channels = []
+        import time
+        now_ts = time.time()
 
+        channels_to_check = []
         for ch_tuple in formatted_channels:
             ch_id = ch_tuple[0]
-            target_id = normalize_channel_identifier(ch_id)
-            if isinstance(target_id, str) and target_id.startswith("-") and target_id.lstrip("-").isdigit():
-                target_id = int(target_id)
+            if _USER_SUB_CACHE.get((user_id, ch_id), 0) > now_ts:
+                continue
+            channels_to_check.append(ch_tuple)
 
-            try:
-                member = await bot.get_chat_member(chat_id=target_id, user_id=user_id)
-                if member.status not in ["creator", "administrator", "member"]:
-                    not_subscribed_channels.append(ch_tuple)
-            except Exception as e:
-                err_str = str(e).lower()
-                print(f"Kanal tekshirishda xato ({target_id}): {e}")
-                # Agar bot kanalda a'zo bo'lmasa yoki kanal topilmasa, foydalanuvchini bloklamaymiz
-                if "chat not found" in err_str or "bot is not a member" in err_str:
-                    pass
-                else:
-                    not_subscribed_channels.append(ch_tuple)
+        if channels_to_check:
+            import asyncio
+            async def _check_one_channel(ch_tuple):
+                ch_id = ch_tuple[0]
+                target_id = normalize_channel_identifier(ch_id)
+                if isinstance(target_id, str) and target_id.startswith("-") and target_id.lstrip("-").isdigit():
+                    target_id = int(target_id)
+                try:
+                    member = await bot.get_chat_member(chat_id=target_id, user_id=user_id)
+                    if member.status in ["creator", "administrator", "member"]:
+                        _USER_SUB_CACHE[(user_id, ch_id)] = now_ts + 60.0
+                        return None
+                    return ch_tuple
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if "chat not found" in err_str or "bot is not a member" in err_str:
+                        return None
+                    return ch_tuple
+
+            results = await asyncio.gather(*[_check_one_channel(ch) for ch in channels_to_check])
+            for r in results:
+                if r:
+                    not_subscribed_channels.append(r)
 
         if not_subscribed_channels:
             if is_msg and event.text:

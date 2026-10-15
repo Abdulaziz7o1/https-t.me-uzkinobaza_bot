@@ -501,11 +501,10 @@ async def set_movie_audience_callback(callback: CallbackQuery, state: FSMContext
         return
 
     await db_req.add_movie_with_id(movie_id, file_id, formatted_caption, is_premium_only=is_prem)
-    await state.set_state(AdminStates.waiting_for_trailer_attach_video)
-    await state.update_data(trailer_target_movie_id=movie_id)
+    await state.clear()
     
     bot_inst = callback.bot
-    await auto_post_movie_to_channel(bot_inst, movie_id, file_id, formatted_caption)
+    asyncio.create_task(auto_post_movie_to_channel(bot_inst, movie_id, file_id, formatted_caption))
     total_movies = await db_req.get_total_movies_count()
     next_free = await db_req.get_next_available_movie_id()
     

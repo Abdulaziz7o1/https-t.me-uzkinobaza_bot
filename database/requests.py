@@ -257,14 +257,32 @@ async def add_movie_with_id(movie_id: int, file_id: str, caption: str, is_premiu
             (movie_id, file_id, caption, is_premium_only)
         )
         await db.commit()
+        _MOVIE_MEMORY_CACHE[movie_id] = (file_id, caption, 0, is_premium_only)
         cache.delete(f"movie_{movie_id}")
     await export_master_backup_json()
     return True
 
+_MOVIE_MEMORY_CACHE: dict[int, tuple] = {}
+
+async def _update_movie_views_bg(movie_id: int, user_id: int, current_views: int):
+    try:
+        async with get_db() as db:
+            async with db.execute("SELECT 1 FROM movie_unique_downloads WHERE user_id = ? AND movie_id = ?", (user_id, movie_id)) as cursor:
+                has_downloaded = await cursor.fetchone()
+            if not has_downloaded:
+                await db.execute("INSERT OR IGNORE INTO movie_unique_downloads (user_id, movie_id) VALUES (?, ?)", (user_id, movie_id))
+                await db.execute("UPDATE movies SET views_count = COALESCE(views_count, 0) + 1 WHERE id = ?", (movie_id,))
+                await db.commit()
+    except Exception:
+        pass
+
 async def get_movie(movie_id: int, user_id: int = None):
-    """Kino ma'lumotlarini bazadan olish (file_id, caption, views_count, is_premium_only)"""
-    from database.connection import cache
-    cache.delete(f"movie_{movie_id}")
+    """Kino ma'lumotlarini ultra-tezkor xotiradan yoki bazadan olish"""
+    cached = _MOVIE_MEMORY_CACHE.get(movie_id)
+    if cached:
+        if user_id is not None:
+            asyncio.create_task(_update_movie_views_bg(movie_id, user_id, cached[2]))
+        return cached
 
     async with get_db() as db:
         async with db.execute("SELECT file_id, caption, views_count, COALESCE(is_premium_only, 0) FROM movies WHERE id = ?", (movie_id,)) as cursor:
@@ -272,22 +290,11 @@ async def get_movie(movie_id: int, user_id: int = None):
         if movie:
             current_views = movie[2] or 0
             is_prem_only = movie[3] or 0
-            new_views = current_views
-
+            res = (movie[0], movie[1], current_views, is_prem_only)
+            _MOVIE_MEMORY_CACHE[movie_id] = res
             if user_id is not None:
-                # User allaqachon shu kinoni ilgari yuklab olganmi?
-                async with db.execute("SELECT 1 FROM movie_unique_downloads WHERE user_id = ? AND movie_id = ?", (user_id, movie_id)) as cursor:
-                    has_downloaded = await cursor.fetchone()
-                
-                if not has_downloaded:
-                    # Birinchi marta yuklayapti -> +1 oshiramiz
-                    await db.execute("INSERT OR IGNORE INTO movie_unique_downloads (user_id, movie_id) VALUES (?, ?)", (user_id, movie_id))
-                    async with db.execute("SELECT COUNT(*) FROM movie_unique_downloads WHERE movie_id = ?", (movie_id,)) as cursor:
-                        cnt_row = await cursor.fetchone()
-                        new_views = cnt_row[0] if cnt_row else current_views + 1
-                    await db.execute("UPDATE movies SET views_count = ? WHERE id = ?", (new_views, movie_id))
-                    await db.commit()
-            return (movie[0], movie[1], new_views, is_prem_only)
+                asyncio.create_task(_update_movie_views_bg(movie_id, user_id, current_views))
+            return res
         return None
 
 async def delete_movie(movie_id: int):
@@ -295,6 +302,7 @@ async def delete_movie(movie_id: int):
     from database.connection import cache
     cache.delete(f"movie_{movie_id}")
 
+    _MOVIE_MEMORY_CACHE.pop(movie_id, None)
     caption = ""
     async with get_db() as db:
         async with db.execute("SELECT file_id, caption, views_count, COALESCE(is_premium_only, 0) FROM movies WHERE id = ?", (movie_id,)) as cursor:
@@ -1422,6 +1430,7 @@ async def update_movie_caption(movie_id: int, caption: str) -> bool:
             (caption, movie_id)
         )
         await db.commit()
+        _MOVIE_MEMORY_CACHE.pop(movie_id, None)
         return True
 
 async def update_movie_video(movie_id: int, file_id: str) -> bool:
@@ -1435,6 +1444,7 @@ async def update_movie_video(movie_id: int, file_id: str) -> bool:
             (file_id, movie_id)
         )
         await db.commit()
+        _MOVIE_MEMORY_CACHE.pop(movie_id, None)
         return True
 
 
