@@ -1,3 +1,4 @@
+import re
 import random
 import asyncio
 import logging
@@ -402,8 +403,8 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
         await message.answer(with_footer("🛠 <b>Botda texnik ishlar olib borilmoqda. Qisqa vaqtdan so'ng qayta urinib ko'ring!</b>"), parse_mode='HTML')
         return
 
-    # Anti-Scraping / Ketma-ket soxta bot so'rovlarini to'xtatish (Admin 15)
-    if not db_req.check_anti_scraping_guard(user_id):
+    # Anti-Scraping / Ketma-ket soxta bot so'rovlarini to'xtatish (Adminlar ozod)
+    if user_id not in config.ADMINS and not db_req.check_anti_scraping_guard(user_id):
         await message.answer(with_footer("⚠️ <b>Iltimos, biroz sekinroq so'rov yuboring! (Anti-Spam himoyasi)</b>"), parse_mode='HTML')
         return
 
