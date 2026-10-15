@@ -251,11 +251,18 @@ class AntiFloodMiddleware(BaseMiddleware):
             
         user_id = event.from_user.id
         
-        # Bosh admin va Moderatorlar Anti-Flood cheklovidan 100% ozod qilinadi
+        # Bosh admin va Moderatorlar Anti-Flood cheklovidan 100% ozod qilinadi (Hech qachon spam hisoblanmaydi)
         user_id_int = int(user_id)
         admin_ids = [int(a) for a in config.ADMINS]
         if user_id_int in admin_ids:
             return await handler(event, data)
+        try:
+            from database.requests import get_all_admins
+            db_admins = [int(a) for a in await get_all_admins()]
+            if user_id_int in db_admins:
+                return await handler(event, data)
+        except Exception:
+            pass
             
         import time
         now = time.time()

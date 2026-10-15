@@ -6,6 +6,16 @@ from database import requests as db_req
 async def send_abuse_alert(bot: Bot, user_id: int, alert_type: str, details: str):
     """Shubhali harakat sodir bo'lganda bosh adminlarga tezkor ogohlantirish yuborish"""
     try:
+        # Adminlar hech qachon alert bermaydi va spam hisoblanmaydi
+        if int(user_id) in [int(a) for a in config.ADMINS]:
+            return
+        try:
+            db_admins = await db_req.get_all_admins()
+            if int(user_id) in [int(a) for a in db_admins]:
+                return
+        except Exception:
+            pass
+
         # DB journalga ham yozish
         await db_req.add_abuse_log(user_id, alert_type, details)
         

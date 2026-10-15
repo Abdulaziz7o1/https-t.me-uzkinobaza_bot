@@ -4161,7 +4161,13 @@ async def set_vip_cashback_percent(pct: int):
 _USER_SEARCH_TIMESTAMPS = {}
 
 def check_anti_scraping_guard(user_id: int) -> bool:
-    """Agar 1 soniyada 3 tadan ko'p so'rov yuborsa bloklaydi"""
+    """Agar 1 soniyada 3 tadan ko'p so'rov yuborsa bloklaydi (Adminlar 100% ozod)"""
+    import config
+    try:
+        if int(user_id) in [int(a) for a in config.ADMINS]:
+            return True
+    except Exception:
+        pass
     import time
     now = time.time()
     stamps = _USER_SEARCH_TIMESTAMPS.get(user_id, [])

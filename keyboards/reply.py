@@ -101,7 +101,7 @@ def make_kb_btn(text: str, custom_emoji_id: str = None, emoji_char: str = None, 
 
 
 def get_admin_menu():
-    """Bosh Adminlar uchun to'liq premium boshqaruv menyusi (faqat toza matn va premium animatsiyali belgi)"""
+    """Bosh Adminlar uchun ixcham, professional premium boshqaruv menyusi"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -125,72 +125,27 @@ def get_admin_menu():
                 make_kb_btn("Zaxira (Backup)")
             ],
             [
-                make_kb_btn("Moderatorlar"),
-                make_kb_btn("Moderatorlarni boshqarish")
-            ],
-            [
-                make_kb_btn("Kino Trendlari")
-            ],
-            [
-                make_kb_btn("Ballar"),
-                make_kb_btn("Mannual Premium Qo'shish")
-            ],
-            [
-                make_kb_btn("Shubhali harakatlar"),
-                make_kb_btn("Keshni tozalash")
-            ],
-            [
-                make_kb_btn("Ommaviy yuklash"),
-                make_kb_btn("Sozlamalar")
-            ],
-            [
-                make_kb_btn("Izohlar moderatsiyasi"),
-                make_kb_btn("Bloklanganlar")
+                make_kb_btn("Foydalanuvchi Qidirish"),
+                make_kb_btn("Barcha Foydalanuvchilar")
             ],
             [
                 make_kb_btn("Premium Obunachilar"),
-                make_kb_btn("Card")
-            ],
-            [
-                make_kb_btn("Limit"),
                 make_kb_btn("Kassa")
             ],
             [
+                make_kb_btn("Card"),
                 make_kb_btn("Promo Kodlar")
             ],
             [
-                make_kb_btn("Audit Log"),
-                make_kb_btn("Faollik Tahlili")
-            ],
-            [
-                make_kb_btn("Yuborilgan reklamalar"),
-                make_kb_btn("Bot Rejimi")
-            ],
-            [
-                make_kb_btn("Nofaollarga Eslatma"),
-                make_kb_btn("Premium Sozlamalar")
-            ],
-            [
-                make_kb_btn("Eng past baholi kinolar (75+)"),
-                make_kb_btn("Aktivlik Grafigi")
-            ],
-            [
                 make_kb_btn("Treyler Post Yuborish"),
+                make_kb_btn("Kolleksiyalar")
+            ],
+            [
+                make_kb_btn("Moderatorlar"),
                 make_kb_btn("Savat (3 kunlik)")
             ],
             [
-                make_kb_btn("Barcha Foydalanuvchilar"),
-                make_kb_btn("Botni Bloklaganlar")
-            ],
-            [
-                make_kb_btn("Barcha Kanallarga Obuna Bo'lganlar"),
-                make_kb_btn("Foydalanuvchi Qidirish")
-            ],
-            [
-                make_kb_btn("Kolleksiyalar"),
-                make_kb_btn("Dashboard")
-            ],
-            [
+                make_kb_btn("Sozlamalar"),
                 make_kb_btn("Premium Emojilar")
             ]
         ],
@@ -260,42 +215,31 @@ def get_moderator_menu(permissions: dict = None):
 
 
 def get_user_menu():
-    """Oddiy foydalanuvchilar uchun toza matnli va premium animatsiyali menyu"""
+    """Oddiy foydalanuvchilar uchun ixcham va professional premium menyu"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                make_kb_btn("VIP Premium"),
-                make_kb_btn("Kino qidirish")
+                make_kb_btn("Kino qidirish"),
+                make_kb_btn("VIP Premium")
             ],
             [
-                make_kb_btn("Menga mos kinolar"),
-                make_kb_btn("Saqlanganlar")
-            ],
-            [
-                make_kb_btn("Tarixim"),
+                make_kb_btn("TOP Kinolar"),
                 make_kb_btn("Tasodifiy Kino")
             ],
             [
+                make_kb_btn("Saqlanganlar"),
+                make_kb_btn("Tarixim")
+            ],
+            [
                 make_kb_btn("Kino so'rash"),
+                make_kb_btn("Kunlik Bonus")
+            ],
+            [
+                make_kb_btn("Reytinglar"),
                 make_kb_btn("Mening Ballarim")
             ],
             [
-                make_kb_btn("Kunlik Bonus"),
-                make_kb_btn("Reytinglar")
-            ],
-            [
-                make_kb_btn("Kino so'rovlari")
-            ],
-            [
                 make_kb_btn("Profilim"),
-                make_kb_btn("TOP Kinolar")
-            ],
-            [
-                make_kb_btn("To'lovlarim"),
-                make_kb_btn("Tug'ilgan Kun")
-            ],
-            [
-                make_kb_btn("Sozlamalar"),
                 make_kb_btn("Yordam / Murojaat")
             ]
         ],

@@ -403,8 +403,16 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
         await message.answer(with_footer("🛠 <b>Botda texnik ishlar olib borilmoqda. Qisqa vaqtdan so'ng qayta urinib ko'ring!</b>"), parse_mode='HTML')
         return
 
-    # Anti-Scraping / Ketma-ket soxta bot so'rovlarini to'xtatish (Adminlar ozod)
-    if user_id not in config.ADMINS and not db_req.check_anti_scraping_guard(user_id):
+    # Anti-Scraping / Ketma-ket soxta bot so'rovlarini to'xtatish (Adminlar 100% ozod, spam ogohlantirish berilmaydi)
+    is_admin_check = user_id in config.ADMINS
+    if not is_admin_check:
+        try:
+            db_adms = await db_req.get_all_admins()
+            is_admin_check = user_id in [int(a) for a in db_adms]
+        except Exception:
+            pass
+
+    if not is_admin_check and not db_req.check_anti_scraping_guard(user_id):
         await message.answer(with_footer("⚠️ <b>Iltimos, biroz sekinroq so'rov yuboring! (Anti-Spam himoyasi)</b>"), parse_mode='HTML')
         return
 
