@@ -101,7 +101,7 @@ def make_kb_btn(text: str, custom_emoji_id: str = None, emoji_char: str = None, 
 
 
 def get_admin_menu():
-    """Bosh Adminlar uchun ixcham, professional premium boshqaruv menyusi"""
+    """Bosh Adminlar uchun to'liq premium boshqaruv menyusi"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -129,6 +129,14 @@ def get_admin_menu():
                 make_kb_btn("Barcha Foydalanuvchilar")
             ],
             [
+                make_kb_btn("Barcha Kanallarga Obuna Bo'lganlar"),
+                make_kb_btn("Botni Bloklaganlar")
+            ],
+            [
+                make_kb_btn("Moderatorlar"),
+                make_kb_btn("Moderatorlarni boshqarish")
+            ],
+            [
                 make_kb_btn("Premium Obunachilar"),
                 make_kb_btn("Kassa")
             ],
@@ -141,8 +149,8 @@ def get_admin_menu():
                 make_kb_btn("Kolleksiyalar")
             ],
             [
-                make_kb_btn("Moderatorlar"),
-                make_kb_btn("Savat (3 kunlik)")
+                make_kb_btn("Savat (3 kunlik)"),
+                make_kb_btn("Bot Rejimi")
             ],
             [
                 make_kb_btn("Sozlamalar"),

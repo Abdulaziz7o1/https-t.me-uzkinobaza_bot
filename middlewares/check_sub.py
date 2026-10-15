@@ -220,8 +220,8 @@ class StateCancelMiddleware(BaseMiddleware):
                             "sozlamalar", "profilim", "top kinolar", "tug'ilgan kun", "yordam", "murojaat",
                             "kino qo'shish", "kino o'chirish", "kino tahrirlash", "statistika", "reklama",
                             "kassa", "audit", "tahlili", "bot rejimi", "nofaollarga", "promo", "zaxira",
-                            "moderatorlar", "trendlari", "shubhali", "keshni", "ommaviy", "bloklaganlar",
-                            "botni bloklaganlar", "barcha foydalanuvchilar"
+                            "moderatorlar", "moderatorlarni boshqarish", "trendlari", "shubhali", "keshni", "ommaviy", "bloklaganlar",
+                            "botni bloklaganlar", "barcha foydalanuvchilar", "barcha kanallarga"
                         ]
                         exact_cancel_cmds = ["/start", "/cancel", "/help", "/stop", "start", "cancel", "bekor qilish ❌", "bekor qilish"]
                         if text_clean in exact_cancel_cmds or any(kw in text_clean for kw in menu_keywords):
