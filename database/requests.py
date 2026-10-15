@@ -662,7 +662,16 @@ async def save_telegram_backup_file_id(file_id: str):
             db_m = client["kino_bot_database"]
             await db_m["backup_info"].replace_one({"_id": "telegram_backup"}, {"_id": "telegram_backup", "file_id": file_id}, upsert=True)
     except Exception as e:
-        print(f"save_telegram_backup_file_id error: {e}")
+        safe_print(f"save_telegram_backup_file_id error: {e}")
+
+def safe_print(msg: str):
+    try:
+        print(msg)
+    except Exception:
+        try:
+            print(msg.encode('ascii', 'ignore').decode('ascii'))
+        except Exception:
+            pass
 
 async def sync_master_backup_to_mongodb(master_data: dict):
     """MongoDB Cloud'ga barcha 15 ta jadvalni va har bir kinoni alohida hujjat sifatida avtomatik zaxiralash"""
@@ -780,9 +789,9 @@ async def sync_master_backup_to_mongodb(master_data: dict):
             "updated_at": os.getenv("TZ", "Asia/Tashkent")
         }
         await collection.replace_one({"_id": "latest_master_backup"}, doc, upsert=True)
-        print("MongoDB Cloud: Barcha kinolar, homiy kanallar, karta raqamlari, sozlamalar va FOYDALANUVCHILAR Bulutli bazaga (MongoDB Atlas) 100% saqlandi! ☁️👥🚀")
+        safe_print("MongoDB Cloud: Barcha kinolar, homiy kanallar, karta raqamlari, sozlamalar va FOYDALANUVCHILAR Bulutli bazaga (MongoDB Atlas) 100% saqlandi! ☁️👥🚀")
     except Exception as e:
-        print(f"MongoDB Cloud sync error: {e}")
+        safe_print(f"MongoDB Cloud sync error: {e}")
 
 async def restore_from_mongodb_cloud() -> bool:
     """MongoDB Cloud'dan (movies, users, sponsor_channels, settings va master_backups) 100% tiklash (3 marta qayta urinish bilan)"""
@@ -810,10 +819,10 @@ async def restore_from_mongodb_cloud() -> bool:
                     import json
                     master_json = json.dumps(doc["data"], ensure_ascii=False)
                     res = await import_master_backup_json(master_json)
-                    print(f"MongoDB Cloud (Master): Bulutdan barcha ma'lumotlar tiklandi: {res}")
+                    safe_print(f"MongoDB Cloud (Master): Bulutdan barcha ma'lumotlar tiklandi: {res}")
                     restored = True
             except Exception as e:
-                print(f"MongoDB Cloud master restore error: {e}")
+                safe_print(f"MongoDB Cloud master restore error: {e}")
 
             # 2. Har bir kinoni 'movies' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
             try:
@@ -834,10 +843,10 @@ async def restore_from_mongodb_cloud() -> bool:
                             m_count += 1
                     await local_db.commit()
                 if m_count > 0:
-                    print(f"MongoDB Cloud (Movies Collection): {m_count} ta kino to'g'ridan-to'g'ri bulutdan tiklandi! ☁️🎬")
+                    safe_print(f"MongoDB Cloud (Movies Collection): {m_count} ta kino to'g'ridan-to'g'ri bulutdan tiklandi! ☁️🎬")
                     restored = True
             except Exception as e:
-                print(f"MongoDB Cloud movies collection restore error: {e}")
+                safe_print(f"MongoDB Cloud movies collection restore error: {e}")
 
             # 3. Homiy kanallarni 'sponsor_channels' kolleksiyasidan to'g'ridan-to'g'ri tiklash
             try:
@@ -856,10 +865,10 @@ async def restore_from_mongodb_cloud() -> bool:
                             sp_count += 1
                     await local_db.commit()
                 if sp_count > 0:
-                    print(f"MongoDB Cloud (Sponsors Collection): {sp_count} ta homiy kanal tiklandi! 📢")
+                    safe_print(f"MongoDB Cloud (Sponsors Collection): {sp_count} ta homiy kanal tiklandi! 📢")
                     restored = True
             except Exception as e:
-                print(f"MongoDB Cloud sponsor_channels restore error: {e}")
+                safe_print(f"MongoDB Cloud sponsor_channels restore error: {e}")
 
             # 4. Karta va sozlamalarni 'settings' kolleksiyasidan to'g'ridan-to'g'ri tiklash
             try:
@@ -877,10 +886,10 @@ async def restore_from_mongodb_cloud() -> bool:
                             st_count += 1
                     await local_db.commit()
                 if st_count > 0:
-                    print(f"MongoDB Cloud (Settings Collection): {st_count} ta sozlama va karta tiklandi! 💳⚙️")
+                    safe_print(f"MongoDB Cloud (Settings Collection): {st_count} ta sozlama va karta tiklandi! 💳⚙️")
                     restored = True
             except Exception as e:
-                print(f"MongoDB Cloud settings restore error: {e}")
+                safe_print(f"MongoDB Cloud settings restore error: {e}")
 
             # 5. Foydalanuvchilarni 'users' kolleksiyasidan to'g'ridan-to'g'ri tiklash (zaxira kafolati)
             try:
@@ -919,15 +928,15 @@ async def restore_from_mongodb_cloud() -> bool:
                             u_count += 1
                     await local_db.commit()
                 if u_count > 0:
-                    print(f"MongoDB Cloud (Users Collection): {u_count} ta foydalanuvchi to'g'ridan-to'g'ri bulutdan tiklandi! 👥☁️")
+                    safe_print(f"MongoDB Cloud (Users Collection): {u_count} ta foydalanuvchi to'g'ridan-to'g'ri bulutdan tiklandi! 👥☁️")
                     restored = True
             except Exception as e:
-                print(f"MongoDB Cloud users restore error: {e}")
+                safe_print(f"MongoDB Cloud users restore error: {e}")
 
             if restored:
                 return True
         except Exception as e:
-            print(f"MongoDB Cloud connection error (attempt {attempt}/3): {e}")
+            safe_print(f"MongoDB Cloud connection error (attempt {attempt}/3): {e}")
             if attempt < 3:
                 await asyncio.sleep(2)
 
@@ -940,7 +949,7 @@ async def restore_master_backup_on_startup():
     # 1. Avval MongoDB Bulutli bazasini tekshiramiz
     restored_mongo = await restore_from_mongodb_cloud()
     if restored_mongo:
-        print("MongoDB Cloud orqali barcha kinolar va ma'lumotlar tiklandi! Eskirgan disk fayllari bilan qayta yozilmaydi. ☁️✅")
+        safe_print("MongoDB Cloud orqali barcha kinolar va ma'lumotlar tiklandi! Eskirgan disk fayllari bilan qayta yozilmaydi. ☁️✅")
         return
         
     candidate_paths = [

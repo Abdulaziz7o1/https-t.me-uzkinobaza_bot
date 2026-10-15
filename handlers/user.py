@@ -483,10 +483,21 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
     asyncio.create_task(_movie_watched_extra(user_id, caption))
     asyncio.create_task(suggest_similar_movies(message, movie_id, caption or ""))
 
-    # Parallel ma'lumotlarni qabul qilish
-    (avg_rating, votes), is_fav, (likes, dislikes, fires), trailer_file_id = await asyncio.gather(
-        rating_task, fav_task, reactions_task, trailer_task
+    # Parallel ma'lumotlarni xavfsiz qabul qilish (hech qachon xato bermasligi uchun)
+    results = await asyncio.gather(
+        rating_task, fav_task, reactions_task, trailer_task,
+        return_exceptions=True
     )
+    
+    r_val = results[0] if len(results) > 0 and not isinstance(results[0], Exception) else (0.0, 0)
+    avg_rating, votes = r_val if isinstance(r_val, (tuple, list)) and len(r_val) == 2 else (0.0, 0)
+    
+    is_fav = results[1] if len(results) > 1 and not isinstance(results[1], Exception) else False
+    
+    re_val = results[2] if len(results) > 2 and not isinstance(results[2], Exception) else (0, 0, 0)
+    likes, dislikes, fires = re_val if isinstance(re_val, (tuple, list)) and len(re_val) == 3 else (0, 0, 0)
+    
+    trailer_file_id = results[3] if len(results) > 3 and not isinstance(results[3], Exception) else None
     has_trailer = bool(trailer_file_id)
 
     rating_stars = '⭐' * round(avg_rating) if avg_rating else ''
@@ -499,26 +510,26 @@ async def search_movie_by_code(message: Message, state: FSMContext = None):
 
     action_kb = get_movie_action_keyboard(movie_id, is_fav, avg_rating, likes, dislikes, fires, has_trailer=has_trailer)
 
-    # Kinoni eng tezkor yuborish
-    try:
-        await message.answer_video(
-            video=file_id,
-            caption=with_footer(cap),
-            parse_mode='HTML',
-            protect_content=True,
-            reply_markup=action_kb
-        )
-    except Exception:
+    # Kinoni eng tezkor va ishonchli yuborish (Video -> Document -> Plain text ko'p bosqichli fallback)
+    delivered = False
+    delivery_attempts = [
+        lambda: message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', protect_content=True, reply_markup=action_kb),
+        lambda: message.answer_video(video=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=action_kb),
+        lambda: message.answer_video(video=file_id, caption=cap, reply_markup=action_kb),
+        lambda: message.answer_document(document=file_id, caption=with_footer(cap), parse_mode='HTML', reply_markup=action_kb),
+        lambda: message.answer_document(document=file_id, caption=cap, reply_markup=action_kb)
+    ]
+    for attempt_fn in delivery_attempts:
         try:
-            await message.answer_video(
-                video=file_id,
-                caption=with_footer(cap),
-                parse_mode='HTML',
-                reply_markup=action_kb
-            )
-        except Exception as e:
-            logging.error(f"Movie delivery error for {movie_id}: {e}")
-            await message.answer(with_footer(f"⚠️ <b>/{movie_id} kodli kino faylini yuborishda xatolik yuz berdi.</b>\n\nIltimos, adminga murojaat qiling."), parse_mode='HTML')
+            await attempt_fn()
+            delivered = True
+            break
+        except Exception as send_err:
+            logging.warning(f"Delivery attempt failed for movie {movie_id}: {send_err}")
+            continue
+
+    if not delivered:
+        await message.answer(with_footer(f"⚠️ <b>/{movie_id} kodli kino faylini yuborishda xatolik yuz berdi.</b>\n\nIltimos, adminga murojaat qiling."), parse_mode='HTML')
 
 @router.callback_query(F.data.startswith('react_'))
 async def movie_reaction_cb(callback: CallbackQuery):

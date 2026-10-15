@@ -425,9 +425,14 @@ async def init_db():
                 start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 end_date TIMESTAMP,
                 plan TEXT,
+                status TEXT DEFAULT 'active',
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
+        try:
+            await db.execute("ALTER TABLE premium_subscriptions ADD COLUMN status TEXT DEFAULT 'active';")
+        except Exception:
+            pass
 
         # Kunlik kino limiti jadvali
         await db.execute("""
