@@ -1159,9 +1159,11 @@ async def restore_sponsor_channels_backup_on_startup():
         print(f"Sponsor channels backup tiklashda xato: {e}")
 
 async def get_sponsor_channels() -> list:
-    """Hamkor kanallar ID ro'yxatini olish"""
+    """Hamkor kanallar ID ro'yxatini olish (o'chirilgan kanallarni filtrlaydi)"""
     async with get_db() as db:
-        async with db.execute("SELECT id, channel_id, channel_name FROM sponsor_channels") as cursor:
+        async with db.execute(
+            "SELECT id, channel_id, channel_name FROM sponsor_channels WHERE channel_id NOT LIKE '%qalb%' AND channel_id NOT LIKE '%madrid%' AND channel_name NOT LIKE '%qalb%' AND channel_name NOT LIKE '%madrid%'"
+        ) as cursor:
             return await cursor.fetchall()
 
 def normalize_channel_identifier(channel_id):

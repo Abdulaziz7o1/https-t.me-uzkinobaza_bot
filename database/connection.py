@@ -215,6 +215,13 @@ async def init_db():
         except Exception:
             pass
         
+        # Eski o'chirilgan homiy kanallarni bazadan tozalash (MadridPrimee, Qalb Ko'zgusi)
+        try:
+            await db.execute("DELETE FROM sponsor_channels WHERE channel_id LIKE '%qalb%' OR channel_id LIKE '%madrid%' OR channel_name LIKE '%qalb%' OR channel_name LIKE '%madrid%'")
+            await db.commit()
+        except Exception:
+            pass
+        
         # Moderator permissions jadvali
         await db.execute("""
             CREATE TABLE IF NOT EXISTS moderator_permissions (

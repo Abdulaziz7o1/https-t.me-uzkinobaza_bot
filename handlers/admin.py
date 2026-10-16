@@ -5167,9 +5167,14 @@ async def get_all_channels_subscribed_users(bot, force_refresh: bool = False):
     db_channels = await db_req.get_sponsor_channels()
     formatted_channels = []
     for ch in config.CHANNELS:
-        formatted_channels.append((ch, ch))
+        ch_s = str(ch).lower()
+        if "madrid" not in ch_s and "qalb" not in ch_s:
+            formatted_channels.append((ch, ch))
     for db_ch in db_channels:
-        formatted_channels.append((db_ch[1], db_ch[2] or db_ch[1]))
+        ch_id_str = str(db_ch[1]).lower()
+        ch_name_str = str(db_ch[2] or '').lower()
+        if "madrid" not in ch_id_str and "madrid" not in ch_name_str and "qalb" not in ch_id_str and "qalb" not in ch_name_str:
+            formatted_channels.append((db_ch[1], db_ch[2] or db_ch[1]))
 
     if not formatted_channels:
         return [], 0, []
@@ -5339,7 +5344,7 @@ async def show_all_sub_users_handler(message: Message, state: FSMContext):
         with_footer("🔄 <b>Barcha foydalanuvchilarning homiy kanallarga a'zoligi tekshirilmoqda...</b>\n\n<i>Biroz kuting...</i>"),
         parse_mode='HTML'
     )
-    await render_sub_users_page(loading_msg, message.bot, page=1, is_edit=True, force_refresh=False)
+    await render_sub_users_page(loading_msg, message.bot, page=1, is_edit=True, force_refresh=True)
 
 
 @router.callback_query(F.data.startswith('sub_users_page_'))
