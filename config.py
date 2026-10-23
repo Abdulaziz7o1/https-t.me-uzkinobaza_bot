@@ -26,7 +26,7 @@ if channels_raw:
                 CHANNELS.append(channel)
 
 # Bot usernamesi (captionlarda ko'rsatish uchun)
-BOT_USERNAME = os.getenv("BOT_USERNAME", "@uzkinobaza_bot")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "@kino7_robot")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "@Abdulaziz7o1")
 
 _clean_admin = ADMIN_USERNAME.lstrip('@')
