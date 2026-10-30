@@ -74,7 +74,7 @@ class WatermarkProcessor:
             logger.error(f"Watermark processing error: {e}")
             return video_path
 
-    async def add_text_watermark(self, video_path: str, text: str = "@uzkinobaza_bot", output_path: str = None) -> str:
+    async def add_text_watermark(self, video_path: str, text: str = "@kino7_robot", output_path: str = None) -> str:
         """
         Add text watermark to video using FFmpeg
 
@@ -133,7 +133,7 @@ class WatermarkProcessor:
 watermark_processor = WatermarkProcessor()
 
 
-async def process_video_with_watermark(video_file: bytes, text: str = "@uzkinobaza_bot") -> bytes:
+async def process_video_with_watermark(video_file: bytes, text: str = "@kino7_robot") -> bytes:
     """
     Process video file with watermark
 

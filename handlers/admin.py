@@ -312,6 +312,18 @@ async def admin_direct_video_handler(message: Message, state: FSMContext):
     file_id = message.video.file_id if message.video else message.document.file_id if message.document else message.animation.file_id if message.animation else message.video_note.file_id
     raw_caption = (message.caption or '').strip()
     import re
+    restore_match = re.search(r'(?i)Kino\s*(\d+)', raw_caption)
+    if restore_match:
+        target_mid = int(restore_match.group(1))
+        exists = await db_req.movie_exists_db(target_mid)
+        if exists:
+            await db_req.update_movie_video(target_mid, file_id)
+            try:
+                await db_req.export_master_backup_json()
+            except Exception:
+                pass
+            await message.answer(f'✅ <b>Kino /{target_mid} muvaffaqiyatli yangi botga biriktirildi!</b> 🍿\n<i>Foydalanuvchilar endi /{target_mid} ni tomosha qila oladilar.</i>', parse_mode='HTML')
+            return
     code_match = re.match('^(\\d+)\\s*[-:]?\\s*(.*)$', raw_caption, re.DOTALL)
     if code_match:
         target_id = int(code_match.group(1))
@@ -3183,7 +3195,7 @@ async def admin_set_watermark_cmd(message: Message, state: FSMContext):
     else:
         current_wm = await db_req.get_setting('custom_watermark_text')
         disp = current_wm if current_wm else f'🎬 <b>@{config.BOT_USERNAME} — Eng sara kinolar bazasi 🍿</b>'
-        await message.answer(with_footer(f"🏷️ <b>KINO WATERMARK / CAPTION SOZLAMASI (FEATURE #10):</b>\n\n📌 <b>Hozirgi watermark matni:</b>\n{disp}\n\n💡 <i>Yangi watermark o'rnatish uchun buyruqdan foydalaning:</i>\n<code>/setwatermark 🎬 @uzkinobaza_bot — Rasmiy kino kanali 🍿</code>"), parse_mode='HTML')
+        await message.answer(with_footer(f"🏷️ <b>KINO WATERMARK / CAPTION SOZLAMASI (FEATURE #10):</b>\n\n📌 <b>Hozirgi watermark matni:</b>\n{disp}\n\n💡 <i>Yangi watermark o'rnatish uchun buyruqdan foydalaning:</i>\n<code>/setwatermark 🎬 {config.BOT_USERNAME} — Rasmiy kino kanali 🍿</code>"), parse_mode='HTML')
 
 @router.message(Command('gift'))
 async def admin_gift_points_cmd(message: Message):
@@ -3773,9 +3785,10 @@ async def process_backup_channel_input(message: Message, state: FSMContext):
         return
 
     try:
+        clean_bot_tag = config.BOT_USERNAME.lstrip('@')
         test_msg = await message.bot.send_message(
             chat_id=channel_id,
-            text=f"⚙️ <b>ZAXIRA KANALI TASDIQLANDI!</b>\n\nUshbu kanal `@uzkinobaza_bot` ning rasmiy Zaxira Bazasi sifatida biriktirildi. 🍿",
+            text=f"⚙️ <b>ZAXIRA KANALI TASDIQLANDI!</b>\n\nUshbu kanal <code>{config.BOT_USERNAME}</code> ning rasmiy Zaxira Bazasi sifatida biriktirildi. 🍿",
             parse_mode="HTML"
         )
         await db_req.set_backup_channel_id(channel_id)

@@ -581,7 +581,7 @@ async def search_movie_by_name(message: Message, state: FSMContext):
         response = f'🔍 <b>Qidirish natijalari: "{query}"</b>\n\n'
         for movie_id, caption in movies:
             first_line = caption.split('\n')[0] if caption else 'Nomsiz'
-            name_clean = first_line.replace('@uzkinobaza_bot', '').replace('—', '').replace('-', '').strip()
+            name_clean = first_line.replace('@uzkinobaza_bot', '').replace('@kino7_robot', '').replace(config.BOT_USERNAME, '').replace('—', '').replace('-', '').strip()
             name_to_show = name_clean if name_clean else 'Kino'
             response += f'🎬 <b>/{movie_id}</b> — {name_to_show} 🍿\n'
         response += "\n<i>Kinoni tomosha qilish uchun uning kodi (masalan /1) ustiga bosing!</i>"
@@ -1992,7 +1992,7 @@ async def search_movie_by_text(message: Message, state: FSMContext=None):
         for movie_id, caption in results:
             first_line = caption.split('\n')[0] if caption else 'Nomsiz'
             # Matndagi kanal/bot reklamalarini tozalash
-            name_clean = first_line.replace('@uzkinobaza_bot', '').replace('—', '').replace('-', '').strip()
+            name_clean = first_line.replace('@uzkinobaza_bot', '').replace('@kino7_robot', '').replace(config.BOT_USERNAME, '').replace('—', '').replace('-', '').strip()
             name_to_show = name_clean if name_clean else 'Kino'
             text += f"🎬 <b>/{movie_id}</b> — {name_to_show} 🍿\n"
         text += "\n<i>Kinoni tomosha qilish uchun uning kodi (masalan /1) ustiga bosing!</i>"

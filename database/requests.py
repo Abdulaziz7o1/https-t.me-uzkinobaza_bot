@@ -2458,7 +2458,8 @@ async def clean_and_format_caption_async(raw_caption: str) -> str:
     if not raw_caption:
         return wm_text
 
-    cleaned = re.sub(r'@(?!uzkinobaza_bot\b)[a-zA-Z0-9_]{5,}', '', raw_caption)
+    escaped_bot = re.escape(clean_bot_name)
+    cleaned = re.sub(rf'@(?!(?:{escaped_bot}|uzkinobaza_bot))[a-zA-Z0-9_]{5,}', '', raw_caption)
     cleaned = re.sub(r'https?://t\.me/\S+', '', cleaned).strip()
     # Takroriy brend sarlavhalarini tozalash
     cleaned = re.sub(r'🎬\s*<b>?@?' + re.escape(clean_bot_name) + r'[^<\n]*</b>?\s*🍿?', '', cleaned, flags=re.IGNORECASE)
@@ -2476,7 +2477,8 @@ def clean_and_format_caption(raw_caption: str) -> str:
     clean_bot_name = bot_tag.lstrip('@')
     if not raw_caption:
         return f"🎬 <b>Kino Bot:</b> {bot_tag}"
-    cleaned = re.sub(r'@(?!uzkinobaza_bot\b)[a-zA-Z0-9_]{5,}', '', raw_caption)
+    escaped_bot = re.escape(clean_bot_name)
+    cleaned = re.sub(rf'@(?!(?:{escaped_bot}|uzkinobaza_bot))[a-zA-Z0-9_]{5,}', '', raw_caption)
     cleaned = re.sub(r'https?://t\.me/\S+', '', cleaned).strip()
     # Takroriy brend sarlavhalarini tozalash
     cleaned = re.sub(r'🎬\s*<b>?@?' + re.escape(clean_bot_name) + r'[^<\n]*</b>?\s*🍿?', '', cleaned, flags=re.IGNORECASE)

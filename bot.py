@@ -2,6 +2,10 @@ import asyncio
 import logging
 import sys
 import os
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -430,6 +434,13 @@ async def restore_from_telegram_cloud(bot: Bot) -> bool:
 
 async def on_startup(bot: Bot):
     """Bot ishga tushganda bajariladigan amallar"""
+    try:
+        me = await bot.get_me()
+        if me.username:
+            config.BOT_USERNAME = f"@{me.username}"
+            logging.info(f"Bot Telegram'dan muvaffaqiyatli aniqlandi: {config.BOT_USERNAME} ({me.first_name})")
+    except Exception as e:
+        logging.warning(f"Bot ma'lumotlarini olishda ogohlantirish: {e}")
     logging.info("Bot ishga tushmoqda...")
     # Baza jadvallarini tekshirish/yaratish
     await init_db()

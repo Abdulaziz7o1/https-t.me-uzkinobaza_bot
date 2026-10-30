@@ -1,6 +1,6 @@
 services:
   - type: worker
-    name: uzkinobaza-bot
+    name: kino7-robot
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
@@ -10,4 +10,4 @@ services:
       - key: ADMINS
         sync: false
       - key: BOT_USERNAME
-        value: "@uzkinobaza_bot"
+        value: "@kino7_robot"
