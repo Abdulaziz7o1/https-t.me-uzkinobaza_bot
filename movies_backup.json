@@ -14,6 +14,55 @@
     "is_premium_only": 0
   },
   {
+    "id": 3,
+    "file_id": "BAACAgIAAxkBAAIZ3mp1gWyVInMgCfulaoFfE8fRexA9AAKZdQACUNiZS3zBNGV90uNZPQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Uch Qahramon | O'zbek Kino (HD)",
+    "views_count": 1,
+    "is_premium_only": 0
+  },
+  {
+    "id": 4,
+    "file_id": "BAACAgIAAxkBAAIZ42p1gXZXFjXPAxvVyPGPCzSQ9SSAAALxnQAC0jSRS_TaPPfUdQlWPQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Amerika Josus 2 | Tarjima Kino (HD)",
+    "views_count": 1,
+    "is_premium_only": 0
+  },
+  {
+    "id": 5,
+    "file_id": "BAACAgIAAxkBAAIbW2p60k2bTFOsU8_QZ-EuBzJrT3ePAAKmrwAC4g5ISqs1oDihpRt2PQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Maktab | O'zbek Kino (HD)",
+    "views_count": 1,
+    "is_premium_only": 0
+  },
+  {
+    "id": 6,
+    "file_id": "BAACAgIAAxkBAAIbdGp6-K9eyiskfDfKH7V5XDoaHfnXAAK_ogACyl_ASyLF_gSQzSG6PQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chempion | O'zbek Kino (HD)",
+    "views_count": 1,
+    "is_premium_only": 0
+  },
+  {
+    "id": 7,
+    "file_id": "BAACAgIAAxkBAAIbgWp6-p-7Ouh33XTtPTGidR1MOASFAAJalQACmMVJS1OtPZm8ZoATPQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Guvoh | O'zbek Kino (HD)",
+    "views_count": 1,
+    "is_premium_only": 0
+  },
+  {
+    "id": 8,
+    "file_id": "BAACAgIAAxkBAAIbhmp6-xyipF2A59jIze-KNWWRyuzSAAKjkQAC4HJYSUdf9S_-krV4PQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Qashshoq Millionerlar | O'zbek Kino (HD)",
+    "views_count": 1,
+    "is_premium_only": 0
+  },
+  {
+    "id": 9,
+    "file_id": "BAACAgIAAxkBAAIfw2qAMS4uM_w-elqJgG1XwXwj5UKmAAKCnAACPnJQSgvCVWfuk8BnPQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Kutilmagan Kelin | O'zbek Kino (HD)",
+    "views_count": 1,
+    "is_premium_only": 0
+  },
+  {
     "id": 10,
     "file_id": "BAACAgQAAxkBAAIiimqNDAuKrndS97f_kKhwl3tpflIJAAJwCgAChS6IUQSEzBWXy1_gPQQ",
     "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chegarasizlar 1  | O'zbek Kino (HD)",
@@ -38,7 +87,28 @@
     "id": 13,
     "file_id": "BAACAgEAAxkBAAIimGqNDEdneSc-VC0bitEZG_16CcNvAAKmHAACtOBYRXXl5uoZa3djPQQ",
     "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Chegarasizlar 4  | O'zbek Kino (HD)",
-    "views_count": 2,
+    "views_count": 3,
     "is_premium_only": 1
+  },
+  {
+    "id": 14,
+    "file_id": "BAACAgIAAxkBAAImNWqqa0ezcIPjh0dgoP2UOJ4f8bZBAAK9oQACijMBSSQqa1StRhlQPQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Xudo Asrasin | O'zbek Kino (HD)",
+    "views_count": 2,
+    "is_premium_only": 0
+  },
+  {
+    "id": 15,
+    "file_id": "BAACAgIAAxkBAAIqoWq8-75mKdD1-GvfbEXVwO5Pk80UAAJYmgACeQIoSpuLdxhNSAAB4T0E",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 PUL VA KO'NGIL | O'zbek Kino (HD)",
+    "views_count": 2,
+    "is_premium_only": 0
+  },
+  {
+    "id": 16,
+    "file_id": "BAACAgIAAxkBAAIuNGrQLRBlC8sJU43wbFyMbbbkc4r7AAJBqwACuwpgSaKFXdCPxKqSPQQ",
+    "caption": "🎬 <b>@uzkinobaza_bot — Eng sara kinolar 🍿</b>\n\n🎬 🔥 Lofchi Kelin | O'zbek Kino (HD)",
+    "views_count": 3,
+    "is_premium_only": 0
   }
 ]
